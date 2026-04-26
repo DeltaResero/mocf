@@ -64,6 +64,7 @@ include(CheckIncludeFile)
 include(CheckFunctionExists)
 include(CheckSymbolExists)
 include(CheckLibraryExists)
+include(TestBigEndian)
 include(GNUInstallDirs)
 
 # Set install directories
@@ -72,6 +73,7 @@ set(DECODER_PLUGIN_DIR "decoder_plugins")
 set(THEMES_DIR "${CMAKE_INSTALL_DATADIR}/mocf/themes")
 
 # Platform checks
+test_big_endian(WORDS_BIGENDIAN)
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
   add_compile_definitions(LINUX=1)
 elseif(CMAKE_SYSTEM_NAME MATCHES "OpenBSD")

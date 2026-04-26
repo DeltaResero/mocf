@@ -68,6 +68,7 @@
 
 /* Misc */
 #cmakedefine HAVE_NL_LANGINFO_CODESET 1
+#cmakedefine WORDS_BIGENDIAN 1
 
 /* Include standard integer types if available */
 #ifdef HAVE_STDINT_H
