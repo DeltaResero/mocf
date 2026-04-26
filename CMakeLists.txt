@@ -141,6 +141,7 @@ check_function_exists(sched_get_priority_max HAVE_SCHED_GET_PRIORITY_MAX)
 check_function_exists(syslog HAVE_SYSLOG)
 check_function_exists(strcasestr HAVE_STRCASESTR)
 check_function_exists(getrlimit HAVE_GETRLIMIT)
+check_function_exists(mmap HAVE_MMAP)
 
 # Clock checks
 check_library_exists(rt clock_gettime "" HAVE_CLOCK_GETTIME_IN_RT)
