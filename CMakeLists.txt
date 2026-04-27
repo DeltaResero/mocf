@@ -30,7 +30,7 @@ set(CMAKE_REQUIRED_DEFINITIONS "-D_GNU_SOURCE")
 # Options
 option(ENABLE_DEBUG "Enable debugging code" OFF)
 option(ENABLE_CACHE "Enable tags caching code" ON)
-option(ENABLE_INTERNAL_FLOAT "Enable internal float processing" OFF)
+option(ENABLE_INTERNAL_FLOAT "Enable internal float processing" ON)
 option(ENABLE_RCC "Enable LIBRCC support" ON)
 option(ENABLE_CURL "Enable network streams support" ON)
 option(ENABLE_SAMPLERATE "Enable libsamplerate" ON)

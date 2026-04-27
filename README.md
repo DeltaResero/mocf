@@ -65,7 +65,7 @@ You can configure the build by passing `-DOPTION=ON/OFF` to cmake.
 |--------|-------------|---------|
 | `ENABLE_DEBUG` | Enable debugging code | `OFF` |
 | `ENABLE_CACHE` | Enable tags caching code (requires BerkeleyDB) | `ON` |
-| `ENABLE_INTERNAL_FLOAT` | Use float for internal processing | `OFF` |
+| `ENABLE_INTERNAL_FLOAT` | Use float for internal processing | `ON` |
 | `ENABLE_RCC` | Enable LIBRCC support | `ON` |
 | `ENABLE_CURL` | Enable network streams support | `ON` |
 | `ENABLE_SAMPLERATE` | Enable libsamplerate | `ON` |
