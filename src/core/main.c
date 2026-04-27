@@ -1073,7 +1073,8 @@ static void override_config_option(const char *arg, lists_t_strs *deferred)
 {
   int len;
   bool append;
-  char *ptr, *name, *value;
+  const char *ptr;
+  char *name, *value;
   enum option_type type;
 
   assert(arg != NULL);
