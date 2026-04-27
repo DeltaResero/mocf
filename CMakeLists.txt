@@ -41,7 +41,7 @@ option(WITH_PULSE "Enable PulseAudio support" ON)
 option(WITH_OSS "Enable OSS support" ON)
 option(WITH_SNDIO "Enable SNDIO support" ON)
 option(WITH_ALSA "Enable ALSA support" ON)
-option(WITH_JACK "Enable JACK support" ON)
+option(WITH_JACK "Enable JACK support" OFF)
 
 # Decoder options
 option(WITH_MP3 "Enable MP3 support (libmad)" ON)
