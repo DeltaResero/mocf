@@ -765,7 +765,7 @@ void options_init()
   add_str("FormatString", "%(n:%n :)%(a:%a - :)%(t:%t:)%(A: \\(%A\\):)",
           CHECK_NONE);
   add_int("InputBuffer", 512, CHECK_RANGE(1), 32, INT_MAX);
-  add_int("OutputBuffer", 512, CHECK_RANGE(1), 128, INT_MAX);
+  add_int("OutputBuffer", 128, CHECK_RANGE(1), 128, INT_MAX);
   add_int("Prebuffering", 64, CHECK_RANGE(1), 0, INT_MAX);
   add_str("HTTPProxy", NULL, CHECK_NONE);
 
