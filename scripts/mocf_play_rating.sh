@@ -1,3 +1,0 @@
-#cd "$2"
-~/bin/ratings_find $1 "$2" > /tmp/pl.m3u
-mocf -cap /tmp/pl.m3u&

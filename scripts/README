@@ -1,6 +1,0 @@
-Helper scripts:
-
-[*] mocf_play_rating.sh, ratings_find - plays all songs in a given directory with ratings in a specified range
-
-Usage: ratings_find min [max] dir
-ExecCommand5 = "~/.mocf/mocf_play_rating.sh 5 %d"
