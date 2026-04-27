@@ -36,11 +36,24 @@ option(ENABLE_CURL "Enable network streams support" ON)
 option(ENABLE_SAMPLERATE "Enable libsamplerate" ON)
 option(ENABLE_MAGIC "Enable MIME magic support" ON)
 
+# OS-specific defaults for native audio backends
+set(DEFAULT_ALSA OFF)
+set(DEFAULT_OSS OFF)
+set(DEFAULT_SNDIO OFF)
+
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+  set(DEFAULT_ALSA ON)
+elseif(CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
+  set(DEFAULT_SNDIO ON)
+else() # FreeBSD, NetBSD, etc.
+  set(DEFAULT_OSS ON)
+endif()
+
 # Sound output options
-option(WITH_PULSE "Enable PulseAudio support" ON)
-option(WITH_OSS "Enable OSS support" ON)
-option(WITH_SNDIO "Enable SNDIO support" ON)
-option(WITH_ALSA "Enable ALSA support" ON)
+option(WITH_PULSE "Enable PulseAudio support" OFF)
+option(WITH_OSS "Enable OSS support" ${DEFAULT_OSS})
+option(WITH_SNDIO "Enable SNDIO support" ${DEFAULT_SNDIO})
+option(WITH_ALSA "Enable ALSA support" ${DEFAULT_ALSA})
 option(WITH_JACK "Enable JACK support" OFF)
 
 # Decoder options
