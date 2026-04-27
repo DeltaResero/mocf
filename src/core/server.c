@@ -47,7 +47,6 @@
 #include "library/files.h"
 #include "audio/processing/softmixer.h"
 #include "audio/processing/equalizer.h"
-#include "library/ratings.h"
 
 #define SERVER_LOG "mocf_server_log"
 #define PID_FILE "pid"
@@ -749,63 +748,6 @@ static int req_play(struct client *cli)
   logit("Playing %s", *file ? file : "first element on the list");
   audio_play(file);
   free(file);
-
-  return 1;
-}
-
-/* Handle CMD_SET_RATING, return 1 if ok or 0 on error. */
-static int req_set_rating(struct client *cli)
-{
-  char *file;
-  int rating;
-
-  if (!(file = get_str(cli->socket)))
-  {
-    return 0;
-  }
-  if (!get_int(cli->socket, &rating))
-  {
-    free(file);
-    return 0;
-  }
-
-  if (!*file)
-  {
-    free(file);
-    file = audio_get_sname();
-    if (!file)
-    {
-      return 0;
-    }
-    if (!*file)
-    {
-      free(file);
-      return 0;
-    }
-  }
-
-  logit("Rating %s %d/5", file, rating);
-
-  if (ratings_write_file(file, rating))
-  {
-    struct file_tags *tags;
-    struct tag_ev_response *data;
-
-    // TODO: is this enough?
-    tags = tags_cache_get_immediate(tags_cache, file, TAGS_RATING);
-
-    data = (struct tag_ev_response *)xmalloc(sizeof(struct tag_ev_response));
-    data->file = file;
-    data->tags = tags;
-
-    add_event_all(EV_FILE_TAGS, data);
-
-    free_tag_ev_data(data); /* frees file as well */
-  }
-  else
-  {
-    free(file);
-  }
 
   return 1;
 }
@@ -1829,12 +1771,6 @@ static void handle_command(const int client_id)
       break;
     case CMD_GET_QUEUE:
       if (!req_send_queue(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_SET_RATING:
-      if (!req_set_rating(cli))
       {
         err = 1;
       }

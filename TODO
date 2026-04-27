@@ -120,7 +120,6 @@ Future Wishlist (items marked with $ are bigger changes requiring more time):
 * Don't use PATH_MAX.
 * Seek forward using the content of the output buffer.
 *$ Locales.
-*$ Song ratings or something like Q in XMMS.
 * Configurable sorting.
 * Add a key for switching sort modes.
 *$ Equalizer like in Beep Media Player

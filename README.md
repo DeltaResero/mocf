@@ -17,7 +17,6 @@ built, saved, and exported as m3u files.
 *   Gapless playback via song precaching.
 *   Native PulseAudio backend and modern FFmpeg (> 4.0) support.
 *   Support for OSS, ALSA, SNDIO, and JACK output drivers.
-*   Integrated song rating system.
 *   Inotify support for automatic directory refreshing.
 *   Reworked audio formats with support for 32-bit samples and float processing.
 *   Simple software mixer and a cache for file tags.

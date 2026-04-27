@@ -27,10 +27,8 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <sys/socket.h>
-#include <sys/wait.h>
 #include <dirent.h>
 #include <sys/select.h>
-#include <libgen.h>
 
 #ifdef HAVE_SYS_INOTIFY_H
 #include <sys/inotify.h>
@@ -53,7 +51,6 @@
 #include "ui/themes.h"
 #include "audio/processing/softmixer.h"
 #include "utils/utf8.h"
-#include "library/ratings.h"
 
 #define INTERFACE_LOG "mocf_client_log"
 #define PLAYLIST_FILE "playlist.m3u"
@@ -649,10 +646,6 @@ static int get_tags_setting()
   {
     needed_tags |= TAGS_COMMENTS;
   }
-  if (options_get_bool("RatingShow"))
-  {
-    needed_tags |= TAGS_RATING;
-  }
   if (!strcasecmp(options_get_symb("ShowTime"), "yes"))
   {
     needed_tags |= TAGS_TIME;
@@ -1007,11 +1000,6 @@ static void event_plist_add(const struct plist_item *item)
     if (options_get_bool("ReadTags") && (!item->tags || !item->tags->title))
     {
       needed_tags |= TAGS_COMMENTS;
-    }
-    if (options_get_bool("RatingShow") &&
-        (!item->tags || !(item->tags->filled & TAGS_RATING)))
-    {
-      needed_tags |= TAGS_RATING;
     }
     if (!strcasecmp(options_get_symb("ShowTime"), "yes") &&
         (!item->tags || item->tags->time == -1))
@@ -2413,32 +2401,6 @@ static void reread_dir()
   }
 }
 
-static void set_rating(int r)
-{
-  assert(r >= 0 && r <= 5);
-
-  if (!options_get_bool("RatingShow"))
-  {
-    return;
-  }
-
-  if (iface_curritem_get_type() != F_SOUND)
-  {
-    return;
-  }
-  char *file = iface_get_curr_file();
-  if (!file)
-  {
-    return;
-  }
-
-  send_int_to_srv(CMD_SET_RATING);
-  send_str_to_srv(file);
-  send_int_to_srv(r);
-
-  free(file);
-}
-
 /* Clear the playlist on user request. */
 static void cmd_clear_playlist()
 {
@@ -3497,238 +3459,6 @@ static char *get_title(const char *file)
                      : plist->items[item_num].title_file);
 }
 
-/* Substitute arguments for custom command that begin with '%'.
- * The new value is returned. */
-static char *custom_cmd_substitute(const char *arg)
-{
-  char *result = NULL;
-  char *file = NULL;
-  struct file_tags *tags = NULL;
-
-  if (strlen(arg) == 2 && arg[0] == '%')
-  {
-    switch (arg[1])
-    {
-      case 'i':
-        file = iface_get_curr_file();
-        result = get_title(file);
-        break;
-      case 't':
-        file = iface_get_curr_file();
-        tags = get_tags(file);
-        result = xstrdup(tags->title);
-        break;
-      case 'a':
-        file = iface_get_curr_file();
-        tags = get_tags(file);
-        result = xstrdup(tags->album);
-        break;
-      case 'r':
-        file = iface_get_curr_file();
-        tags = get_tags(file);
-        result = xstrdup(tags->artist);
-        break;
-      case 'n':
-        file = iface_get_curr_file();
-        tags = get_tags(file);
-        result = (char *)xmalloc(sizeof(char) * 16);
-        snprintf(result, 16, "%d", tags->track);
-        break;
-      case 'm':
-        file = iface_get_curr_file();
-        tags = get_tags(file);
-        result = (char *)xmalloc(sizeof(char) * 16);
-        snprintf(result, 16, "%d", tags->time);
-        break;
-      case 'f':
-        result = iface_get_curr_file();
-        break;
-      case 'd':
-        result = xstrdup(cwd);
-        break;
-      case 'I':
-        result = xstrdup(curr_file.title);
-        break;
-      case 'T':
-        if (curr_file.tags && curr_file.tags->title)
-        {
-          result = xstrdup(curr_file.tags->title);
-        }
-        break;
-      case 'A':
-        if (curr_file.tags && curr_file.tags->album)
-        {
-          result = xstrdup(curr_file.tags->album);
-        }
-        break;
-      case 'R':
-        if (curr_file.tags && curr_file.tags->artist)
-        {
-          result = xstrdup(curr_file.tags->artist);
-        }
-        break;
-      case 'N':
-        if (curr_file.tags && curr_file.tags->track != -1)
-        {
-          result = (char *)xmalloc(sizeof(char) * 16);
-          snprintf(result, 16, "%d", curr_file.tags->track);
-        }
-        break;
-      case 'M':
-        if (curr_file.tags && curr_file.tags->time != -1)
-        {
-          result = (char *)xmalloc(sizeof(char) * 16);
-          snprintf(result, 16, "%d", curr_file.tags->time);
-        }
-        break;
-      case 'F':
-        if (curr_file.file)
-        {
-          result = xstrdup(curr_file.file);
-        }
-        break;
-      case 'D':
-        if (curr_file.file)
-        {
-          char *filename = xstrdup(curr_file.file);
-          result = xstrdup(dirname(filename));
-          free(filename);
-        }
-        break;
-      case 'S':
-        if (curr_file.file && curr_file.block_file)
-        {
-          result = (char *)xmalloc(sizeof(char) * 16);
-          snprintf(result, 16, "%d", curr_file.block_start);
-        }
-        break;
-      case 'E':
-        if (curr_file.file && curr_file.block_file)
-        {
-          result = (char *)xmalloc(sizeof(char) * 16);
-          snprintf(result, 16, "%d", curr_file.block_end);
-        }
-        break;
-      default:
-        result = xstrdup(arg);
-    }
-  }
-  else
-  {
-    result = xstrdup(arg);
-  }
-
-  /* Replace nonexisting data with an empty string. */
-  if (!result)
-  {
-    result = xstrdup("");
-  }
-
-  free(file);
-  if (tags)
-  {
-    tags_free(tags);
-  }
-
-  return result;
-}
-
-static void run_external_cmd(char **args, const int arg_num ASSERT_ONLY)
-{
-  pid_t child;
-
-  assert(args != NULL);
-  assert(arg_num >= 1);
-  assert(args[0] != NULL);
-  assert(args[arg_num] == NULL);
-
-  iface_temporary_exit();
-
-  child = fork();
-  if (child == -1)
-  {
-    error_errno("fork() failed", errno);
-  }
-  else
-  {
-    int status;
-
-    if (child == 0)
-    { /* I'm a child. */
-      char *err;
-
-      putchar('\n');
-      execvp(args[0], args);
-
-      /* We have an error. */
-      err = xstrerror(errno);
-      fprintf(stderr, "\nError executing %s: %s\n", args[0], err);
-      free(err);
-      xsleep(2, 1);
-      exit(EXIT_FAILURE);
-    }
-
-    /* parent */
-    waitpid(child, &status, 0);
-    if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
-    {
-      fprintf(stderr, "\nCommand exited with error (status %d).\n",
-              WEXITSTATUS(status));
-      xsleep(2, 1);
-    }
-    iface_restore();
-  }
-}
-
-/* Exec (execvp()) a custom command (ExecCommand[1-10] options). */
-static void exec_custom_command(const char *option)
-{
-  char *cmd, *arg;
-  char **args;
-  int ix, arg_num;
-  lists_t_strs *cmd_list, *arg_list;
-
-  assert(option != NULL);
-
-  cmd = options_get_str(option);
-  if (!cmd || !cmd[0])
-  {
-    error("%s is not set", option);
-    return;
-  }
-
-  /* Split into arguments. */
-  cmd_list = lists_strs_new(4);
-  arg_num = lists_strs_tokenise(cmd_list, cmd);
-  if (arg_num == 0)
-  {
-    error("Malformed %s option", option);
-    lists_strs_free(cmd_list);
-    return;
-  }
-
-  arg_list = lists_strs_new(lists_strs_size(cmd_list));
-  for (ix = 0; ix < arg_num; ix += 1)
-  {
-    arg = custom_cmd_substitute(lists_strs_at(cmd_list, ix));
-    lists_strs_push(arg_list, arg);
-  }
-  lists_strs_free(cmd_list);
-
-  cmd = lists_strs_fmt(arg_list, " %s");
-  logit("Running command:%s", cmd);
-  free(cmd);
-
-  args = lists_strs_save(arg_list);
-  lists_strs_free(arg_list);
-  run_external_cmd(args, arg_num);
-  free(args);
-
-  if (iface_in_dir_menu())
-  {
-    reread_dir();
-  }
-}
 
 static void go_to_fast_dir(const int num)
 {
@@ -4002,24 +3732,6 @@ static void menu_key(const struct iface_key *k)
       case KEY_CMD_VOLUME_100:
         set_mixer(100);
         break;
-      case KEY_CMD_RATE_0:
-        set_rating(0);
-        break;
-      case KEY_CMD_RATE_1:
-        set_rating(1);
-        break;
-      case KEY_CMD_RATE_2:
-        set_rating(2);
-        break;
-      case KEY_CMD_RATE_3:
-        set_rating(3);
-        break;
-      case KEY_CMD_RATE_4:
-        set_rating(4);
-        break;
-      case KEY_CMD_RATE_5:
-        set_rating(5);
-        break;
       case KEY_CMD_MARK_START:
         file_info_block_mark(&curr_file.block_start);
         break;
@@ -4101,36 +3813,6 @@ static void menu_key(const struct iface_key *k)
         break;
       case KEY_CMD_THEME_MENU:
         make_theme_menu();
-        break;
-      case KEY_CMD_EXEC1:
-        exec_custom_command("ExecCommand1");
-        break;
-      case KEY_CMD_EXEC2:
-        exec_custom_command("ExecCommand2");
-        break;
-      case KEY_CMD_EXEC3:
-        exec_custom_command("ExecCommand3");
-        break;
-      case KEY_CMD_EXEC4:
-        exec_custom_command("ExecCommand4");
-        break;
-      case KEY_CMD_EXEC5:
-        exec_custom_command("ExecCommand5");
-        break;
-      case KEY_CMD_EXEC6:
-        exec_custom_command("ExecCommand6");
-        break;
-      case KEY_CMD_EXEC7:
-        exec_custom_command("ExecCommand7");
-        break;
-      case KEY_CMD_EXEC8:
-        exec_custom_command("ExecCommand8");
-        break;
-      case KEY_CMD_EXEC9:
-        exec_custom_command("ExecCommand9");
-        break;
-      case KEY_CMD_EXEC10:
-        exec_custom_command("ExecCommand10");
         break;
       case KEY_CMD_QUEUE_TOGGLE_FILE:
         queue_toggle_file();
@@ -4944,24 +4626,6 @@ void interface_cmdline_seek_by(int server_sock, const int seek_by)
   srv_sock = server_sock; /* the interface is not initialized, so set it
            here */
   seek(seek_by);
-}
-
-void interface_cmdline_set_rating(int server_sock, int rating)
-{
-  if (rating < 0)
-  {
-    rating = 0;
-  }
-  if (rating > 5)
-  {
-    rating = 5;
-  }
-
-  srv_sock = server_sock; /* the interface is not initialized, so set it here */
-
-  send_int_to_srv(CMD_SET_RATING);
-  send_str_to_srv("");
-  send_int_to_srv(rating);
 }
 
 void interface_cmdline_jump_to(int server_sock, const int pos)

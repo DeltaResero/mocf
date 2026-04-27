@@ -41,7 +41,6 @@
 #include "library/playlist_file.h"
 #include "core/log.h"
 #include "utils/utf8.h"
-#include "library/ratings.h"
 
 #define READ_LINE_INIT_SIZE 256
 
@@ -422,11 +421,6 @@ struct file_tags *read_file_tags(const char *file, struct file_tags *tags,
            (tags->title || tags->artist || tags->album)));
 
   df->info(file, tags, needed_tags);
-
-  if (needed_tags & TAGS_RATING)
-  {
-    ratings_read_file(file, tags);
-  }
 
   tags->filled |= tags_sel;
 

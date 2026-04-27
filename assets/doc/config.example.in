@@ -496,51 +496,6 @@
 # from the last directory.
 #CanStartInPlaylist = yes
 
-# Executing external commands (1 - 10) invoked with key commands (F1 - F10
-# by default).
-#
-# Some arguments are substituted before executing:
-#
-#     %f - file path
-#     %d - current directory
-#     %i - title made from tags
-#     %S - start block mark (in seconds)
-#     %E - end block mark (in seconds)
-#
-# Data from tags can also be substituted:
-#
-#     %t - title
-#     %a - album
-#     %r - artist
-#     %n - track
-#     %m - time of the file (in seconds)
-#
-# The parameters above apply to the currently selected file.  If you change
-# them to capital letters, they are taken from the file currently playing.
-#
-# Programs are run using execv(), not a shell, so you can't do things like
-# redirecting the output to a file.  The command string is split using blank
-# characters as separators; the first element is the command to be executed
-# and the rest are its parameters, so if you use "echo Playing: %I" we run
-# program 'echo' (from $PATH) with 2 parameters: the string 'Playing:' and
-# the title of the file currently playing.  Even if the title contains
-# spaces, it's still one parameter and it's safe if it contains `rm -rf /`.
-#
-# You can use ~ at the beginning of command.
-#
-# Examples:   ExecCommand1 = "cp %f /mnt/usb_drive"
-#             ExecCommand2 = "/home/joe/now_playing %I"
-#
-#ExecCommand1 =
-#ExecCommand2 =
-#ExecCommand3 =
-#ExecCommand4 =
-#ExecCommand5 =
-#ExecCommand6 =
-#ExecCommand7 =
-#ExecCommand8 =
-#ExecCommand9 =
-#ExecCommand10 =
 
 # Display the cursor in the line with the selected file.  Some braille
 # readers (the Handy Tech modular series ZMU 737, for example) use the
@@ -682,27 +637,4 @@
 # values 1 and 0; these are now deprecated in favour of 'yes' and 'no'.)
 #QueueNextSongReturn = yes
 
-# Next option decides if ratings should be displayed for all songs
-# If this is 'no', ratings are not read, which is faster.
-#RatingShow = yes
-
-# RatingStar and RatingSpace are used to generate the rating strings.
-# They can be UTF-8, but must be single characters.
-# These have no effect if RatingShow is 'no'.
-#RatingStar  = "*"
-#RatingSpace = " "
-
-# RatingFile is searched in every directory containing music files.
-# Ratings files are plaintext files where every line starts with a
-# rating (0..5), followed by a single space and a filename the rating
-# applies to. Example:
-#
-# 5 song1.mp3
-# 3 song2.mp3
-# 4 song3.mp3
-# 1 song42.ogg
-#
-# For shared libraries "ratings_alice", "ratings_bob", etc can be used.
-#
-#RatingFile = "ratings"
 

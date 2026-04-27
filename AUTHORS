@@ -29,9 +29,6 @@ xdch47 (https://github.com/xdch47/moc):
   * Native support for PulseAudio backend.
   * Modern FFmpeg (> 4.0) support.
 
-Johannes Hilgenberg:
-  * Integrated song rating system.
-
 
 ================================================================================
 Original MOC Contributors

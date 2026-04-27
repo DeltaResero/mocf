@@ -357,7 +357,6 @@ set(MOCF_SOURCES
     src/audio/processing/softmixer.c
     src/utils/lists.c
     src/audio/processing/equalizer.c
-    src/library/ratings.c
     ${EXTRA_OBJS})
 
 add_executable(mocf ${MOCF_SOURCES})

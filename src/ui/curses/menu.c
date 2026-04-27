@@ -37,7 +37,7 @@ static void draw_item(const struct menu *menu, const struct menu_item *mi,
   assert(mi != NULL);
   assert(pos >= 0);
   assert(item_info_pos > menu->posx ||
-         (!menu->show_time && !menu->show_rating && !menu->show_format));
+         (!menu->show_time && !menu->show_format));
   assert(title_space > 0);
   assert(number_space == 0 || number_space >= 2);
 
@@ -117,25 +117,6 @@ static void draw_item(const struct menu *menu, const struct menu_item *mi,
     }
   }
 
-  /* Rating - keep the "theme", but not selected nor bold.
-     Some utf8 chars do not have bold versions. */
-  if (menu->show_rating)
-  {
-    wmove(menu->win, pos, item_info_pos + 1);
-    if (mi == menu->marked)
-    {
-      wattrset(menu->win, mi->attr_marked);
-    }
-    else
-    {
-      wattrset(menu->win, mi->attr_normal);
-    }
-    wattroff(menu->win, A_BOLD);
-
-    mvwaddstr(menu->win, pos, item_info_pos + 1,
-              *mi->rating ? mi->rating : "     ");
-  }
-
   /* Description. */
   if (draw_selected && mi == menu->selected && mi == menu->marked)
   {
@@ -163,17 +144,12 @@ static void draw_item(const struct menu *menu, const struct menu_item *mi,
     xwaddstr(menu->win, "]");
   }
 
-  if ((menu->show_time && *mi->time) || (menu->show_rating && *mi->rating) ||
+  if ((menu->show_time && *mi->time) ||
       (menu->show_format && *mi->format))
   {
     bool first = 1;
     xwprintw(menu->win, "[");
 
-    if (menu->show_rating)
-    {
-      wmove(menu->win, pos, item_info_pos + 6); /* Already printed. */
-      first = 0;
-    }
     if (menu->show_time)
     {
       if (!first)
@@ -232,11 +208,6 @@ void menu_draw(const struct menu *menu, const int active)
   {
     ++number_details;
     title_width -= 3; /* MP3 */
-  }
-  if (menu->show_rating)
-  {
-    ++number_details;
-    title_width -= 5;
   }
   if (number_details)
   {
@@ -310,7 +281,6 @@ struct menu *menu_new(WINDOW *win, const int posx, const int posy,
   menu->height = height;
   menu->marked = NULL;
   menu->show_time = 0;
-  menu->show_rating = 0;
   menu->show_format = false;
   menu->info_attr_normal = A_NORMAL;
   menu->info_attr_sel = A_NORMAL;
@@ -345,7 +315,6 @@ struct menu_item *menu_add(struct menu *menu, const char *title,
   mi->align = MENU_ALIGN_LEFT;
 
   mi->time[0] = 0;
-  mi->rating[0] = 0;
   mi->format[0] = 0;
   mi->queue_pos = 0;
 
@@ -396,7 +365,6 @@ static struct menu_item *menu_add_from_item(struct menu *menu,
   new->attr_sel_marked = mi->attr_sel_marked;
 
   strncpy(new->time, mi->time, FILE_TIME_STR_SZ);
-  strncpy(new->rating, mi->rating, FILE_RATING_STR_SZ);
   strncpy(new->format, mi->format, FILE_FORMAT_SZ);
 
   return new;
@@ -682,7 +650,6 @@ struct menu *menu_filter_pattern(const struct menu *menu, const char *pattern)
 
   new = menu_new(menu->win, menu->posx, menu->posy, menu->width, menu->height);
   menu_set_show_time(new, menu->show_time);
-  menu_set_show_rating(new, menu->show_rating);
   menu_set_show_format(new, menu->show_format);
   menu_set_info_attr_normal(new, menu->info_attr_normal);
   menu_set_info_attr_sel(new, menu->info_attr_sel);
@@ -742,15 +709,6 @@ void menu_item_set_time(struct menu_item *mi, const char *time)
   memcpy(mi->time, time, len + 1);
 }
 
-void menu_item_set_rating(struct menu_item *mi, const char *rating)
-{
-  assert(mi != NULL);
-
-  mi->rating[sizeof(mi->rating) - 1] = 0;
-  strncpy(mi->rating, rating, sizeof(mi->rating));
-  assert(mi->rating[sizeof(mi->rating) - 1] == 0);
-}
-
 void menu_item_set_format(struct menu_item *mi, const char *format)
 {
   assert(mi != NULL);
@@ -772,13 +730,6 @@ void menu_set_show_time(struct menu *menu, const int t)
   assert(menu != NULL);
 
   menu->show_time = t;
-}
-
-void menu_set_show_rating(struct menu *menu, const bool t)
-{
-  assert(menu != NULL);
-
-  menu->show_rating = t;
 }
 
 void menu_set_show_format(struct menu *menu, const bool t)
