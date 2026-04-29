@@ -560,7 +560,7 @@ static struct decoder sidplay2_decoder =
   NULL
 };
 
-extern "C" struct decoder *plugin_init ()
+extern "C" struct decoder *sidplay2_plugin_init ()
 {
   pthread_mutex_init(&db_mtx, NULL);
   pthread_mutex_init(&player_select_mtx, NULL);

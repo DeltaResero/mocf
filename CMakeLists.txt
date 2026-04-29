@@ -81,8 +81,6 @@ include(TestBigEndian)
 include(GNUInstallDirs)
 
 # Set install directories
-set(PLUGIN_DIR "${CMAKE_INSTALL_LIBDIR}/mocf")
-set(DECODER_PLUGIN_DIR "decoder_plugins")
 set(THEMES_DIR "${CMAKE_INSTALL_DATADIR}/mocf/themes")
 
 # Platform checks
@@ -114,14 +112,6 @@ check_include_file("ncurses.h" HAVE_NCURSES_H)
 check_include_file("curses.h" HAVE_CURSES_H)
 unset(CMAKE_REQUIRED_INCLUDES)
 
-# libltdl (Libtool Dynamic Linker)
-find_library(LTDL_LIBRARY NAMES ltdl)
-find_path(LTDL_INCLUDE_DIR ltdl.h)
-if(NOT LTDL_LIBRARY OR NOT LTDL_INCLUDE_DIR)
-  message(
-    FATAL_ERROR
-      "libltdl not found. Please install libtool-ltdl-devel or equivalent.")
-endif()
 
 # POPT
 find_library(POPT_LIBRARY NAMES popt)
@@ -370,32 +360,37 @@ set(MOCF_SOURCES
     src/audio/processing/softmixer.c
     src/utils/lists.c
     src/audio/processing/equalizer.c
-    ${EXTRA_OBJS})
+    ${EXTRA_OBJS}
+    ${DECODER_OBJECTS})
 
 add_executable(mocf ${MOCF_SOURCES})
 
 target_include_directories(
-  mocf PRIVATE ${CMAKE_SOURCE_DIR}/src ${CURSES_INCLUDE_DIRS}
-               ${LTDL_INCLUDE_DIR} ${POPT_INCLUDE_DIR})
+  mocf PRIVATE ${CMAKE_SOURCE_DIR}/src
+               ${CMAKE_BINARY_DIR}/src/audio
+               ${CURSES_INCLUDE_DIRS}
+               ${POPT_INCLUDE_DIR})
 
 target_compile_definitions(
   mocf
   PRIVATE
-    SYSTEM_THEMES_DIR="${CMAKE_INSTALL_PREFIX}/${THEMES_DIR}"
-    PLUGIN_DIR="${CMAKE_INSTALL_PREFIX}/${PLUGIN_DIR}/${DECODER_PLUGIN_DIR}")
+    SYSTEM_THEMES_DIR="${CMAKE_INSTALL_PREFIX}/${THEMES_DIR}")
 
 target_link_libraries(
   mocf
   PRIVATE ${CMAKE_THREAD_LIBS_INIT}
           ${CURSES_LIBRARIES}
-          ${LTDL_LIBRARY}
           ${POPT_LIBRARY}
           Iconv::Iconv
           m
+          ${DECODER_LIBS}
           ${EXTRA_LIBS})
 
-# Enable export-dynamic for plugins to resolve symbols from main executable
-set_target_properties(mocf PROPERTIES ENABLE_EXPORTS ON)
+# Propagate any extra library search paths needed by decoder dependencies
+# (currently only sidplay2's resid-builder path, when enabled).
+if(DECODER_LINK_DIRS)
+  target_link_directories(mocf PRIVATE ${DECODER_LINK_DIRS})
+endif()
 
 # Installation
 install(TARGETS mocf DESTINATION ${CMAKE_INSTALL_BINDIR})

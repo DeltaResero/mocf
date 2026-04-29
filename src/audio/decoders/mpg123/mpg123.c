@@ -599,6 +599,6 @@ static struct decoder mpg123_decoderX = {DECODER_API_VERSION,
                                          mpg123_get_stream,
                                          mpg123_get_avg_bitrate};
 
-struct decoder *plugin_init() { return &mpg123_decoderX; }
+struct decoder *mpg123_plugin_init() { return &mpg123_decoderX; }
 
 // EOF

@@ -632,6 +632,6 @@ static struct decoder flac_decoder = {DECODER_API_VERSION,
                                       NULL,
                                       flac_get_avg_bitrate};
 
-struct decoder *plugin_init() { return &flac_decoder; }
+struct decoder *flac_plugin_init() { return &flac_decoder; }
 
 // EOF

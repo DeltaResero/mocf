@@ -1597,6 +1597,6 @@ static struct decoder ffmpeg_decoder = {DECODER_API_VERSION,
                                         ffmpeg_get_iostream,
                                         ffmpeg_get_avg_bitrate};
 
-struct decoder *plugin_init() { return &ffmpeg_decoder; }
+struct decoder *ffmpeg_plugin_init() { return &ffmpeg_decoder; }
 
 // EOF

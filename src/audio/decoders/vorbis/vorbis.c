@@ -540,14 +540,10 @@ static struct decoder vorbis_decoder = {DECODER_API_VERSION,
                                         vorbis_get_stream,
                                         vorbis_get_avg_bitrate};
 
-struct decoder *plugin_init() { return &vorbis_decoder; }
+struct decoder *vorbis_plugin_init() { return &vorbis_decoder; }
 
-/* Defined and true if the Vorbis decoder is using Tremor, otherwise
- * undefined.  This is used by the decoder plugin loader so it can
- * document which library is being used without requiring the decoder
- * and the loader be built with the same HAVE_TREMOR setting. */
-#ifdef HAVE_TREMOR
-const bool vorbis_has_tremor = true;
-#endif
+/* The have_tremor flag is now detected at compile time in decoder.c via
+ * #ifdef HAVE_TREMOR — the vorbis_has_tremor exported symbol is no longer
+ * needed. */
 
 // EOF

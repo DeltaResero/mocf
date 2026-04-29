@@ -317,6 +317,6 @@ static struct decoder wv_decoder = {DECODER_API_VERSION,
                                     NULL, // wav_get_stream
                                     wav_get_avg_bitrate};
 
-struct decoder *plugin_init() { return &wv_decoder; }
+struct decoder *wavpack_plugin_init() { return &wv_decoder; }
 
 // EOF

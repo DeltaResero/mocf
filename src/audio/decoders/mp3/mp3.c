@@ -882,6 +882,6 @@ static struct decoder mp3_decoder = {DECODER_API_VERSION,
                                      mp3_get_stream,
                                      mp3_get_avg_bitrate};
 
-struct decoder *plugin_init() { return &mp3_decoder; }
+struct decoder *mp3_plugin_init() { return &mp3_decoder; }
 
 // EOF

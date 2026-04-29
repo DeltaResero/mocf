@@ -205,7 +205,7 @@ static struct decoder timidity_decoder = {DECODER_API_VERSION,
                                           NULL,
                                           NULL};
 
-struct decoder *plugin_init()
+struct decoder *timidity_plugin_init()
 {
   char *config;
   int initresult;

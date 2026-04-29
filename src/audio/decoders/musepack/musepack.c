@@ -521,6 +521,6 @@ static struct decoder musepack_decoder = {DECODER_API_VERSION,
                                           musepack_get_stream,
                                           musepack_get_avg_bitrate};
 
-struct decoder *plugin_init() { return &musepack_decoder; }
+struct decoder *musepack_plugin_init() { return &musepack_decoder; }
 
 // EOF

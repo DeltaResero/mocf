@@ -471,6 +471,6 @@ static struct decoder opus_decoder = {DECODER_API_VERSION,
                                       opus_get_stream,
                                       opus_get_avg_bitrate};
 
-struct decoder *plugin_init() { return &opus_decoder; }
+struct decoder *opus_plugin_init() { return &opus_decoder; }
 
 // EOF

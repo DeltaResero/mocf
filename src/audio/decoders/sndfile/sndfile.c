@@ -437,6 +437,6 @@ static struct decoder sndfile_decoder = {DECODER_API_VERSION,
                                          NULL,
                                          NULL};
 
-struct decoder *plugin_init() { return &sndfile_decoder; }
+struct decoder *sndfile_plugin_init() { return &sndfile_decoder; }
 
 // EOF
