@@ -74,7 +74,7 @@ You can configure the build by passing `-DOPTION=ON/OFF` to cmake.
 #### Sound Output Options
 | Option | Description | Default |
 |--------|-------------|---------|
-| `WITH_PULSE` | Enable PulseAudio support | `OFF` |
+| `WITH_PULSE` | Enable PulseAudio support | `ON` (Linux) |
 | `WITH_ALSA` | Enable ALSA support | `ON` (Linux) |
 | `WITH_JACK` | Enable JACK support | `OFF` |
 | `WITH_OSS` | Enable OSS support | `ON` (FreeBSD/NetBSD) |

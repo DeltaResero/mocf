@@ -40,9 +40,11 @@ option(ENABLE_MAGIC "Enable MIME magic support" ON)
 set(DEFAULT_ALSA OFF)
 set(DEFAULT_OSS OFF)
 set(DEFAULT_SNDIO OFF)
+set(DEFAULT_PULSE OFF)
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
   set(DEFAULT_ALSA ON)
+  set(DEFAULT_PULSE ON)
 elseif(CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
   set(DEFAULT_SNDIO ON)
 else() # FreeBSD, NetBSD, etc.
@@ -50,7 +52,7 @@ else() # FreeBSD, NetBSD, etc.
 endif()
 
 # Sound output options
-option(WITH_PULSE "Enable PulseAudio support" OFF)
+option(WITH_PULSE "Enable PulseAudio support" ${DEFAULT_PULSE})
 option(WITH_OSS "Enable OSS support" ${DEFAULT_OSS})
 option(WITH_SNDIO "Enable SNDIO support" ${DEFAULT_SNDIO})
 option(WITH_ALSA "Enable ALSA support" ${DEFAULT_ALSA})
