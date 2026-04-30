@@ -125,7 +125,7 @@
 
 # Input and output buffer sizes (in kilobytes).
 #InputBuffer = 512                  # Minimum value is 32KB
-#OutputBuffer = 512                 # Minimum value is 128KB
+#OutputBuffer = 128                 # Minimum value is 128KB
 
 # How much to fill the input buffer before playing (in kilobytes)?
 # This can't be greater than the value of InputBuffer.  While this has
@@ -140,9 +140,20 @@
 #
 #HTTPProxy =
 
-# Sound driver - OSS, ALSA, JACK, SNDIO (on OpenBSD) or null (only for
-# debugging).  You can enter more than one driver as a colon-separated
-# list.  The first working driver will be used.
+# Sound driver - ALSA, JACK, OSS, PULSE, SNDIO, or null
+# You can enter more than one driver as a colon-separated list.
+# The first working driver will be the one that is used.
+#
+# Available drivers depend on what was enabled at compile time. You can
+# run 'mocf -V' to see which sound drivers are compiled into your binary.
+#
+# Valid options include:
+#   PULSE, ALSA - The modern defaults for Linux
+#   OSS         - The default for FreeBSD and NetBSD (legacy on Linux)
+#   SNDIO       - The default for OpenBSD
+#   JACK        - For advanced audio routing (not enabled by default)
+#   null        - Only for debugging
+#
 #SoundDriver = @SOUNDDRIVER@
 
 # Jack output settings.
