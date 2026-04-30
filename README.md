@@ -13,16 +13,16 @@ built, saved, and exported as m3u files.
 
 ### Key Features
 
-*   Client-server architecture for persistent playback.
-*   Gapless playback via song precaching.
-*   Native PulseAudio backend and modern FFmpeg (> 4.0) support.
-*   Support for OSS, ALSA, SNDIO, and JACK output drivers.
-*   Inotify support for automatic directory refreshing.
-*   Reworked audio formats with support for 32-bit samples and float processing.
-*   Simple software mixer and a cache for file tags.
-*   Customizable color themes and user-defined keybindings.
-*   Stripped non-essential features for a minimal default build.
-*   Optimized defaults for software-rendered and terminal environments.
+*   Client-server architecture for persistent playback
+*   Gapless playback via song precaching
+*   Native PulseAudio backend and modern FFmpeg (> 4.0) support
+*   Support for OSS, ALSA, SNDIO, and JACK output drivers
+*   Inotify support for automatic directory refreshing
+*   Reworked audio formats with support for 32-bit samples and float processing
+*   Simple software mixer and a cache for file tags
+*   Customizable color themes and user-defined keybindings
+*   Stripped non-essential features for a minimal default build
+*   Optimized defaults for software-rendered and terminal environments
 
 ## Supported Formats
 
@@ -39,7 +39,7 @@ This project uses the **CMake** build system.
 *   CMake 3.15 or later
 *   C99 and C++17 compatible compilers
 *   POSIX.1-2001 compatible system
-*   **Required Libraries:** libltdl (libtool), libpopt, ncurses, pthreads.
+*   **Required Libraries:** libpopt, ncurses, pthreads
 *   **Optional Libraries:** PulseAudio, ALSA, JACK, OSS, SNDIO, libcurl,
     libsamplerate, libmagic, librcc, BerkeleyDB.
 *   **Decoder Libraries:** libmad, libmpg123, libfaad2, libvorbis, opusfile,
