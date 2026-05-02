@@ -31,6 +31,15 @@
 #include <strings.h>
 #include <errno.h>
 
+/* Platform-specific headers for executable path resolution */
+#if defined(__linux__)
+#  include <unistd.h>
+#elif defined(__FreeBSD__) || defined(__NetBSD__)
+#  include <sys/types.h>
+#  include <unistd.h>
+#  include <sys/sysctl.h>
+#endif
+
 #include "core/common.h"
 #include "ui/curses/interface.h"
 #include "ui/themes.h"
@@ -261,6 +270,69 @@ static int new_colordef(const int line_num, const char *name, const short red,
   return 1;
 }
 
+/* Resolve the directory containing the running executable into 'buf'.
+ * Returns 1 on success, 0 if the path could not be determined.
+ * Supported: Linux (/proc/self/exe), FreeBSD (sysctl KERN_PROC_PATHNAME),
+ * NetBSD (sysctl KERN_PROC_ARGS/KERN_PROC_PATHNAME).
+ * OpenBSD has no supported mechanism for this and returns 0, causing callers
+ * to fall through to SYSTEM_THEMES_DIR as before. */
+static int get_exe_dir(char *buf, size_t len)
+{
+  char exe_path[PATH_MAX] = {0};
+  int  path_retrieved = 0;
+
+#if defined(__linux__)
+  {
+    ssize_t n = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+    if (n > 0)
+    {
+      exe_path[n] = '\0';
+      path_retrieved = 1;
+    }
+  }
+#elif defined(__FreeBSD__)
+  {
+    int    mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1};
+    size_t sz = sizeof(exe_path);
+    if (sysctl(mib, 4, exe_path, &sz, NULL, 0) == 0)
+    {
+      path_retrieved = 1;
+    }
+  }
+#elif defined(__NetBSD__)
+  {
+    /* NetBSD exposes the executable path under KERN_PROC_ARGS with the
+     * process ID as the third level, not under KERN_PROC like FreeBSD. */
+    int    mib[4] = {CTL_KERN, KERN_PROC_ARGS, getpid(), KERN_PROC_PATHNAME};
+    size_t sz = sizeof(exe_path);
+    if (sysctl(mib, 4, exe_path, &sz, NULL, 0) == 0)
+    {
+      path_retrieved = 1;
+    }
+  }
+#endif
+
+  if (!path_retrieved)
+  {
+    return 0;
+  }
+
+  /* Strip the filename to get the directory */
+  char *slash = strrchr(exe_path, '/');
+  if (!slash)
+  {
+    return 0;
+  }
+  *slash = '\0';
+
+  if ((size_t)snprintf(buf, len, "%s", exe_path) >= len)
+  {
+    return 0;
+  }
+
+  return 1;
+}
+
 /* Find path to the theme for the given name. Returned memory is static. */
 static char *find_theme_file(const char *name)
 {
@@ -282,6 +354,24 @@ static char *find_theme_file(const char *name)
   if (file_exists(path))
   {
     return path;
+  }
+
+  /* Try exe-relative path (build directory or portable deployment).
+   * Checks <exe_dir>/assets/themes/<name>, which naturally resolves to the
+   * source tree's assets/themes/ when running from a build subdirectory, and
+   * works equally for any portable layout that ships assets alongside the
+   * binary.  Silently skipped on platforms where the exe path cannot be
+   * determined (e.g. OpenBSD), falling through to the system directory. */
+  {
+    char exe_dir[PATH_MAX];
+    if (get_exe_dir(exe_dir, sizeof(exe_dir)))
+    {
+      rc = snprintf(path, sizeof(path), "%s/assets/themes/%s", exe_dir, name);
+      if (rc < ssizeof(path) && file_exists(path))
+      {
+        return path;
+      }
+    }
   }
 
   /* Try the system directory */

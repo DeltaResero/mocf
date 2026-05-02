@@ -329,7 +329,14 @@ configure_file(assets/doc/config.example.in assets/doc/config.example @ONLY)
 
 # Subdirectories
 add_subdirectory(src/audio/decoders)
-add_subdirectory(assets/themes)
+
+# Themes
+file(GLOB THEME_FILES "assets/themes/*_theme")
+
+# Copy themes into the build tree
+file(COPY ${THEME_FILES} DESTINATION "${CMAKE_BINARY_DIR}/assets/themes")
+
+install(FILES ${THEME_FILES} DESTINATION ${THEMES_DIR})
 
 # Main Executable
 set(MOCF_SOURCES
