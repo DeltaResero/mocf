@@ -127,7 +127,7 @@ full list of options and documentation.
 ### Themes
 
 Themes control the color scheme of the interface. An example theme is included
-in `assets/themes/`. Custom themes should be placed in `~/.mocf/themes/`.
+in `data/themes/`. Custom themes should be placed in `~/.mocf/themes/`.
 
 The active theme can be selected with the `Theme` option in your config file
 or by using the `-T` command-line option.

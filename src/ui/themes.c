@@ -357,16 +357,16 @@ static char *find_theme_file(const char *name)
   }
 
   /* Try exe-relative path (build directory or portable deployment).
-   * Checks <exe_dir>/assets/themes/<name>, which naturally resolves to the
-   * source tree's assets/themes/ when running from a build subdirectory, and
-   * works equally for any portable layout that ships assets alongside the
+   * Checks <exe_dir>/data/themes/<name>, which naturally resolves to the
+   * source tree's data/themes/ when running from a build subdirectory, and
+   * works equally for any portable layout that ships data alongside the
    * binary.  Silently skipped on platforms where the exe path cannot be
    * determined (e.g. OpenBSD), falling through to the system directory. */
   {
     char exe_dir[PATH_MAX];
     if (get_exe_dir(exe_dir, sizeof(exe_dir)))
     {
-      rc = snprintf(path, sizeof(path), "%s/assets/themes/%s", exe_dir, name);
+      rc = snprintf(path, sizeof(path), "%s/data/themes/%s", exe_dir, name);
       if (rc < ssizeof(path) && file_exists(path))
       {
         return path;

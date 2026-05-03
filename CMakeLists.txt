@@ -325,16 +325,16 @@ set(pkgdatadir "${CMAKE_INSTALL_FULL_DATADIR}/mocf")
 set(libdir "${CMAKE_INSTALL_FULL_LIBDIR}")
 set(includedir "${CMAKE_INSTALL_FULL_INCLUDEDIR}")
 
-configure_file(assets/doc/config.example.in assets/doc/config.example @ONLY)
+configure_file(data/config/config.example.in data/config/config.example @ONLY)
 
 # Subdirectories
 add_subdirectory(src/audio/decoders)
 
 # Themes
-file(GLOB THEME_FILES "assets/themes/*_theme")
+file(GLOB THEME_FILES "data/themes/*_theme")
 
 # Copy themes into the build tree
-file(COPY ${THEME_FILES} DESTINATION "${CMAKE_BINARY_DIR}/assets/themes")
+file(COPY ${THEME_FILES} DESTINATION "${CMAKE_BINARY_DIR}/data/themes")
 
 install(FILES ${THEME_FILES} DESTINATION ${THEMES_DIR})
 
@@ -403,13 +403,13 @@ endif()
 
 # Installation
 install(TARGETS mocf DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/assets/doc/config.example" README.md
-              assets/doc/README_equalizer assets/doc/keymap.example
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/data/config/config.example" README.md
+              docs/README_equalizer data/config/keymap.example
         DESTINATION ${CMAKE_INSTALL_DOCDIR})
-install(FILES assets/man/mocf.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
-install(FILES assets/desktop/mocf.desktop
+install(FILES data/man/mocf.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+install(FILES data/desktop/mocf.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
-install(FILES assets/desktop/mocf.svg
+install(FILES data/desktop/mocf.svg
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
 
 # Helper for summary output
