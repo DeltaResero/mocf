@@ -923,9 +923,9 @@ void plist_shuffle(struct plist *plist)
 {
   int i;
 
-  for (i = 0; i < plist->num; i += 1)
+  for (i = plist->num - 1; i > 0; i -= 1)
   {
-    plist_swap(plist, i, (rand() / (float)RAND_MAX) * (plist->num - 1));
+    plist_swap(plist, i, rand() % (i + 1));
   }
 
   rb_tree_clear(plist->search_tree);
