@@ -317,11 +317,11 @@ static int init_option(const char *name, enum option_type type)
   unsigned int h = hash(name);
   int pos = find_free(h);
 
-  assert(strlen(name) < OPTION_NAME_MAX);
   assert(is_valid_symbol(name));
   assert(pos >= 0);
 
-  strcpy(options[pos].name, name);
+  strncpy(options[pos].name, name, OPTION_NAME_MAX - 1);
+  options[pos].name[OPTION_NAME_MAX - 1] = '\0';
   options[pos].hash = h;
   options[pos].type = type;
   options[pos].ignore_in_config = 0;
