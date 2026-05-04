@@ -442,7 +442,7 @@ void server_init(int debugging, int foreground)
     fatal("Can't create socket: %s", xstrerror(errno));
   }
   sock_name.sun_family = AF_UNIX;
-  strcpy(sock_name.sun_path, socket_name());
+  snprintf(sock_name.sun_path, sizeof(sock_name.sun_path), "%s", socket_name());
 
   /* Bind to socket */
   if (bind(server_sock, (struct sockaddr *)&sock_name, SUN_LEN(&sock_name)) ==

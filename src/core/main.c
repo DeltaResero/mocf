@@ -104,7 +104,7 @@ static int server_connect()
   }
 
   sock_name.sun_family = AF_UNIX;
-  strcpy(sock_name.sun_path, socket_name());
+  snprintf(sock_name.sun_path, sizeof(sock_name.sun_path), "%s", socket_name());
 
   if (connect(sock, (struct sockaddr *)&sock_name, SUN_LEN(&sock_name)) == -1)
   {
