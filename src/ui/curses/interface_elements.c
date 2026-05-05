@@ -213,7 +213,6 @@ static struct info_win
   struct entry entry;
   int in_entry; /* are we using the entry (is the above
          structure initialized)?  */
-  struct entry_history urls_history;
   struct entry_history dirs_history;
   struct entry_history user_history;
 
@@ -222,7 +221,7 @@ static struct info_win
   bool state_shuffle;
   bool state_repeat;
   bool state_next;
-  bool state_net;
+
 
   int bitrate; /* in kbps */
   int rate;    /* in kHz */
@@ -408,12 +407,6 @@ static void entry_init(struct entry *e, const enum entry_type type,
       break;
     case ENTRY_GO_DIR:
       title = "GO";
-      break;
-    case ENTRY_GO_URL:
-      title = "URL";
-      break;
-    case ENTRY_ADD_URL:
-      title = "ADD URL";
       break;
     case ENTRY_PLIST_OVERWRITE:
       title = "File exists, overwrite?";
@@ -1102,7 +1095,7 @@ static char *make_menu_title(const char *plist_title, const int made_from_tags,
 
   if (!made_from_tags)
   {
-    if (!full_path && !is_url(title))
+    if (!full_path)
     {
       /* Use only the file name instead of the full path. */
       char *slash = strrchr(title, '/');
@@ -2869,7 +2862,7 @@ static void info_win_init(struct info_win *w)
   w->state_repeat = false;
   w->state_next = false;
   w->state_play = STATE_STOP;
-  w->state_net = false;
+
 
   w->bitrate = -1;
   w->rate = -1;
@@ -2885,7 +2878,6 @@ static void info_win_init(struct info_win *w)
   w->status_msg[0] = 0;
 
   w->in_entry = 0;
-  entry_history_init(&w->urls_history);
   entry_history_init(&w->dirs_history);
   entry_history_init(&w->user_history);
 
@@ -2911,7 +2903,6 @@ static void info_win_destroy(struct info_win *w)
     entry_destroy(&w->entry);
   }
 
-  entry_history_clear(&w->urls_history);
   entry_history_clear(&w->dirs_history);
   entry_history_clear(&w->user_history);
 }
@@ -3325,7 +3316,7 @@ static void info_win_draw_options_state(const struct info_win *w)
   assert(w != NULL);
 
   info_win_draw_switch(w, 38, 2, "STEREO", w->state_stereo);
-  info_win_draw_switch(w, 47, 2, "NET", w->state_net);
+
   info_win_draw_switch(w, 53, 2, "SHUFFLE", w->state_shuffle);
   info_win_draw_switch(w, 63, 2, "REPEAT", w->state_repeat);
   info_win_draw_switch(w, 72, 2, "NEXT", w->state_next);
@@ -3344,12 +3335,6 @@ static void info_win_make_entry(struct info_win *w, const enum entry_type type)
   {
     case ENTRY_GO_DIR:
       history = &w->dirs_history;
-      break;
-    case ENTRY_GO_URL:
-      history = &w->urls_history;
-      break;
-    case ENTRY_ADD_URL:
-      history = &w->urls_history;
       break;
     case ENTRY_USER_QUERY:
       history = &w->user_history;
@@ -3568,10 +3553,7 @@ static void info_win_set_option_state(struct info_win *w, const char *name,
   {
     w->state_next = value;
   }
-  else if (!strcasecmp(name, "Net"))
-  {
-    w->state_net = value;
-  }
+
   else
   {
     abort();
@@ -3823,8 +3805,7 @@ static void info_win_entry_handle_key(struct info_win *iw, struct main_win *mw,
         iface_user_reply(NULL);
       }
     }
-    else if ((type == ENTRY_GO_DIR || type == ENTRY_GO_URL ||
-              type == ENTRY_ADD_URL || type == ENTRY_USER_QUERY) &&
+    else if ((type == ENTRY_GO_DIR || type == ENTRY_USER_QUERY) &&
              cmd != KEY_CMD_WRONG)
     {
       if (cmd == KEY_CMD_HISTORY_UP)
@@ -4383,11 +4364,6 @@ void iface_set_played_file(const char *file)
     info_win_set_curr_time(&info_win, -1);
     info_win_set_total_time(&info_win, -1);
     info_win_set_block(&info_win, -1, -1);
-    info_win_set_option_state(&info_win, "Net", 0);
-  }
-  else if (is_url(file))
-  {
-    info_win_set_option_state(&info_win, "Net", 1);
   }
 
   iface_refresh_screen();

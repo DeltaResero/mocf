@@ -84,23 +84,10 @@ void files_cleanup()
 #endif
 }
 
-/* Is the string a URL? */
-inline int is_url(const char *str)
-{
-  return !strncasecmp(str, "http://", sizeof("http://") - 1) ||
-         !strncasecmp(str, "https://", sizeof("https://") - 1) ||
-         !strncasecmp(str, "ftp://", sizeof("ftp://") - 1);
-}
-
 /* Return 1 if the file is a directory, 0 if not, -1 on error. */
 int is_dir(const char *file)
 {
   struct stat file_stat;
-
-  if (is_url(file))
-  {
-    return 0;
-  }
 
   if (stat(file, &file_stat) == -1)
   {
@@ -121,10 +108,6 @@ enum file_type file_type(const char *file)
 
   assert(file != NULL);
 
-  if (is_url(file))
-  {
-    return F_URL;
-  }
   if (stat(file, &file_stat) == -1)
   {
     return F_OTHER; /* Ignore the file if stat() failed */
@@ -193,35 +176,28 @@ void make_file_title(struct plist *plist, const int num,
   assert(LIMIT(num, plist->num));
   assert(!plist_deleted(plist, num));
 
-  if (file_type(plist->items[num].file) != F_URL)
+  char *file = xstrdup(plist->items[num].file);
+
+  if (hide_extension)
   {
-    char *file = xstrdup(plist->items[num].file);
+    char *extn;
 
-    if (hide_extension)
+    extn = ext_pos(file);
+    if (extn)
     {
-      char *extn;
-
-      extn = ext_pos(file);
-      if (extn)
-      {
-        *(extn - 1) = 0;
-      }
+      *(extn - 1) = 0;
     }
-
-    if (options_get_bool("FileNamesIconv"))
-    {
-      char *old_title = file;
-      file = files_iconv_str(file);
-      free(old_title);
-    }
-
-    plist_set_title_file(plist, num, file);
-    free(file);
   }
-  else
+
+  if (options_get_bool("FileNamesIconv"))
   {
-    plist_set_title_file(plist, num, plist->items[num].file);
+    char *old_title = file;
+    file = files_iconv_str(file);
+    free(old_title);
   }
+
+  plist_set_title_file(plist, num, file);
+  free(file);
 }
 
 /* Make a title from the tags for the item. */
@@ -233,12 +209,6 @@ void make_tags_title(struct plist *plist, const int num)
   assert(plist != NULL);
   assert(LIMIT(num, plist->num));
   assert(!plist_deleted(plist, num));
-
-  if (file_type(plist->items[num].file) == F_URL)
-  {
-    make_file_title(plist, num, false);
-    return;
-  }
 
   if (plist->items[num].title_tags)
   {
@@ -395,11 +365,6 @@ struct file_tags *read_file_tags(const char *file, struct file_tags *tags,
   if (tags == NULL)
   {
     tags = tags_new();
-  }
-
-  if (file_type(file) == F_URL)
-  {
-    return tags;
   }
 
   needed_tags = ~tags->filled & tags_sel;
@@ -835,7 +800,7 @@ char *absolute_path(const char *path, const char *cwd)
   assert(path);
   assert(cwd);
 
-  if (path[0] != '/' && !is_url(path))
+  if (path[0] != '/')
   {
     strncpy(tmp, cwd, sizeof(tmp));
     tmp[sizeof(tmp) - 1] = 0;

@@ -31,7 +31,6 @@ extern "C"
   char *ext_pos(const char *file);
   enum file_type file_type(const char *file);
   char *file_mime_type(const char *file);
-  int is_url(const char *str);
   char *read_line(FILE *file);
   char *find_match_dir(char *dir);
   int file_exists(const char *file);

@@ -251,12 +251,6 @@ char *file_type_name(const char *file)
   int i;
   static char buf[4];
 
-  if (file_type(file) == F_URL)
-  {
-    strcpy(buf, "NET");
-    return buf;
-  }
-
   i = find_type(file);
   if (i == -1)
   {

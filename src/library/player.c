@@ -932,62 +932,20 @@ void player(const char *file, const char *next_file, struct out_buf *out_buf)
 {
   struct decoder *f;
 
-  if (file_type(file) == F_URL)
+  f = get_decoder(file);
+  LOCK(decoder_stream_mtx);
+  decoder_stream = NULL;
+  UNLOCK(decoder_stream_mtx);
+
+  if (!f)
   {
-    status_msg("Connecting...");
-
-    LOCK(decoder_stream_mtx);
-    decoder_stream = io_open(file, 1);
-    if (!io_ok(decoder_stream))
-    {
-      error("Could not open URL: %s", io_strerror(decoder_stream));
-      io_close(decoder_stream);
-      status_msg("");
-      decoder_stream = NULL;
-      UNLOCK(decoder_stream_mtx);
-      return;
-    }
-    UNLOCK(decoder_stream_mtx);
-
-    f = get_decoder_by_content(decoder_stream);
-    if (!f)
-    {
-      LOCK(decoder_stream_mtx);
-      io_close(decoder_stream);
-      status_msg("");
-      decoder_stream = NULL;
-      UNLOCK(decoder_stream_mtx);
-      return;
-    }
-
-    status_msg("Prebuffering...");
-    prebuffering = 1;
-    io_set_buf_fill_callback(decoder_stream, fill_cb, NULL);
-    io_prebuffer(decoder_stream, options_get_int("Prebuffering") * 1024);
-    prebuffering = 0;
-
-    status_msg("Playing...");
-    ev_audio_start();
-    play_stream(f, out_buf);
-    ev_audio_stop();
+    error("Can't get decoder for %s", file);
+    return;
   }
-  else
-  {
-    f = get_decoder(file);
-    LOCK(decoder_stream_mtx);
-    decoder_stream = NULL;
-    UNLOCK(decoder_stream_mtx);
 
-    if (!f)
-    {
-      error("Can't get decoder for %s", file);
-      return;
-    }
-
-    ev_audio_start();
-    play_file(file, f, next_file, out_buf);
-    ev_audio_stop();
-  }
+  ev_audio_start();
+  play_file(file, f, next_file, out_buf);
+  ev_audio_stop();
 
   logit("exiting");
 }

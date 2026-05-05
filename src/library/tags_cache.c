@@ -1404,14 +1404,7 @@ struct file_tags *tags_cache_get_immediate(struct tags_cache *c,
 
   debug("Immediate tags read for %s", file);
 
-  if (!is_url(file))
-  {
-    tags = tags_cache_read_add(c, file, tags_sel, -1);
-  }
-  else
-  {
-    tags = tags_new();
-  }
+  tags = tags_cache_read_add(c, file, tags_sel, -1);
 
   return tags;
 }

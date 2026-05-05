@@ -110,10 +110,6 @@ static struct sound_params req_sound_params = {0, 0, 0};
 static struct audio_conversion sound_conv;
 static int need_audio_conversion = 0;
 
-/* URL of the last played stream. Used to fake pause/unpause of internet
- * streams. Protected by curr_playing_mtx. */
-static char *last_stream_url = NULL;
-
 static int current_mixer = 0;
 
 /* Make a human readable description of the sound sample format(s).
@@ -776,14 +772,6 @@ static void *play_thread(void *unused ATTR_UNUSED)
       free(file);
     }
 
-    LOCK(curr_playing_mtx);
-    if (last_stream_url)
-    {
-      free(last_stream_url);
-      last_stream_url = NULL;
-    }
-    UNLOCK(curr_playing_mtx);
-
     if (stop_playing)
     {
       LOCK(curr_playing_mtx);
@@ -959,35 +947,11 @@ void audio_pause()
 
   if (curr_playing != -1)
   {
-    char *sname = plist_get_file(curr_plist, curr_playing);
-
-    if (file_type(sname) == F_URL)
-    {
-      UNLOCK(curr_playing_mtx);
-      UNLOCK(plist_mtx);
-      audio_stop();
-      LOCK(curr_playing_mtx);
-      LOCK(plist_mtx);
-
-      if (last_stream_url)
-      {
-        free(last_stream_url);
-      }
-      last_stream_url = xstrdup(sname);
-
-      /* Pretend that we are paused on this. */
-      curr_playing_fname = xstrdup(sname);
-    }
-    else
-    {
-      out_buf_pause(out_buf);
-    }
+    out_buf_pause(out_buf);
 
     prev_state = state;
     state = STATE_PAUSE;
     state_change();
-
-    free(sname);
   }
 
   UNLOCK(plist_mtx);
@@ -997,15 +961,7 @@ void audio_pause()
 void audio_unpause()
 {
   LOCK(curr_playing_mtx);
-  if (last_stream_url && file_type(last_stream_url) == F_URL)
-  {
-    char *url = xstrdup(last_stream_url);
-
-    UNLOCK(curr_playing_mtx);
-    audio_play(url);
-    free(url);
-  }
-  else if (curr_playing != -1)
+  if (curr_playing != -1)
   {
     out_buf_unpause(out_buf);
     prev_state = state;
@@ -1523,11 +1479,6 @@ void audio_exit()
   if (rc != 0)
   {
     log_errno("Can't destroy request_mtx", rc);
-  }
-
-  if (last_stream_url)
-  {
-    free(last_stream_url);
   }
 
   softmixer_shutdown();

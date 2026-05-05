@@ -445,9 +445,6 @@ static void show_version()
 #ifndef NDEBUG
   printf(" DEBUG");
 #endif
-#ifdef HAVE_CURL
-  printf(" Network streams");
-#endif
 #ifdef HAVE_SAMPLERATE
   printf(" resample");
 #endif

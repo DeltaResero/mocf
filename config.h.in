@@ -50,7 +50,6 @@
 #cmakedefine HAVE_GETTIMEOFDAY 1
 
 /* Features */
-#cmakedefine HAVE_CURL 1
 #cmakedefine HAVE_SAMPLERATE 1
 #cmakedefine HAVE_LIBMAGIC 1
 #cmakedefine HAVE_RCC 1

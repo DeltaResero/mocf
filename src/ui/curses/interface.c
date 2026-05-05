@@ -431,10 +431,6 @@ static void file_info_block_mark(int *marker)
   {
     error("Cannot make block marks while stopped.");
   }
-  else if (file_type(curr_file.file) == F_URL)
-  {
-    error("Cannot make block marks in URLs.");
-  }
   else if (file_type(curr_file.file) != F_SOUND)
   {
     error("Cannot make block marks in non-audio files.");
@@ -831,29 +827,7 @@ static void update_ctime()
   }
 }
 
-/* Use new tags for current file title (for Internet streams). */
-static void update_curr_tags()
-{
-  if (curr_file.file && is_url(curr_file.file))
-  {
-    if (curr_file.tags)
-    {
-      tags_free(curr_file.tags);
-    }
-    send_int_to_srv(CMD_GET_TAGS);
-    curr_file.tags = get_data_tags();
 
-    if (curr_file.tags->title)
-    {
-      if (curr_file.title)
-      {
-        free(curr_file.title);
-      }
-      curr_file.title = build_title(curr_file.tags);
-      iface_set_played_file_title(curr_file.title);
-    }
-  }
-}
 
 /* Make sure that the currently played file is visible if it is in one of our
  * menus. */
@@ -912,10 +886,9 @@ static void update_curr_file()
     curr_file.file = file;
 
     /* make a title that will be used until we get tags */
-    if (file_type(file) == F_URL || !strchr(file, '/'))
+    if (!strchr(file, '/'))
     {
       curr_file.title = xstrdup(file);
-      update_curr_tags();
     }
     else
     {
@@ -1329,9 +1302,7 @@ static void server_event(const int event, void *data)
         event_plist_move((struct move_ev_data *)data);
       }
       break;
-    case EV_TAGS:
-      update_curr_tags();
-      break;
+
     case EV_STATUS_MSG:
       iface_set_status((char *)data);
       break;
@@ -1786,29 +1757,21 @@ static void process_multiple_args(lists_t_strs *args)
     arg = lists_strs_at(args, ix);
     dir = is_dir(arg);
 
-    if (is_url(arg))
+    if (arg[0] == '/')
     {
-      strncpy(path, arg, sizeof(path));
-      path[sizeof(path) - 1] = 0;
+      strcpy(path, "/");
     }
     else
     {
-      if (arg[0] == '/')
-      {
-        strcpy(path, "/");
-      }
-      else
-      {
-        strcpy(path, this_cwd);
-      }
-      resolve_path(path, sizeof(path), arg);
+      strcpy(path, this_cwd);
     }
+    resolve_path(path, sizeof(path), arg);
 
     if (dir == 1)
     {
       read_directory_recurr(path, playlist);
     }
-    else if (!dir && (is_sound_file(path) || is_url(path)))
+    else if (!dir && is_sound_file(path))
     {
       if (plist_find_fname(playlist, path) == -1)
       {
@@ -2031,7 +1994,7 @@ static void go_file()
     return;
   }
 
-  if (type == F_SOUND || type == F_URL)
+  if (type == F_SOUND)
   {
     play_it(file);
   }
@@ -2310,10 +2273,9 @@ static void queue_toggle_file()
     return;
   }
 
-  if (iface_curritem_get_type() != F_SOUND &&
-      iface_curritem_get_type() != F_URL)
+  if (iface_curritem_get_type() != F_SOUND)
   {
-    error("You can only add a file or URL using this command.");
+    error("You can only add a file using this command.");
     free(file);
     return;
   }
@@ -2561,170 +2523,6 @@ static void entry_key_go_dir(const struct iface_key *k)
   }
 }
 
-/* Request playing from the specified URL. */
-static void play_from_url(const char *url)
-{
-  send_int_to_srv(CMD_LOCK);
-
-  change_srv_plist_serial();
-  send_int_to_srv(CMD_LIST_CLEAR);
-  send_int_to_srv(CMD_LIST_ADD);
-  send_str_to_srv(url);
-
-  send_int_to_srv(CMD_PLAY);
-  send_str_to_srv("");
-
-  send_int_to_srv(CMD_UNLOCK);
-}
-
-/* Return malloc()ed string that is a copy of str without leading and trailing
- * white spaces. */
-static char *strip_white_spaces(const char *str)
-{
-  char *clean;
-  int n;
-
-  assert(str != NULL);
-
-  n = strlen(str);
-
-  /* Strip trailing. */
-  while (n > 0 && isblank(str[n - 1]))
-  {
-    n--;
-  }
-
-  /* Strip leading whitespace. */
-  while (*str && isblank(*str))
-  {
-    str++;
-    n--;
-  }
-
-  if (n > 0)
-  {
-    clean = (char *)xmalloc((n + 1) * sizeof(char));
-    memcpy(clean, str, n - 1);
-    clean[n] = 0;
-  }
-  else
-  {
-    clean = xstrdup("");
-  }
-
-  return clean;
-}
-
-static void entry_key_go_url(const struct iface_key *k)
-{
-  if (k->type == IFACE_KEY_CHAR && k->key.ucs == '\n')
-  {
-    char *entry_text = iface_entry_get_text();
-
-    if (entry_text[0])
-    {
-      char *clean_url = strip_white_spaces(entry_text);
-
-      iface_entry_history_add();
-
-      if (is_url(clean_url))
-      {
-        play_from_url(clean_url);
-      }
-      else
-      {
-        error("Not a valid URL.");
-      }
-
-      free(clean_url);
-    }
-
-    free(entry_text);
-    iface_entry_disable();
-  }
-  else
-  {
-    iface_entry_handle_key(k);
-  }
-}
-
-static void add_url_to_plist(const char *url)
-{
-  assert(url != NULL);
-
-  if (plist_find_fname(playlist, url) == -1)
-  {
-    send_int_to_srv(CMD_LOCK);
-
-    if (options_get_bool("SyncPlaylist"))
-    {
-      struct plist_item *item = plist_new_item();
-
-      item->file = xstrdup(url);
-      item->title_file = xstrdup(url);
-
-      send_int_to_srv(CMD_CLI_PLIST_ADD);
-      send_item_to_srv(item);
-
-      plist_free_item_fields(item);
-      free(item);
-    }
-    else
-    {
-      int added;
-
-      added = plist_add(playlist, url);
-      make_file_title(playlist, added, false);
-      iface_add_to_plist(playlist, added);
-    }
-
-    /* Add to the server's playlist if the server has our
-     * playlist. */
-    if (get_server_plist_serial() == plist_get_serial(playlist))
-    {
-      send_int_to_srv(CMD_LIST_ADD);
-      send_str_to_srv(url);
-    }
-    send_int_to_srv(CMD_UNLOCK);
-  }
-  else
-  {
-    error("URL already on the playlist");
-  }
-}
-
-static void entry_key_add_url(const struct iface_key *k)
-{
-  if (k->type == IFACE_KEY_CHAR && k->key.ucs == '\n')
-  {
-    char *entry_text = iface_entry_get_text();
-
-    if (entry_text[0])
-    {
-      char *clean_url = strip_white_spaces(entry_text);
-
-      iface_entry_history_add();
-
-      if (is_url(clean_url))
-      {
-        add_url_to_plist(clean_url);
-      }
-      else
-      {
-        error("Not a valid URL.");
-      }
-
-      free(clean_url);
-    }
-
-    free(entry_text);
-    iface_entry_disable();
-  }
-  else
-  {
-    iface_entry_handle_key(k);
-  }
-}
 
 static void entry_key_search(const struct iface_key *k)
 {
@@ -2743,11 +2541,7 @@ static void entry_key_search(const struct iface_key *k)
         file = dir_up(cwd);
       }
 
-      if (is_url(file))
-      {
-        play_from_url(file);
-      }
-      else if (file_type(file) == F_DIR)
+      if (file_type(file) == F_DIR)
       {
         go_to_dir(file, 0);
       }
@@ -2890,12 +2684,7 @@ static void entry_key(const struct iface_key *k)
     case ENTRY_GO_DIR:
       entry_key_go_dir(k);
       break;
-    case ENTRY_GO_URL:
-      entry_key_go_url(k);
-      break;
-    case ENTRY_ADD_URL:
-      entry_key_add_url(k);
-      break;
+
     case ENTRY_SEARCH:
       entry_key_search(k);
       break;
@@ -3060,8 +2849,7 @@ static time_t rounded_time()
 /* Handle silent seek key. */
 static void seek_silent(const int sec)
 {
-  if (curr_file.state == STATE_PLAY && curr_file.file &&
-      !is_url(curr_file.file))
+  if (curr_file.state == STATE_PLAY && curr_file.file)
   {
     if (silent_seek_pos == -1)
     {
@@ -3683,9 +3471,7 @@ static void menu_key(const struct iface_key *k)
       case KEY_CMD_GO_DIR:
         iface_make_entry(ENTRY_GO_DIR);
         break;
-      case KEY_CMD_GO_URL:
-        iface_make_entry(ENTRY_GO_URL);
-        break;
+
       case KEY_CMD_GO_DIR_UP:
         go_dir_up();
         break;
@@ -3807,9 +3593,7 @@ static void menu_key(const struct iface_key *k)
       case KEY_CMD_PLIST_MOVE_DOWN:
         move_item(-1);
         break;
-      case KEY_CMD_ADD_STREAM:
-        iface_make_entry(ENTRY_ADD_URL);
-        break;
+
       case KEY_CMD_THEME_MENU:
         make_theme_menu();
         break;
@@ -4214,7 +3998,7 @@ static void add_recursively(struct plist *plist, lists_t_strs *args)
 
     arg = lists_strs_at(args, ix);
 
-    if (arg[0] != '/' && !is_url(arg))
+    if (arg[0] != '/')
     {
       strncpy(path, cwd, sizeof(path));
       path[sizeof(path) - 1] = 0;
@@ -4224,11 +4008,7 @@ static void add_recursively(struct plist *plist, lists_t_strs *args)
     {
       strncpy(path, arg, sizeof(path));
       path[sizeof(path) - 1] = 0;
-
-      if (!is_url(arg))
-      {
-        resolve_path(path, sizeof(path), "");
-      }
+      resolve_path(path, sizeof(path), "");
     }
 
     dir = is_dir(path);
@@ -4241,15 +4021,10 @@ static void add_recursively(struct plist *plist, lists_t_strs *args)
     {
       plist_load(plist, arg, cwd, 0);
     }
-    else if ((is_url(path) || is_sound_file(path)) &&
+    else if (is_sound_file(path) &&
              plist_find_fname(plist, path) == -1)
     {
-      int added = plist_add(plist, path);
-
-      if (is_url(path))
-      {
-        make_file_title(plist, added, false);
-      }
+      plist_add(plist, path);
     }
   }
 }
@@ -4450,16 +4225,8 @@ void interface_cmdline_file_info(const int server_sock)
     if (curr_file.file[0])
     {
       /* get tags */
-      if (file_type(curr_file.file) == F_URL)
-      {
-        send_int_to_srv(CMD_GET_TAGS);
-        curr_file.tags = get_data_tags();
-      }
-      else
-      {
-        curr_file.tags =
-            get_tags_no_iface(curr_file.file, TAGS_COMMENTS | TAGS_TIME);
-      }
+      curr_file.tags =
+          get_tags_no_iface(curr_file.file, TAGS_COMMENTS | TAGS_TIME);
 
       /* get the title */
       if (curr_file.tags->title)
@@ -4560,7 +4327,7 @@ void interface_cmdline_enqueue(int server_sock, lists_t_strs *args)
     const char *arg;
 
     arg = lists_strs_at(args, ix);
-    if (is_sound_file(arg) || is_url(arg))
+    if (is_sound_file(arg))
     {
       char *path = absolute_path(arg, cwd);
       send_int_to_srv(CMD_QUEUE_ADD);
@@ -4590,7 +4357,7 @@ void interface_cmdline_playit(int server_sock, lists_t_strs *args)
     const char *arg;
 
     arg = lists_strs_at(args, ix);
-    if (is_url(arg) || is_sound_file(arg))
+    if (is_sound_file(arg))
     {
       char *path = absolute_path(arg, cwd);
       plist_add(&plist, path);
@@ -4651,11 +4418,7 @@ void interface_cmdline_jump_to_percent(int server_sock, const int percent)
     return;
   }
 
-  if (file_type(curr_file.file) == F_URL)
-  {
-    fprintf(stderr, "Can't seek in network stream.\n");
-    return;
-  }
+
 
   curr_file.tags = get_tags_no_iface(curr_file.file, TAGS_TIME);
   new_pos = (percent * curr_file.tags->time) / 100;
@@ -4822,16 +4585,8 @@ void interface_cmdline_formatted_info(const int server_sock,
     if (curr_file.file[0])
     {
       /* get tags */
-      if (file_type(curr_file.file) == F_URL)
-      {
-        send_int_to_srv(CMD_GET_TAGS);
-        curr_file.tags = get_data_tags();
-      }
-      else
-      {
-        curr_file.tags =
-            get_tags_no_iface(curr_file.file, TAGS_COMMENTS | TAGS_TIME);
-      }
+      curr_file.tags =
+          get_tags_no_iface(curr_file.file, TAGS_COMMENTS | TAGS_TIME);
 
       /* get the title */
       if (curr_file.tags->title)

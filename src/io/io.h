@@ -13,10 +13,6 @@
 
 #include <sys/types.h>
 #include <pthread.h>
-#ifdef HAVE_CURL
-#include <sys/socket.h> /* curl sometimes needs this */
-#include <curl/curl.h>
-#endif
 
 #include "utils/fifo_buf.h"
 
@@ -28,36 +24,8 @@ extern "C"
   enum io_source
   {
     IO_SOURCE_FD,
-    IO_SOURCE_MMAP,
-    IO_SOURCE_CURL
+    IO_SOURCE_MMAP
   };
-
-#ifdef HAVE_CURL
-  struct io_stream_curl
-  {
-    CURLM *multi_handle;    /* we use the multi interface to get the
-                 data in pieces */
-    CURL *handle;           /* the actual used handle */
-    CURLMcode multi_status; /* curl status of the last multi operation */
-    CURLcode status;        /* curl status of the last easy operation */
-    char *url;
-    struct curl_slist *http_headers; /* HTTP headers to send with
-                the request */
-    char *buf;                       /* buffer for data that curl gives us */
-    long buf_fill;
-    int need_perform_loop;              /* do we need the perform() loop? */
-    int got_locn;                       /* received a location header */
-    char *mime_type;                    /* mime type of the stream */
-    int wake_up_pipe[2];                /* pipes used to wake up the curl read
-                             loop that does select() */
-    struct curl_slist *http200_aliases; /* list of aliases for http
-              response's status line */
-    size_t icy_meta_int;                /* how often are icy metadata sent?
-                           0 - disabled, in bytes */
-    size_t icy_meta_count;              /* how many bytes was read from the last
-                         metadata packet */
-  };
-#endif
 
   struct io_stream;
 
@@ -83,10 +51,6 @@ extern "C"
 #ifdef HAVE_MMAP
     void *mem;
     off_t mem_pos;
-#endif
-
-#ifdef HAVE_CURL
-    struct io_stream_curl curl;
 #endif
 
     struct fifo_buf *buf;
