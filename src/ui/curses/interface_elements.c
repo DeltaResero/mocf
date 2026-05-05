@@ -2958,9 +2958,8 @@ static void info_win_set_status(struct info_win *w, const char *msg)
 {
   assert(w != NULL);
   assert(msg != NULL);
-  assert(strlen(msg) < sizeof(w->status_msg));
-
-  strcpy(w->status_msg, msg);
+  strncpy(w->status_msg, msg, sizeof(w->status_msg) - 1);
+  w->status_msg[sizeof(w->status_msg) - 1] = '\0';
   info_win_draw_status(w);
 }
 
@@ -3598,7 +3597,7 @@ static void sec_to_min_plist(char *buff, const int seconds)
   }
   else
   {
-    strcpy(buff, "!!!!!!!!!");
+    snprintf(buff, 48, "!!!!!!!!!");
   }
 }
 
