@@ -1226,8 +1226,8 @@ static void process_options(poptContext ctx, lists_t_strs *deferred)
             }
           }
         }
-        // TODO: Add message explaining the error
-        show_usage(ctx);
+        fprintf(stderr, "mocf: invalid argument for --jump: '%s' (expected N%% or Ns, e.g. 50%% or 30s)\n", arg);
+        fprintf(stderr, "Try 'mocf --help' for more information.\n");
         exit(EXIT_FAILURE);
       case CL_GETINFO:
         params.get_formatted_info = 1;
