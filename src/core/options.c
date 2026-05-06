@@ -821,8 +821,6 @@ void options_init()
   add_bool("UseMMap", false);
   add_bool("UseMimeMagic", false);
   add_str("ID3v1TagsEncoding", "WINDOWS-1250", CHECK_NONE);
-  add_bool("UseRCC", true);
-  add_bool("UseRCCForFilesystem", true);
   add_bool("EnforceTagsEncoding", false);
   add_bool("FileNamesIconv", false);
   add_bool("NonUTFXterm", false);

@@ -47,7 +47,6 @@
 #include "core/log.h"
 #include "core/options.h"
 #include "utils/utf8.h"
-#include "library/rcc.h"
 
 static char *terminal_charset = NULL;
 static int using_utf8 = 0;

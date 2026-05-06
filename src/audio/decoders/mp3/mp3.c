@@ -43,7 +43,6 @@
 #include "core/options.h"
 #include "library/files.h"
 #include "utils/utf8.h"
-#include "library/rcc.h"
 
 #define INPUT_BUFFER (32 * 1024)
 
@@ -176,20 +175,9 @@ static char *get_tag(struct id3_tag *tag, const char *what)
 
         comm = (char *)id3_ucs4_latin1duplicate(ucs4);
 
-#ifdef HAVE_RCC
-        if (options_get_bool("UseRCC"))
-        {
-          comm = rcc_reencode(comm);
-        }
-        else
-        {
-#endif /* HAVE_RCC */
           t = comm;
           comm = id3v1_fix(comm);
           free(t);
-#ifdef HAVE_RCC
-        }
-#endif /* HAVE_RCC */
       }
       else
       {

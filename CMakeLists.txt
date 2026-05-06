@@ -31,7 +31,6 @@ set(CMAKE_REQUIRED_DEFINITIONS "-D_GNU_SOURCE")
 option(ENABLE_DEBUG "Enable debugging code" OFF)
 option(ENABLE_CACHE "Enable tags caching code" ON)
 option(ENABLE_INTERNAL_FLOAT "Enable internal float processing" ON)
-option(ENABLE_RCC "Enable LIBRCC support" ON)
 option(ENABLE_SAMPLERATE "Enable libsamplerate" ON)
 option(ENABLE_MAGIC "Enable MIME magic support" ON)
 
@@ -195,14 +194,6 @@ if(ENABLE_MAGIC)
   endif()
 endif()
 
-if(ENABLE_RCC)
-  check_include_file(librcc.h HAVE_RCC_H)
-  check_library_exists(rcc rccInit "" HAVE_LIBRCC)
-  if(HAVE_RCC_H AND HAVE_LIBRCC)
-    set(HAVE_RCC 1)
-    list(APPEND EXTRA_LIBS rcc)
-  endif()
-endif()
 
 # Sound Drivers
 set(SOUND_DRIVERS "")
@@ -354,7 +345,6 @@ set(MOCF_SOURCES
     src/utils/rbtree.c
     src/library/tags_cache.c
     src/utils/utf8.c
-    src/library/rcc.c
     src/audio/processing/softmixer.c
     src/utils/lists.c
     src/audio/processing/equalizer.c
@@ -410,7 +400,6 @@ macro(bool_to_onoff VAR RESULT)
   endif()
 endmacro()
 
-bool_to_onoff(HAVE_RCC STATUS_RCC)
 bool_to_onoff(HAVE_SAMPLERATE STATUS_SAMPLERATE)
 bool_to_onoff(HAVE_LIBMAGIC STATUS_MAGIC)
 
@@ -422,7 +411,6 @@ message(STATUS "  Install prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "  Sound drivers: ${SOUND_DRIVERS}")
 message(STATUS "  Debug: ${ENABLE_DEBUG}")
 message(STATUS "  Cache: ${ENABLE_CACHE}")
-message(STATUS "  RCC: ${STATUS_RCC}")
 message(STATUS "  Resampling: ${STATUS_SAMPLERATE}")
 message(STATUS "  MIME magic: ${STATUS_MAGIC}")
 message(STATUS "")

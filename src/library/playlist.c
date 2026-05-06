@@ -31,7 +31,6 @@
 #include "library/files.h"
 #include "utils/rbtree.h"
 #include "utils/utf8.h"
-#include "library/rcc.h"
 
 /* Initial size of the table */
 #define INIT_SIZE 64
@@ -785,14 +784,6 @@ void plist_set_title_file(struct plist *plist, const int num, const char *title)
     free(plist->items[num].title_file);
   }
 
-#ifdef HAVE_RCC
-  if (options_get_bool("UseRCCForFilesystem"))
-  {
-    char *t_str = xstrdup(title);
-    plist->items[num].title_file = rcc_reencode(t_str);
-    return;
-  }
-#endif
 
   plist->items[num].title_file = xstrdup(title);
 }

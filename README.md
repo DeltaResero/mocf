@@ -41,7 +41,7 @@ This project uses the **CMake** build system.
 *   POSIX.1-2001 compatible system
 *   **Required Libraries:** libpopt, ncurses, pthreads
 *   **Optional Libraries:** PulseAudio, ALSA, JACK, OSS, SNDIO, libcurl,
-    libsamplerate, libmagic, librcc, BerkeleyDB.
+    libsamplerate, libmagic, BerkeleyDB.
 *   **Decoder Libraries:** libmad, libmpg123, libfaad2, libvorbis, opusfile,
     libflac, libmpcdec, libwavpack, libsndfile, libmodplug, ffmpeg/libav,
     libspeex, libtimidity, libsidplay2.
@@ -66,7 +66,6 @@ You can configure the build by passing `-DOPTION=ON/OFF` to cmake.
 | `ENABLE_DEBUG` | Enable debugging code | `OFF` |
 | `ENABLE_CACHE` | Enable tags caching code (requires BerkeleyDB) | `ON` |
 | `ENABLE_INTERNAL_FLOAT` | Use float for internal processing | `ON` |
-| `ENABLE_RCC` | Enable LIBRCC support | `ON` |
 | `ENABLE_CURL` | Enable network streams support | `ON` |
 | `ENABLE_SAMPLERATE` | Enable libsamplerate | `ON` |
 | `ENABLE_MAGIC` | Enable MIME magic support | `ON` |

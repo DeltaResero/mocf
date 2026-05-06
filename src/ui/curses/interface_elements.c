@@ -42,7 +42,6 @@
 #include "core/protocol.h"
 #include "ui/curses/interface.h"
 #include "utils/utf8.h"
-#include "library/rcc.h"
 
 #ifndef PACKAGE_REVISION
 #define STARTUP_MESSAGE                                                        \
@@ -1224,19 +1223,6 @@ static void side_menu_make_list_content(struct side_menu *m,
     {
       char title[PATH_MAX];
 
-#ifdef HAVE_RCC
-      char *t_str = NULL;
-      if (options_get_bool("UseRCCForFilesystem"))
-      {
-        strcpy(title, strrchr(lists_strs_at(dirs, i), '/') + 1);
-        strcat(title, "/");
-        t_str = xstrdup(title);
-        t_str = rcc_reencode(t_str);
-        snprintf(title, PATH_MAX, "%s", t_str);
-        free(t_str);
-      }
-      else
-#endif
           if (options_get_bool("FileNamesIconv"))
       {
         char *conv_title =

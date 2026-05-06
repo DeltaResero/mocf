@@ -22,7 +22,6 @@
 #cmakedefine HAVE_SOUNDCARD_H 1
 #cmakedefine HAVE_SNDIO_H 1
 #cmakedefine HAVE_DB_H 1
-#cmakedefine HAVE_RCC_H 1
 #cmakedefine HAVE_STDINT_H 1
 #cmakedefine HAVE_INTTYPES_H 1
 
@@ -52,7 +51,6 @@
 /* Features */
 #cmakedefine HAVE_SAMPLERATE 1
 #cmakedefine HAVE_LIBMAGIC 1
-#cmakedefine HAVE_RCC 1
 #cmakedefine HAVE_ICONV 1
 #cmakedefine INTERNAL_FLOAT 1
 #cmakedefine NDEBUG 1

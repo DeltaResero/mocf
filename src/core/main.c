@@ -41,7 +41,6 @@
 #include "audio/decoder.h"
 #include "utils/lists.h"
 #include "library/files.h"
-#include "library/rcc.h"
 
 static int mocf_argc;
 static const char **mocf_argv;
@@ -213,7 +212,6 @@ static void start_moc(const struct parameters *params, lists_t_strs *args)
         decoder_cleanup();
         io_cleanup();
         files_cleanup();
-        rcc_cleanup();
         common_cleanup();
         exit(EXIT_SUCCESS);
       case -1:
@@ -1474,7 +1472,6 @@ int main(int argc, const char *argv[])
   check_moc_dir();
 
   io_init();
-  rcc_init();
   decoder_init(params.debug);
   srand(time(NULL));
 
@@ -1491,7 +1488,6 @@ int main(int argc, const char *argv[])
   options_free();
   decoder_cleanup();
   io_cleanup();
-  rcc_cleanup();
   files_cleanup();
   common_cleanup();
 
