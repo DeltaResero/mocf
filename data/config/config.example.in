@@ -127,19 +127,6 @@
 #InputBuffer = 512                  # Minimum value is 32KB
 #OutputBuffer = 128                 # Minimum value is 128KB
 
-# How much to fill the input buffer before playing (in kilobytes)?
-# This can't be greater than the value of InputBuffer.  While this has
-# a positive effect for network streams, it also causes the broadcast
-# audio to be delayed.
-#Prebuffering = 64
-
-# Use this HTTP proxy server for internet streams.  If not set, the
-# environment variables http_proxy and ALL_PROXY will be used if present.
-#
-# Format: HTTPProxy = PROXY_NAME:PORT
-#
-#HTTPProxy =
-
 # Sound driver - ALSA, JACK, OSS, PULSE, SNDIO, or null
 # You can enter more than one driver as a colon-separated list.
 # The first working driver will be the one that is used.
@@ -332,8 +319,7 @@
 # in the actual file MIME type (so all combinations of 'audio/flac' and
 # 'audio/x-flac' match each other).
 #
-# For Internet streams the matching is done on MIME media type and on
-# actual content.  For files the matches are made on MIME media type
+# For files the matches are made on MIME media type
 # (if the 'UseMimeMagic' option is set) and on filename extension.  The
 # MIME media type of a file is not determined until the first entry for
 # MIME is encountered in the list.
@@ -341,31 +327,28 @@
 # The matching is done in the order of appearance in the list with any
 # entries added from the command line being matched before those listed
 # here.  Therefore, if you place all filename extension entries before
-# all MIME entries you will speed up MOC's processing of directories
-# (which could be significant for remote file systems).
+# all MIME entries you will speed up MOC's processing of directories.
 #
 # The decoder list may be empty, in which case no decoders will be used
-# for files (and files with that audio format ignored) while Internet
-# streams will be assessed on the actual content.  Any decoder position
-# may contain an asterisk, in which case any decoder not otherwise listed
-# which can handle the audio format will be used.  It is not an error to
-# list the same decoder twice, but neither does it make sense to do so.
+# for files with that audio format (they will be ignored).  Any decoder
+# position may contain an asterisk, in which case any decoder not
+# otherwise listed which can handle the audio format will be used.  It
+# is not an error to list the same decoder twice, but neither does it
+# make sense to do so.
 #
 # If you have a mix of audio and non-audio files in your directories, you
 # may wish to include entries at top of the list which ignore non-audio
 # files by extension.
 #
 # In summary, the PreferredDecoders option provides fine control over the
-# type of matching which is performed (filename extension, MIME media
-# type and streamed media content) and which decoder(s) (if any) are used
-# based on the option's list entries and their ordering.
+# type of matching which is performed (filename extension and MIME media
+# type) and which decoder(s) (if any) are used based on the option's
+# list entries and their ordering.
 #
 # Examples:   aac(aac,ffmpeg)             first try FAAD2 for AACs then FFmpeg
 #             mp3()                       ignore MP3 files
 #             wav(*,sndfile)              use sndfile for WAV as a last resort
 #             ogg(vorbis,*):flac(flac,*)  try Xiph decoders first
-#             ogg():audio/ogg()           ignore OGG files, and
-#                                         force Internet selection by content
 #             gz():html()                 ignore some non-audio files
 #
 # Any unspecified audio formats default to trying all decoders.
@@ -379,17 +362,10 @@
 #PreferredDecoders += sid(sidplay2):mus(sidplay2)
 #PreferredDecoders += wav(sndfile,*,ffmpeg)
 #PreferredDecoders += wv(wavpack,*,ffmpeg)
-#PreferredDecoders += audio/aac(aac):audio/aacp(aac):audio/m4a(ffmpeg)
-#PreferredDecoders += audio/wav(sndfile,*)
 
-# The following PreferredDecoders attempt to handle the ambiguity surrounding
-# container types such as OGG for files.  The first two entries will force
-# a local file to the correct decoder (assuming the .ogg file contains Vorbis
-# audio), while the MIME media types will cause Internet audio streams to
-# be assessed on content (which may be either Vorbis or Speex).
+# The following PreferredDecoders handle OGG container ambiguity for local files.
 #
 #PreferredDecoders += ogg(vorbis,*,ffmpeg):oga(vorbis,*,ffmpeg):ogv(ffmpeg)
-#PreferredDecoders += application/ogg(vorbis):audio/ogg(vorbis)
 #PreferredDecoders += flac(flac,*,ffmpeg)
 #PreferredDecoders += opus(opus,ffmpeg)
 #PreferredDecoders += spx(speex)

@@ -910,43 +910,6 @@ static void *ffmpeg_open(const char *file)
   return ffmpeg_open_internal(data);
 }
 
-static void *ffmpeg_open_stream(struct io_stream *stream)
-{
-  struct ffmpeg_data *data;
-
-  data = ffmpeg_make_data();
-
-  data->iostream = stream;
-
-  return ffmpeg_open_internal(data);
-}
-
-static int ffmpeg_can_decode(struct io_stream *stream)
-{
-  int res;
-  AVProbeData probe_data;
-  const AVInputFormat *fmt;
-  char buf[8096 + AVPROBE_PADDING_SIZE] = {0};
-
-  res = io_peek(stream, buf, sizeof(buf));
-  if (res < 0)
-  {
-    error("Stream error: %s", io_strerror(stream));
-    return 0;
-  }
-
-  probe_data.filename = NULL;
-  probe_data.buf = (unsigned char *)buf;
-  probe_data.buf_size = sizeof(buf) - AVPROBE_PADDING_SIZE;
-#ifdef HAVE_STRUCT_AVPROBEDATA_MIME_TYPE
-  probe_data.mime_type = NULL;
-#endif
-
-  fmt = av_probe_input_format(&probe_data, 1);
-
-  return fmt != NULL;
-}
-
 static void put_in_remain_buf(struct ffmpeg_data *data, const char *buf,
                               const int len)
 {
@@ -1581,8 +1544,6 @@ static struct decoder ffmpeg_decoder = {DECODER_API_VERSION,
                                         ffmpeg_init,
                                         ffmpeg_destroy,
                                         ffmpeg_open,
-                                        ffmpeg_open_stream,
-                                        ffmpeg_can_decode,
                                         ffmpeg_close,
                                         ffmpeg_decode,
                                         ffmpeg_seek,

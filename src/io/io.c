@@ -369,15 +369,6 @@ void io_close(struct io_stream *s)
         log_errno("Destroying buf_fill_cond failed", rc);
       }
     }
-
-    if (s->metadata.title)
-    {
-      free(s->metadata.title);
-    }
-    if (s->metadata.url)
-    {
-      free(s->metadata.url);
-    }
   }
 
   rc = pthread_mutex_destroy(&s->buf_mtx);
@@ -389,11 +380,6 @@ void io_close(struct io_stream *s)
   if (rc != 0)
   {
     log_errno("Destroying io_mtx failed", rc);
-  }
-  rc = pthread_mutex_destroy(&s->metadata.mtx);
-  if (rc != 0)
-  {
-    log_errno("Destroying metadata.mtx failed", rc);
   }
 
   if (s->strerror)
@@ -570,13 +556,11 @@ struct io_stream *io_open(const char *file, const int buffered)
   s->opened = 0;
   s->size = -1;
   s->buf_fill_callback = NULL;
-  memset(&s->metadata, 0, sizeof(s->metadata));
 
   io_open_file(s, file);
 
   pthread_mutex_init(&s->buf_mtx, NULL);
   pthread_mutex_init(&s->io_mtx, NULL);
-  pthread_mutex_init(&s->metadata.mtx, NULL);
 
   if (!s->opened)
   {
@@ -592,7 +576,6 @@ struct io_stream *io_open(const char *file, const int buffered)
   if (buffered)
   {
     s->buf = fifo_buf_new(options_get_int("InputBuffer") * 1024);
-    s->prebuffer = options_get_int("Prebuffering") * 1024;
 
     pthread_cond_init(&s->buf_free_cond, NULL);
     pthread_cond_init(&s->buf_fill_cond, NULL);
@@ -650,24 +633,6 @@ static ssize_t io_peek_internal(struct io_stream *s, void *buf, size_t count)
   UNLOCK(s->buf_mtx);
 
   return io_ok(s) ? received : -1;
-}
-
-/* Wait until there are s->prebuffer bytes in the buffer or some event
- * occurs which prevents prebuffering. */
-void io_prebuffer(struct io_stream *s, const size_t to_fill)
-{
-  logit("prebuffering to %zu bytes...", to_fill);
-
-  LOCK(s->buf_mtx);
-  while (io_ok_nolock(s) && !s->stop_read_thread && !s->eof &&
-         to_fill > fifo_buf_get_fill(s->buf))
-  {
-    debug("waiting (buffer %zu bytes full)", fifo_buf_get_fill(s->buf));
-    pthread_cond_wait(&s->buf_fill_cond, &s->buf_mtx);
-  }
-  UNLOCK(s->buf_mtx);
-
-  logit("done");
 }
 
 static ssize_t io_read_buffered(struct io_stream *s, void *buf, size_t count)
@@ -847,62 +812,6 @@ void io_init()
 
 void io_cleanup()
 {
-}
-
-/* Return the mime type if available or NULL.
- * The mime type is read by curl only after the first read (or peek), until
- * then it's NULL. */
-char *io_get_mime_type(struct io_stream *s ATTR_UNUSED)
-{
-  return NULL;
-}
-
-/* Return the malloc()ed stream title if available or NULL. */
-char *io_get_metadata_title(struct io_stream *s)
-{
-  char *t;
-
-  LOCK(s->metadata.mtx);
-  t = xstrdup(s->metadata.title);
-  UNLOCK(s->metadata.mtx);
-
-  return t;
-}
-
-/* Return the malloc()ed stream url (from metadata) if available or NULL. */
-char *io_get_metadata_url(struct io_stream *s)
-{
-  char *t;
-
-  LOCK(s->metadata.mtx);
-  t = xstrdup(s->metadata.url);
-  UNLOCK(s->metadata.mtx);
-
-  return t;
-}
-
-/* Set the metadata title of the stream. */
-void io_set_metadata_title(struct io_stream *s, const char *title)
-{
-  LOCK(s->metadata.mtx);
-  if (s->metadata.title)
-  {
-    free(s->metadata.title);
-  }
-  s->metadata.title = xstrdup(title);
-  UNLOCK(s->metadata.mtx);
-}
-
-/* Set the metadata url for the stream. */
-void io_set_metadata_url(struct io_stream *s, const char *url)
-{
-  LOCK(s->metadata.mtx);
-  if (s->metadata.url)
-  {
-    free(s->metadata.url);
-  }
-  s->metadata.url = xstrdup(url);
-  UNLOCK(s->metadata.mtx);
 }
 
 /* Set the callback function to be invoked when the fill of the buffer

@@ -219,20 +219,6 @@ static void *musepack_open(const char *file)
   return data;
 }
 
-static void *musepack_open_stream(struct io_stream *stream)
-{
-  struct musepack_data *data;
-
-  data = (struct musepack_data *)xmalloc(sizeof(struct musepack_data));
-  data->ok = 0;
-
-  decoder_error_init(&data->error);
-  data->stream = stream;
-  musepack_open_stream_internal(data);
-
-  return data;
-}
-
 static void musepack_close(void *prv_data)
 {
   struct musepack_data *data = (struct musepack_data *)prv_data;
@@ -505,8 +491,6 @@ static struct decoder musepack_decoder = {DECODER_API_VERSION,
                                           NULL,
                                           NULL,
                                           musepack_open,
-                                          musepack_open_stream,
-                                          NULL /* musepack_can_decode */,
                                           musepack_close,
                                           musepack_decode,
                                           musepack_seek,

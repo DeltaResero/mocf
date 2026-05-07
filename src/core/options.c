@@ -766,8 +766,6 @@ void options_init()
           CHECK_NONE);
   add_int("InputBuffer", 512, CHECK_RANGE(1), 32, INT_MAX);
   add_int("OutputBuffer", 128, CHECK_RANGE(1), 128, INT_MAX);
-  add_int("Prebuffering", 64, CHECK_RANGE(1), 0, INT_MAX);
-  add_str("HTTPProxy", NULL, CHECK_NONE);
 
 #ifdef OPENBSD
   add_list("SoundDriver", "SNDIO:JACK:OSS", CHECK_DISCRETE(5), "SNDIO",
@@ -1246,11 +1244,6 @@ static bool set_option(const char *name, const char *value_in, bool append)
  * be checked without parsing the whole file. */
 static void sanity_check()
 {
-  if (options_get_int("Prebuffering") > options_get_int("InputBuffer"))
-  {
-    fatal("Prebuffering is set to a value greater than InputBuffer!");
-  }
-
   if ((options_get_int("EnableResample") == 2) &&
       (options_get_int("MaxSamplerate") == 0))
   {

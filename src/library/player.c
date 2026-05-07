@@ -96,9 +96,8 @@ static int req_seek;
 
 /* Source of the played stream tags. */
 static enum {
-  TAGS_SOURCE_DECODER, /* tags from the stream (e.g., id3tags, vorbis comments)
-                        */
-  TAGS_SOURCE_METADATA /* tags from icecast metadata */
+  TAGS_SOURCE_DECODER /* tags from the decoder (e.g., id3tags, vorbis comments)
+                       */
 } tags_source;
 
 /* Tags of the currently played file. */
@@ -110,8 +109,6 @@ static pthread_mutex_t curr_tags_mtx = PTHREAD_MUTEX_INITIALIZER;
 /* Stream associated with the currently playing decoder. */
 static struct io_stream *decoder_stream = NULL;
 static pthread_mutex_t decoder_stream_mtx = PTHREAD_MUTEX_INITIALIZER;
-
-static int prebuffering = 0; /* are we prebuffering now? */
 
 static struct bitrate_list bitrate_list;
 
@@ -411,9 +408,8 @@ static void show_tags(const struct file_tags *tags DEBUG_ONLY)
 
 /* Update tags if tags from the decoder or the stream are available. */
 static void update_tags(const struct decoder *f, void *decoder_data,
-                        struct io_stream *s)
+                        struct io_stream *s ATTR_UNUSED)
 {
-  char *stream_title = NULL;
   int tags_changed = 0;
   struct file_tags *new_tags;
 
@@ -428,24 +424,6 @@ static void update_tags(const struct decoder *f, void *decoder_data,
     logit("Tags change from the decoder");
     tags_source = TAGS_SOURCE_DECODER;
     show_tags(curr_tags);
-  }
-  else if (s && (stream_title = io_get_metadata_title(s)))
-  {
-    if (curr_tags && curr_tags->title && tags_source == TAGS_SOURCE_DECODER)
-    {
-      logit("New IO stream tags, ignored because there are "
-            "decoder tags present");
-      free(stream_title);
-    }
-    else
-    {
-      tags_clear(curr_tags);
-      curr_tags->title = stream_title;
-      show_tags(curr_tags);
-      tags_changed = 1;
-      logit("New IO stream tags");
-      tags_source = TAGS_SOURCE_METADATA;
-    }
   }
 
   if (tags_changed)
@@ -513,14 +491,6 @@ static void decode_loop(const struct decoder *f, void *decoder_data,
       struct decoder_error err;
 
       UNLOCK(request_cond_mtx);
-
-      if (decoder_stream && out_buf_get_fill(out_buf) < PREBUFFER_THRESHOLD)
-      {
-        prebuffering = 1;
-        io_prebuffer(decoder_stream, options_get_int("Prebuffering") * 1024);
-        prebuffering = 0;
-        status_msg("Playing...");
-      }
 
       decoded = f->decode(decoder_data, buf, sizeof(buf), &new_sound_params);
 
@@ -875,55 +845,6 @@ static void play_file(const char *file, const struct decoder *f,
     log_md5_sum(file, sound_params, f, buf, md5.len);
   }
 #endif
-}
-
-/* Play the stream (global decoder_stream) using the given decoder. */
-static void play_stream(const struct decoder *f, struct out_buf *out_buf)
-{
-  void *decoder_data;
-  struct sound_params sound_params = {0, 0, 0};
-  struct decoder_error err;
-  struct md5_data null_md5;
-
-  null_md5.okay = false;
-  out_buf_reset(out_buf);
-
-  assert(f->open_stream != NULL);
-
-  decoder_data = f->open_stream(decoder_stream);
-  f->get_error(decoder_data, &err);
-  if (err.type != ERROR_OK)
-  {
-    LOCK(decoder_stream_mtx);
-    decoder_stream = NULL;
-    UNLOCK(decoder_stream_mtx);
-
-    f->close(decoder_data);
-    error("%s", err.err);
-    status_msg("");
-    decoder_error_clear(&err);
-    logit("Can't open file");
-  }
-  else
-  {
-    audio_state_started_playing();
-    bitrate_list_init(&bitrate_list);
-    decode_loop(f, decoder_data, NULL, out_buf, &sound_params, &null_md5, 0.0);
-  }
-}
-
-/* Callback for io buffer fill - show the prebuffering state. */
-static void fill_cb(struct io_stream *unused1 ATTR_UNUSED, size_t fill,
-                    size_t unused2 ATTR_UNUSED, void *unused3 ATTR_UNUSED)
-{
-  if (prebuffering)
-  {
-    char msg[64];
-
-    sprintf(msg, "Prebuffering %zu/%d KB", fill / 1024U,
-            options_get_int("Prebuffering"));
-    status_msg(msg);
-  }
 }
 
 /* Open a file, decode it and put output into the buffer. At the end, start

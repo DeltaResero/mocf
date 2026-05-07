@@ -419,13 +419,6 @@ static void *aac_open(const char *file)
   return data;
 }
 
-static void *aac_open_stream(struct io_stream *stream)
-{
-  assert(stream != NULL);
-
-  return aac_open_internal(stream, NULL);
-}
-
 static char *get_tag(struct id3_tag *tag, const char *what)
 {
   struct id3_frame *frame;
@@ -673,8 +666,6 @@ static struct decoder aac_decoder = {DECODER_API_VERSION,
                                      NULL,
                                      NULL,
                                      aac_open,
-                                     aac_open_stream,
-                                     NULL,
                                      aac_close,
                                      aac_decode,
                                      aac_seek,

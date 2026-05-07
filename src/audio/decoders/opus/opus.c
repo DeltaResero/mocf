@@ -271,31 +271,6 @@ static void *opus_open(const char *file)
   return data;
 }
 
-static int opus_can_decode(struct io_stream *stream)
-{
-  char buf[36];
-
-  if (io_peek(stream, buf, 36) == 36 && !memcmp(buf, "OggS", 4) &&
-      !memcmp(buf + 28, "OpusHead", 8))
-  {
-    return 1;
-  }
-  return 0;
-}
-
-static void *opus_open_stream(struct io_stream *stream)
-{
-  struct opus_data *data;
-
-  data = (struct opus_data *)xmalloc(sizeof(struct opus_data));
-  data->ok = 0;
-
-  decoder_error_init(&data->error);
-  data->stream = stream;
-  opus_open_stream_internal(data);
-  return data;
-}
-
 static void opus_close(void *prv_data)
 {
   struct opus_data *data = (struct opus_data *)prv_data;
@@ -455,8 +430,6 @@ static struct decoder opus_decoder = {DECODER_API_VERSION,
                                       NULL,
                                       NULL,
                                       opus_open,
-                                      opus_open_stream,
-                                      opus_can_decode,
                                       opus_close,
                                       opus_decodeX,
                                       opus_seek,

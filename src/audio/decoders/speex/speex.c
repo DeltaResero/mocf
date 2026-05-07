@@ -273,24 +273,6 @@ static void *spx_open(const char *file)
   return data;
 }
 
-static void *spx_open_stream(struct io_stream *stream)
-{
-  return spx_open_internal(stream);
-}
-
-static int spx_can_decode(struct io_stream *stream)
-{
-  char buf[36];
-
-  if (io_peek(stream, buf, 36) == 36 && !memcmp(buf, "OggS", 4) &&
-      !memcmp(buf + 28, "Speex   ", 8))
-  {
-    return 1;
-  }
-
-  return 0;
-}
-
 static void spx_close(void *prv_data)
 {
   struct spx_data *data = (struct spx_data *)prv_data;
@@ -750,8 +732,6 @@ static struct decoder spx_decoder = {DECODER_API_VERSION,
                                      NULL,
                                      NULL,
                                      spx_open,
-                                     spx_open_stream,
-                                     spx_can_decode,
                                      spx_close,
                                      spx_decode,
                                      spx_seek,

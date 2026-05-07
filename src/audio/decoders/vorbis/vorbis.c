@@ -284,33 +284,6 @@ static void *vorbis_open(const char *file)
   return data;
 }
 
-static int vorbis_can_decode(struct io_stream *stream)
-{
-  char buf[35];
-
-  if (io_peek(stream, buf, 35) == 35 && !memcmp(buf, "OggS", 4) &&
-      !memcmp(buf + 28, "\01vorbis", 7))
-  {
-    return 1;
-  }
-
-  return 0;
-}
-
-static void *vorbis_open_stream(struct io_stream *stream)
-{
-  struct vorbis_data *data;
-
-  data = (struct vorbis_data *)xmalloc(sizeof(struct vorbis_data));
-  data->ok = 0;
-
-  decoder_error_init(&data->error);
-  data->stream = stream;
-  vorbis_open_stream_internal(data);
-
-  return data;
-}
-
 static void vorbis_close(void *prv_data)
 {
   struct vorbis_data *data = (struct vorbis_data *)prv_data;
@@ -524,8 +497,6 @@ static struct decoder vorbis_decoder = {DECODER_API_VERSION,
                                         NULL,
                                         NULL,
                                         vorbis_open,
-                                        vorbis_open_stream,
-                                        vorbis_can_decode,
                                         vorbis_close,
                                         vorbis_decode,
                                         vorbis_seek,

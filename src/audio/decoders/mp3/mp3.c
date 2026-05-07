@@ -407,35 +407,6 @@ static struct mp3_data *mp3_open_internal(const char *file, const int buffered)
 
 static void *mp3_open(const char *file) { return mp3_open_internal(file, 1); }
 
-static void *mp3_open_stream(struct io_stream *stream)
-{
-  struct mp3_data *data;
-
-  data = (struct mp3_data *)xmalloc(sizeof(struct mp3_data));
-  data->ok = 1;
-  decoder_error_init(&data->error);
-
-  /* Reset information about the file */
-  data->freq = 0;
-  data->channels = 0;
-  data->skip_frames = 0;
-  data->bitrate = -1;
-  data->io_stream = stream;
-  data->duration = -1;
-  data->size = -1;
-
-  mad_stream_init(&data->stream);
-  mad_frame_init(&data->frame);
-  mad_synth_init(&data->synth);
-
-  if (options_get_bool("MP3IgnoreCRCErrors"))
-  {
-    mad_stream_options(&data->stream, MAD_OPTION_IGNORECRC);
-  }
-
-  return data;
-}
-
 static void mp3_close(void *void_data)
 {
   struct mp3_data *data = (struct mp3_data *)void_data;
@@ -804,35 +775,6 @@ static int mp3_our_mime(const char *mime)
          !strncasecmp(mime, "audio/mpeg;", 11);
 }
 
-static int mp3_can_decode(struct io_stream *stream)
-{
-  unsigned char buf[16 * 1024];
-
-  /* We must use such a sophisticated test, because there are Shoutcast
-   * servers that can start broadcasting in the middle of a frame, so we
-   * can't use any fewer bytes for magic values. */
-  if (io_peek(stream, buf, sizeof(buf)) == sizeof(buf))
-  {
-    struct mad_stream stream;
-    struct mad_header header;
-    int dec_res;
-
-    mad_stream_init(&stream);
-    mad_header_init(&header);
-
-    mad_stream_buffer(&stream, buf, sizeof(buf));
-    stream.error = 0;
-
-    while ((dec_res = mad_header_decode(&header, &stream)) == -1 &&
-           MAD_RECOVERABLE(stream.error))
-      ;
-
-    return dec_res != -1 ? 1 : 0;
-  }
-
-  return 0;
-}
-
 static void mp3_init()
 {
   iconv_id3_fix = iconv_open("UTF-8", options_get_str("ID3v1TagsEncoding"));
@@ -854,8 +796,6 @@ static struct decoder mp3_decoder = {DECODER_API_VERSION,
                                      mp3_init,
                                      mp3_destroy,
                                      mp3_open,
-                                     mp3_open_stream,
-                                     mp3_can_decode,
                                      mp3_close,
                                      mp3_decode,
                                      mp3_seek,

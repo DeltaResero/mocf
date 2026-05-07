@@ -84,35 +84,6 @@ extern "C"
      */
     void *(*open)(const char *uri);
 
-    /** Open the resource for an already opened stream.
-     *
-     * Handle the stream that was already opened, but no data were read.
-     * You must operate on the stream using io_*() functions. This is used
-     * for internet streams, so seeking is not possible. This function is
-     * optional.
-     *
-     * \param stream Opened stream from which the decoder must read.
-     *
-     * \return Private decoder data. This pointer will be passed to every
-     * other function that operates on the stream.
-     */
-    void *(*open_stream)(struct io_stream *stream);
-
-    /** Check if the decoder is able to decode from this stream.
-     *
-     * Used to check if the decoder is able to read from an already opened
-     * stream. This is used to find the proper decoder for an internet
-     * stream when searching by the MIME type failed. The decoder must not
-     * read from this stream (io_read()), but can peek data (io_peek()).
-     * The decoder is expected to peek a few bytes to recognize its format.
-     * Optional.
-     *
-     * \param stream Opened stream.
-     *
-     * \return 1 if the decoder is able to decode data from this stream.
-     */
-    int (*can_decode)(struct io_stream *stream);
-
     /** Close the resource and cleanup.
      *
      * Free all decoder's private data and allocated resources.
@@ -246,8 +217,7 @@ extern "C"
     /** Get the IO stream used by the decoder.
      *
      * Get the pointer to the io_stream object used by the decoder. This
-     * is used for fast interrupting especially when the stream reads
-     * from a network. This function is optional.
+     * is used for fast interrupting of local file reads. Optional.
      *
      * \param data Decoder's private data.
      *
@@ -276,7 +246,6 @@ extern "C"
 
   int is_sound_file(const char *name);
   struct decoder *get_decoder(const char *file);
-  struct decoder *get_decoder_by_content(struct io_stream *stream);
   const char *get_decoder_name(const struct decoder *decoder);
   void decoder_init(int debug_info);
   void decoder_cleanup();

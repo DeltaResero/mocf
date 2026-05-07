@@ -392,24 +392,6 @@ static void *mpg123_openX(const char *file)
   return data;
 }
 
-static int mpg123_can_decode(__attribute__((unused)) struct io_stream *stream)
-{
-  return 1;
-}
-
-static void *mpg123_open_stream(struct io_stream *stream)
-{
-  struct mpg123_data *data;
-
-  data = (struct mpg123_data *)xmalloc(sizeof(struct mpg123_data));
-  data->ok = 0;
-
-  decoder_error_init(&data->error);
-  data->stream = stream;
-  mpg123_open_stream_internal(data);
-  return data;
-}
-
 static void mpg123_closeX(void *prv_data)
 {
   struct mpg123_data *data = (struct mpg123_data *)prv_data;
@@ -583,8 +565,6 @@ static struct decoder mpg123_decoderX = {DECODER_API_VERSION,
                                          NULL,
                                          NULL,
                                          mpg123_openX,
-                                         mpg123_open_stream,
-                                         mpg123_can_decode,
                                          mpg123_closeX,
                                          mpg123_decodeX,
                                          mpg123_seekX,

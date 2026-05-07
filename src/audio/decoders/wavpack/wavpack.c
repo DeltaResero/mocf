@@ -301,8 +301,6 @@ static struct decoder wv_decoder = {DECODER_API_VERSION,
                                     NULL, // wav_init
                                     NULL, // wav_destroy
                                     wav_open,
-                                    NULL, // wav_open_stream,
-                                    NULL, // wav_can_decode,
                                     wav_close,
                                     wav_decode,
                                     wav_seek,

@@ -97,7 +97,6 @@ toggle_shuffle        = S
 toggle_repeat         = R
 toggle_auto_next      = X
 toggle_mixer          = x
-go_url                = o
 
 # Volume control keys:
 volume_down_1         = <
@@ -135,7 +134,6 @@ go_up                 = U
 # Playlist specific keys:
 add_file              = a
 add_directory         = A
-plist_add_stream      = ^u
 delete_from_playlist  = d
 playlist_full_paths   = P
 plist_move_up         = u

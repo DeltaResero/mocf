@@ -45,7 +45,6 @@ extern "C"
     int after_seek; /* are we after seek and need to do fresh read()? */
     int buffered;   /* are we using the buffer? */
     off_t pos; /* current position in the file from the user point of view */
-    size_t prebuffer;       /* number of bytes left to prebuffer */
     pthread_mutex_t io_mtx; /* mutex for IO operations */
 
 #ifdef HAVE_MMAP
@@ -61,13 +60,6 @@ extern "C"
     pthread_t read_thread;
     int stop_read_thread; /* request for stopping the read
              thread */
-
-    struct stream_metadata
-    {
-      pthread_mutex_t mtx;
-      char *title; /* title of the stream */
-      char *url;
-    } metadata;
 
     /* callbacks */
     buf_fill_callback_t buf_fill_callback;
@@ -87,13 +79,6 @@ extern "C"
   void io_init();
   void io_cleanup();
   void io_abort(struct io_stream *s);
-  char *io_get_mime_type(struct io_stream *s);
-  char *io_get_title(struct io_stream *s);
-  char *io_get_metadata_title(struct io_stream *s);
-  char *io_get_metadata_url(struct io_stream *s);
-  void io_set_metadata_title(struct io_stream *s, const char *title);
-  void io_set_metadata_url(struct io_stream *s, const char *url);
-  void io_prebuffer(struct io_stream *s, const size_t to_fill);
   void io_set_buf_fill_callback(struct io_stream *s,
                                 buf_fill_callback_t callback, void *data_ptr);
   int io_seekable(const struct io_stream *s);
