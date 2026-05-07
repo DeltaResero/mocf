@@ -570,16 +570,13 @@ static int pulse_get_buff_fill(void)
    */
   if (stream && pa_stream_get_latency(stream, &buffered_usecs, NULL) >= 0)
   {
-    /* Crash-avoidance HACK: floor our latency to at most
-     * 1 second. It is usually more, but reporting that at
-     * the start of playback crashes MOC, and we cannot
-     * sanely detect when reporting it is safe.
-     */
-    if (buffered_usecs > 1000000)
-    {
-      buffered_usecs = 1000000;
-    }
-
+    /* The old 1-second cap was added to avoid a negative out_buf_time_get
+     * value crashing MOC during song transitions (when buf->time is reset
+     * to 0 but hardware_buf_fill still reflects the previous song).
+     * That crash path no longer exists: server.c uses MAX(0, audio_get_time()).
+     * Keeping the cap meant hardware_buf_fill could only account for 1s of
+     * a ~2s PA buffer, making the pause/unpause time correction in out_buf.c
+     * incomplete. Report the true latency so that correction is accurate. */
     buffered_bytes =
         pa_usec_to_bytes(buffered_usecs, pa_stream_get_sample_spec(stream));
   }

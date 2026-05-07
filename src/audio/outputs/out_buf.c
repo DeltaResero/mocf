@@ -117,6 +117,18 @@ static void *read_thread(void *arg)
 
     if (buf->reset_dev && !audio_dev_closed)
     {
+      /* Roll back buf->time by the amount of audio buffered in hardware
+       * but not yet heard. audio_reset() (e.g. pa_stream_flush) discards
+       * that buffered audio, so without this correction pause/unpause would
+       * resume playback ~2 seconds ahead of where it was paused. */
+      int bps = audio_get_bps();
+      if (bps > 0 && buf->hardware_buf_fill > 0)
+      {
+        buf->time -= buf->hardware_buf_fill / (float)bps;
+        if (buf->time < 0.0f)
+          buf->time = 0.0f;
+      }
+      buf->hardware_buf_fill = 0;
       audio_reset();
       buf->reset_dev = 0;
     }
