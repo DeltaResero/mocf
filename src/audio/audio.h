@@ -230,6 +230,17 @@ extern "C"
      * \return malloc()ed channel's name.
      */
     char *(*get_mixer_channel_name)();
+
+    /** Pause the stream without closing it.
+     *
+     * If non-NULL the backend supports pausing the stream in place
+     * (e.g. PulseAudio cork).  Buffered audio is preserved so that
+     * unpause resumes exactly where it left off.
+     */
+    void (*hw_pause)();
+
+    /** Unpause a previously paused stream. */
+    void (*hw_unpause)();
   };
 
 /* Are the parameters p1 and p2 equal? */
@@ -263,6 +274,9 @@ extern "C"
   int audio_get_bps();
   int audio_get_buf_fill();
   void audio_close();
+  int audio_can_hw_pause();
+  void audio_hw_pause();
+  void audio_hw_unpause();
   int audio_get_time();
   int audio_get_state();
   int audio_get_prev_state();

@@ -101,6 +101,7 @@ static void *read_thread(void *arg)
 {
   struct out_buf *buf = (struct out_buf *)arg;
   int audio_dev_closed = 0;
+  int hw_paused = 0;
 
   logit("entering output buffer thread");
 
@@ -117,18 +118,6 @@ static void *read_thread(void *arg)
 
     if (buf->reset_dev && !audio_dev_closed)
     {
-      /* Roll back buf->time by the amount of audio buffered in hardware
-       * but not yet heard. audio_reset() (e.g. pa_stream_flush) discards
-       * that buffered audio, so without this correction pause/unpause would
-       * resume playback ~2 seconds ahead of where it was paused. */
-      int bps = audio_get_bps();
-      if (bps > 0 && buf->hardware_buf_fill > 0)
-      {
-        buf->time -= buf->hardware_buf_fill / (float)bps;
-        if (buf->time < 0.0f)
-          buf->time = 0.0f;
-      }
-      buf->hardware_buf_fill = 0;
       audio_reset();
       buf->reset_dev = 0;
     }
@@ -153,11 +142,20 @@ static void *read_thread(void *arg)
     if ((fifo_buf_get_fill(buf->buf) == 0 || buf->pause || buf->stop) &&
         !buf->exit)
     {
-      if (buf->pause && !audio_dev_closed)
+      if (buf->pause && !audio_dev_closed && !hw_paused)
       {
-        logit("Closing the device due to pause");
-        audio_close();
-        audio_dev_closed = 1;
+        if (audio_can_hw_pause())
+        {
+          logit("Corking the stream due to pause");
+          audio_hw_pause();
+          hw_paused = 1;
+        }
+        else
+        {
+          logit("Closing the device due to pause");
+          audio_close();
+          audio_dev_closed = 1;
+        }
       }
 
       debug("waiting for something in the buffer");
@@ -168,7 +166,13 @@ static void *read_thread(void *arg)
 
     buf->read_thread_waiting = 0;
 
-    if (audio_dev_closed && !buf->pause)
+    if (hw_paused && !buf->pause)
+    {
+      logit("Uncorking the stream after pause");
+      audio_hw_unpause();
+      hw_paused = 0;
+    }
+    else if (audio_dev_closed && !buf->pause)
     {
       logit("Opening the device again after pause");
       if (!audio_open(NULL))
@@ -385,7 +389,6 @@ void out_buf_pause(struct out_buf *buf)
 {
   LOCK(buf->mutex);
   buf->pause = 1;
-  buf->reset_dev = 1;
   UNLOCK(buf->mutex);
 }
 

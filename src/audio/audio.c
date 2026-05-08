@@ -1162,6 +1162,20 @@ int audio_get_bps() { return driver_sound_params.rate * audio_get_bpf(); }
 
 int audio_get_buf_fill() { return hw.get_buff_fill(); }
 
+int audio_can_hw_pause() { return hw.hw_pause != NULL; }
+
+void audio_hw_pause()
+{
+  if (hw.hw_pause)
+    hw.hw_pause();
+}
+
+void audio_hw_unpause()
+{
+  if (hw.hw_unpause)
+    hw.hw_unpause();
+}
+
 int audio_send_pcm(const char *buf, const size_t size)
 {
   char *softmixed = NULL;

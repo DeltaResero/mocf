@@ -570,13 +570,16 @@ static int pulse_get_buff_fill(void)
    */
   if (stream && pa_stream_get_latency(stream, &buffered_usecs, NULL) >= 0)
   {
-    /* The old 1-second cap was added to avoid a negative out_buf_time_get
-     * value crashing MOC during song transitions (when buf->time is reset
-     * to 0 but hardware_buf_fill still reflects the previous song).
-     * That crash path no longer exists: server.c uses MAX(0, audio_get_time()).
-     * Keeping the cap meant hardware_buf_fill could only account for 1s of
-     * a ~2s PA buffer, making the pause/unpause time correction in out_buf.c
-     * incomplete. Report the true latency so that correction is accurate. */
+    /* Cap latency to 1 second.  pa_stream_get_latency() normally
+     * returns more (PA's default ~2s buffer), but reporting that
+     * near the start of playback (when buf->time is still very
+     * small) would make out_buf_time_get() return a negative
+     * value.  The cap keeps the displayed time sane. */
+    if (buffered_usecs > 1000000)
+    {
+      buffered_usecs = 1000000;
+    }
+
     buffered_bytes =
         pa_usec_to_bytes(buffered_usecs, pa_stream_get_sample_spec(stream));
   }
@@ -710,6 +713,72 @@ static char *pulse_get_mixer_channel_name(void)
   return result;
 }
 
+static void cork_callback(pa_stream *s ATTR_UNUSED, int success,
+                          void *userdata)
+{
+  int *result = userdata;
+
+  *result = success;
+
+  pa_threaded_mainloop_signal(mainloop, 0);
+}
+
+static void pulse_hw_pause(void)
+{
+  pa_operation *op;
+  int result = 0;
+
+  debug("corking stream for pause");
+
+  pa_threaded_mainloop_lock(mainloop);
+
+  if (stream)
+  {
+    op = pa_stream_cork(stream, 1, cork_callback, &result);
+
+    while (pa_operation_get_state(op) == PA_OPERATION_RUNNING)
+    {
+      pa_threaded_mainloop_wait(mainloop);
+    }
+
+    pa_operation_unref(op);
+  }
+  else
+  {
+    logit("pulse_hw_pause() called without a stream");
+  }
+
+  pa_threaded_mainloop_unlock(mainloop);
+}
+
+static void pulse_hw_unpause(void)
+{
+  pa_operation *op;
+  int result = 0;
+
+  debug("uncorking stream for unpause");
+
+  pa_threaded_mainloop_lock(mainloop);
+
+  if (stream)
+  {
+    op = pa_stream_cork(stream, 0, cork_callback, &result);
+
+    while (pa_operation_get_state(op) == PA_OPERATION_RUNNING)
+    {
+      pa_threaded_mainloop_wait(mainloop);
+    }
+
+    pa_operation_unref(op);
+  }
+  else
+  {
+    logit("pulse_hw_unpause() called without a stream");
+  }
+
+  pa_threaded_mainloop_unlock(mainloop);
+}
+
 void pulse_funcs(struct hw_funcs *funcs)
 {
   funcs->init = pulse_init;
@@ -724,6 +793,8 @@ void pulse_funcs(struct hw_funcs *funcs)
   funcs->get_rate = pulse_get_rate;
   funcs->toggle_mixer_channel = pulse_toggle_mixer_channel;
   funcs->get_mixer_channel_name = pulse_get_mixer_channel_name;
+  funcs->hw_pause = pulse_hw_pause;
+  funcs->hw_unpause = pulse_hw_unpause;
 }
 
 // EOF
