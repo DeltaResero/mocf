@@ -1776,11 +1776,36 @@ char *audio_get_mixer_channel_name()
 
 void audio_toggle_mixer_channel()
 {
-  current_mixer = (current_mixer + 1) % 3;
-  if (current_mixer < 2)
+  char *old_name = audio_get_mixer_channel_name();
+  int i;
+
+  for (i = 0; i < 2; i++)
   {
-    hw.toggle_mixer_channel();
+    int prev_mixer = current_mixer;
+    current_mixer = (current_mixer + 1) % 3;
+
+    if (current_mixer < 2)
+    {
+      hw.toggle_mixer_channel();
+      if (prev_mixer == 2)
+      {
+        softmixer_set_active(0);
+      }
+    }
+    else
+    {
+      softmixer_set_active(1);
+    }
+
+    char *new_name = audio_get_mixer_channel_name();
+    if (strcmp(old_name, new_name) != 0)
+    {
+      free(new_name);
+      break;
+    }
+    free(new_name);
   }
+  free(old_name);
 }
 
 // EOF

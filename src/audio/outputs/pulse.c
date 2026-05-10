@@ -84,7 +84,55 @@ static uint32_t pa_default_sink_index = 0;
 /* The stream is initialized in pulse_open and destroyed in pulse_close. */
 static pa_stream *stream = NULL;
 
-static int showing_sink_volume = 1;
+static int showing_sink_volume = 0;
+static int stream_volume = 100;
+
+/* File used to persist stream_volume across sessions, stored in the
+ * same config directory as the softmixer state file. */
+#define PULSE_VOLUME_SAVE_FILE "pulse_volume"
+
+/* Forward declaration: defined after pulse_open but called from within it. */
+static void sink_input_volume_cb(pa_context *c, const pa_sink_input_info *i,
+                                 int eol, void *userdata);
+
+/* Load stream_volume from disk.  Silently ignored if the file does not
+ * exist yet (first run). */
+static void pulse_load_volume(void)
+{
+  char *cfname = create_file_name(PULSE_VOLUME_SAVE_FILE);
+  FILE *cf = fopen(cfname, "r");
+
+  if (!cf)
+  {
+    return; /* first run — keep default of 100 */
+  }
+
+  int vol;
+  if (fscanf(cf, "%d", &vol) == 1 && vol >= 0 && vol <= 100)
+  {
+    stream_volume = vol;
+    logit("Pulse: loaded saved stream volume: %d%%", stream_volume);
+  }
+
+  fclose(cf);
+}
+
+/* Save stream_volume to disk so it survives across sessions. */
+static void pulse_save_volume(void)
+{
+  char *cfname = create_file_name(PULSE_VOLUME_SAVE_FILE);
+  FILE *cf = fopen(cfname, "w");
+
+  if (!cf)
+  {
+    logit("Pulse: unable to save stream volume");
+    return;
+  }
+
+  fprintf(cf, "%d\n", stream_volume);
+  fclose(cf);
+  logit("Pulse: saved stream volume: %d%%", stream_volume);
+}
 
 /* Callbacks that do nothing but wake up the mainloop. */
 
@@ -208,6 +256,10 @@ static int pulse_init(struct output_driver_caps *caps)
   caps->max_rate = 192000;
   caps->formats = (SFMT_S8 | SFMT_S16 | SFMT_S32 | SFMT_FLOAT | SFMT_NE);
 
+  /* Restore the last saved volume so the UI shows the correct value
+   * immediately, before any stream has been opened. */
+  pulse_load_volume();
+
   return 1;
 
 unlock_and_fail:
@@ -225,6 +277,9 @@ unlock_and_fail:
 
 static void pulse_shutdown(void)
 {
+  /* Persist the current volume so it is restored on the next startup. */
+  pulse_save_volume();
+
   pa_threaded_mainloop_lock(mainloop);
 
   pa_context_disconnect(context);
@@ -306,6 +361,12 @@ static int pulse_open(struct sound_params *sound_params)
   pa_stream_set_state_callback(s, stream_state_callback, mainloop);
   pa_stream_set_write_callback(s, stream_write_callback, mainloop);
 
+  /* Do NOT pass an initial volume.  PulseAudio's module-stream-restore
+   * (present on all modern distros, and PipeWire's equivalent) persists
+   * per-application stream volumes across sessions and restores the last
+   * set value automatically when a new stream is opened.  Passing an
+   * explicit volume here would override that mechanism, resetting the
+   * volume to stream_volume (100 at startup) on every session open. */
   /* Ignore return value, rely on failed stream state instead. */
   pa_stream_connect_playback(s, NULL, &ba,
                              PA_STREAM_INTERPOLATE_TIMING |
@@ -335,6 +396,27 @@ static int pulse_open(struct sound_params *sound_params)
 
   /* Only set the global stream now that it is actually ready */
   stream = s;
+
+  /* Sync stream_volume with the value the server set on this stream.
+   * module-stream-restore (or PipeWire's equivalent) will have applied
+   * the last remembered volume; read it back so our in-memory state and
+   * the UI reflect reality rather than the stale startup default. */
+  {
+    int restored_vol = 0;
+    pa_operation *op = pa_context_get_sink_input_info(
+        context, pa_stream_get_index(stream),
+        sink_input_volume_cb, &restored_vol);
+    while (pa_operation_get_state(op) == PA_OPERATION_RUNNING)
+    {
+      pa_threaded_mainloop_wait(mainloop);
+    }
+    pa_operation_unref(op);
+    if (restored_vol > 0)
+    {
+      stream_volume = restored_vol;
+      logit("Pulse: server-side stream volume is %d%%", stream_volume);
+    }
+  }
 
   pa_threaded_mainloop_unlock(mainloop);
 
@@ -453,7 +535,7 @@ static void sink_volume_cb(pa_context *c ATTR_UNUSED, const pa_sink_info *i,
 static void sink_input_volume_cb(pa_context *c ATTR_UNUSED,
                                  const pa_sink_input_info *i,
                                  int eol ATTR_UNUSED,
-                                 void *userdata ATTR_UNUSED)
+                                 void *userdata)
 {
   volume_cb(i ? &i->volume : NULL, userdata);
 }
@@ -478,6 +560,10 @@ static int pulse_read_mixer(void)
   {
     op = pa_context_get_sink_input_info(context, pa_stream_get_index(stream),
                                         sink_input_volume_cb, &result);
+  }
+  else
+  {
+    result = stream_volume;
   }
 
   if (showing_sink_volume || stream)
@@ -512,12 +598,16 @@ static void pulse_set_mixer(int vol)
         stream ? pa_stream_get_device_index(stream) : pa_default_sink_index, &v,
         NULL, NULL);
   }
-  else if (stream)
+  else
   {
-    op = pa_context_set_sink_input_volume(context, pa_stream_get_index(stream),
-                                          &v, NULL, NULL);
+    stream_volume = vol;
 
-    pa_operation_unref(op);
+    if (stream)
+    {
+      op = pa_context_set_sink_input_volume(context, pa_stream_get_index(stream),
+                                            &v, NULL, NULL);
+      pa_operation_unref(op);
+    }
   }
 
   pa_threaded_mainloop_unlock(mainloop);

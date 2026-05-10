@@ -20,8 +20,8 @@ extern "C"
 /* Allow amplification, might result in clipping... */
 #define SOFTMIXER_MAX 2000
 
-#define SOFTMIXER_NAME "Soft"
-#define SOFTMIXER_NAME_OFF "S.Off"
+#define SOFTMIXER_NAME "Software"
+#define SOFTMIXER_NAME_OFF "Software Off"
 
 #define SOFTMIXER_CFG_ACTIVE "Active:"
 #define SOFTMIXER_CFG_AMP "Amplification:"

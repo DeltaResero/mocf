@@ -610,6 +610,41 @@ static void alsa_set_current_mixer()
   }
 }
 
+/* Check for a running PulseAudio or PipeWire-PulseAudio instance via
+ * environment variables and the well-known socket path.  No libpulse
+ * linkage; this is a lightweight heuristic. */
+static bool is_pulseaudio_present(void)
+{
+  if (getenv("PULSE_SERVER") || getenv("PULSE_SINK") ||
+      getenv("PIPEWIRE_REMOTE"))
+  {
+    return true;
+  }
+
+  /* Both PulseAudio and PipeWire (in PA-compatibility mode) create a
+   * native socket at $XDG_RUNTIME_DIR/pulse/native when running. */
+  const char *xdg = getenv("XDG_RUNTIME_DIR");
+  if (xdg)
+  {
+    const char *suffix  = "/pulse/native";
+    size_t      xdg_len = strlen(xdg);
+    size_t      suf_len = strlen(suffix);
+    char        path[4096];
+
+    if (xdg_len + suf_len < sizeof(path))
+    {
+      memcpy(path, xdg, xdg_len);
+      memcpy(path + xdg_len, suffix, suf_len + 1);
+      if (access(path, F_OK) == 0)
+      {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 static void alsa_shutdown()
 {
   alsa_close_mixer();
@@ -633,7 +668,34 @@ static int alsa_init(struct output_driver_caps *caps)
   snd_lib_error_set_handler(alsa_log_cb);
 #endif
 
-  alsa_open_mixer(device);
+  /* When PulseAudio/PipeWire is running, attach the ALSA mixer to the
+   * "pulse" virtual ALSA device rather than to the PCM device.
+   *
+   * The PA ALSA plugin exposes "pulse" as a named ALSA device; attaching
+   * the mixer there gives us a "Master" control that actually maps to
+   * PA's own sink volume — exactly what "alsamixer -D pulse" uses.
+   * Attaching to "default" instead would resolve to whatever ALSA card
+   * happens to be card0 (often HDMI on multi-card systems), which may
+   * have Master at 0% and is unrelated to what PA is playing through.
+   *
+   * If the PA ALSA plugin is not installed (no "pulse" device), we fall
+   * back to the configured ALSADevice silently. */
+  if (is_pulseaudio_present())
+  {
+    logit("ALSA: PulseAudio/PipeWire detected; attaching mixer to 'pulse' "
+          "ALSA device so that Master maps to the PA sink volume.");
+    alsa_open_mixer("pulse");
+    if (!mixer_handle)
+    {
+      logit("ALSA: 'pulse' mixer device unavailable (PA ALSA plugin not "
+            "installed?); falling back to configured device '%s'.", device);
+      alsa_open_mixer(device);
+    }
+  }
+  else
+  {
+    alsa_open_mixer(device);
+  }
 
   if (mixer_handle)
   {
