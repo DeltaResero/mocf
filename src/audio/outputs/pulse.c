@@ -91,9 +91,10 @@ static int stream_volume = 100;
  * same config directory as the softmixer state file. */
 #define PULSE_VOLUME_SAVE_FILE "pulse_volume"
 
-/* Forward declaration: defined after pulse_open but called from within it. */
+/* Forward declarations: defined later but called before their definitions. */
 static void sink_input_volume_cb(pa_context *c, const pa_sink_input_info *i,
                                  int eol, void *userdata);
+static void flush_callback(pa_stream *s, int success, void *userdata);
 
 /* Load stream_volume from disk.  Silently ignored if the file does not
  * exist yet (first run). */
@@ -431,9 +432,19 @@ fail:
 
 static void pulse_close(void)
 {
+  pa_operation *op;
+  int result = 0;
+
   debug("closing stream");
 
   pa_threaded_mainloop_lock(mainloop);
+
+  op = pa_stream_drain(stream, flush_callback, &result);
+  while (pa_operation_get_state(op) == PA_OPERATION_RUNNING)
+  {
+    pa_threaded_mainloop_wait(mainloop);
+  }
+  pa_operation_unref(op);
 
   pa_stream_disconnect(stream);
   pa_stream_unref(stream);
