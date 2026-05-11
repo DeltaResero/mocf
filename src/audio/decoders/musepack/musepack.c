@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
-// FIXME: mpc_decoder_decode() can give fixed point values, do we have to
-// handle this case?
 // Copyright (C) 2005 Damian Pietras <daper@daper.net>
 //
 // This program is free software: you can redistribute it and/or modify
@@ -52,8 +50,8 @@ struct musepack_data
   int bitrate;
   struct decoder_error error;
   int ok; /* was this stream successfully opened? */
-  float *remain_buf;
-  size_t remain_buf_len; /* in samples (sizeof(float)) */
+  MPC_SAMPLE_FORMAT *remain_buf;
+  size_t remain_buf_len; /* in samples (sizeof(MPC_SAMPLE_FORMAT)) */
 };
 
 #ifdef MPC_IS_OLD_API
@@ -340,20 +338,20 @@ static int musepack_decode(void *prv_data, char *buf, int buf_len,
   mpc_uint32_t vbrAcc = 0;
   mpc_uint32_t vbrUpd = 0;
 #endif
-  float decode_buf[MPC_DECODER_BUFFER_LENGTH];
+  MPC_SAMPLE_FORMAT decode_buf[MPC_DECODER_BUFFER_LENGTH];
   if (data->remain_buf)
   {
     size_t to_copy =
-        MIN((unsigned int)buf_len, data->remain_buf_len * sizeof(float));
+        MIN((unsigned int)buf_len, data->remain_buf_len * sizeof(MPC_SAMPLE_FORMAT));
 
     debug("Copying %zu bytes from the remain buf", to_copy);
 
     memcpy(buf, data->remain_buf, to_copy);
-    if (to_copy / sizeof(float) < data->remain_buf_len)
+    if (to_copy / sizeof(MPC_SAMPLE_FORMAT) < data->remain_buf_len)
     {
       memmove(data->remain_buf, data->remain_buf + to_copy,
-              data->remain_buf_len * sizeof(float) - to_copy);
-      data->remain_buf_len -= to_copy / sizeof(float);
+              data->remain_buf_len * sizeof(MPC_SAMPLE_FORMAT) - to_copy);
+      data->remain_buf_len -= to_copy / sizeof(MPC_SAMPLE_FORMAT);
     }
     else
     {
@@ -380,7 +378,7 @@ static int musepack_decode(void *prv_data, char *buf, int buf_len,
     return 0;
   }
 
-  bytes_from_decoder = ret * sizeof(float) * 2; /* stereo */
+  bytes_from_decoder = ret * sizeof(MPC_SAMPLE_FORMAT) * 2; /* stereo */
   data->bitrate = vbrUpd * sound_params->rate / 1152 / 1000;
 #else
   do
@@ -417,7 +415,11 @@ static int musepack_decode(void *prv_data, char *buf, int buf_len,
   decoder_error_clear(&data->error);
   sound_params->channels = data->info.channels;
   sound_params->rate = data->info.sample_freq;
+#ifdef MPC_FIXED_POINT
+  sound_params->fmt = SFMT_S32 | SFMT_NE;
+#else
   sound_params->fmt = SFMT_FLOAT;
+#endif
 
   if (bytes_from_decoder >= buf_len)
   {
@@ -426,10 +428,10 @@ static int musepack_decode(void *prv_data, char *buf, int buf_len,
     debug("Copying %zu bytes", to_copy);
 
     memcpy(buf, decode_buf, to_copy);
-    data->remain_buf_len = (bytes_from_decoder - to_copy) / sizeof(float);
-    data->remain_buf = (float *)xmalloc(data->remain_buf_len * sizeof(float));
+    data->remain_buf_len = (bytes_from_decoder - to_copy) / sizeof(MPC_SAMPLE_FORMAT);
+    data->remain_buf = (MPC_SAMPLE_FORMAT *)xmalloc(data->remain_buf_len * sizeof(MPC_SAMPLE_FORMAT));
     memcpy(data->remain_buf, decode_buf + to_copy,
-           data->remain_buf_len * sizeof(float));
+           data->remain_buf_len * sizeof(MPC_SAMPLE_FORMAT));
     decoded = to_copy;
   }
   else
