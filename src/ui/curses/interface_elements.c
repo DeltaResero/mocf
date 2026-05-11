@@ -3098,7 +3098,10 @@ static void info_win_set_curr_time(struct info_win *w, const int time)
   w->curr_time = time;
   if (w->total_time > 0 && w->curr_time >= 0)
   {
-    bar_set_fill(&w->time_bar, w->curr_time * 100.0 / w->total_time);
+    double fill = (w->curr_time >= w->total_time - 1)
+                      ? 100.0
+                      : w->curr_time * 100.0 / w->total_time;
+    bar_set_fill(&w->time_bar, fill);
   }
   else
   {

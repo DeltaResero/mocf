@@ -17,6 +17,7 @@
 #endif
 
 #include <assert.h>
+#include <math.h>
 #include <pthread.h>
 #include <string.h>
 #include <errno.h>
@@ -191,6 +192,7 @@ static void *read_thread(void *arg)
       if (buf->exit)
       {
         logit("exit");
+        buf->hardware_buf_fill = 0;
         break;
       }
 
@@ -446,14 +448,14 @@ void out_buf_time_set(struct out_buf *buf, const float time)
  * its own processing. */
 int out_buf_time_get(struct out_buf *buf)
 {
-  int time;
+  float time_f;
   int bps = audio_get_bps();
 
   LOCK(buf->mutex);
-  time = buf->time - (bps ? buf->hardware_buf_fill / (float)bps : 0);
+  time_f = buf->time - (bps ? buf->hardware_buf_fill / (float)bps : 0);
   UNLOCK(buf->mutex);
 
-  return time;
+  return (int)roundf(time_f);
 }
 
 void out_buf_set_free_callback(struct out_buf *buf,
