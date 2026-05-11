@@ -1527,10 +1527,16 @@ static int ffmpeg_our_format_ext(const char *ext)
 
 static int ffmpeg_our_format_mime(const char *mime_type)
 {
-  const AVOutputFormat *fmt;
+#if HAVE_STRUCT_AVPROBEDATA_MIME_TYPE
+  AVProbeData pd;
 
-  fmt = av_guess_format(NULL, NULL, mime_type);
-  return fmt ? 1 : 0;
+  memset(&pd, 0, sizeof(pd));
+  pd.mime_type = mime_type;
+  return av_probe_input_format(&pd, 0) ? 1 : 0;
+#else
+  (void)mime_type;
+  return 0;
+#endif
 }
 
 static void ffmpeg_get_error(void *prv_data, struct decoder_error *error)
