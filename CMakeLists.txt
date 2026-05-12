@@ -97,6 +97,7 @@ endif()
 find_package(Threads REQUIRED)
 find_package(Curses REQUIRED)
 find_package(Iconv REQUIRED)
+find_package(PkgConfig REQUIRED)
 
 # Iconv Check
 if(Iconv_FOUND)
@@ -114,11 +115,7 @@ unset(CMAKE_REQUIRED_INCLUDES)
 
 
 # POPT
-find_library(POPT_LIBRARY NAMES popt)
-find_path(POPT_INCLUDE_DIR popt.h)
-if(NOT POPT_LIBRARY OR NOT POPT_INCLUDE_DIR)
-  message(FATAL_ERROR "libpopt not found.")
-endif()
+pkg_check_modules(POPT REQUIRED popt)
 
 # Header checks
 check_include_file(strings.h HAVE_STRINGS_H)
@@ -175,14 +172,11 @@ if(ENABLE_INTERNAL_FLOAT)
 endif()
 
 if(ENABLE_SAMPLERATE)
-  find_package(PkgConfig)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(SAMPLERATE samplerate>=0.1.0)
-    if(SAMPLERATE_FOUND)
-      set(HAVE_SAMPLERATE 1)
-      include_directories(${SAMPLERATE_INCLUDE_DIRS})
-      list(APPEND EXTRA_LIBS ${SAMPLERATE_LIBRARIES})
-    endif()
+  pkg_check_modules(SAMPLERATE samplerate>=0.1.0)
+  if(SAMPLERATE_FOUND)
+    set(HAVE_SAMPLERATE 1)
+    include_directories(${SAMPLERATE_INCLUDE_DIRS})
+    list(APPEND EXTRA_LIBS ${SAMPLERATE_LIBRARIES})
   endif()
 endif()
 
@@ -199,49 +193,40 @@ endif()
 set(SOUND_DRIVERS "")
 
 if(WITH_PULSE)
-  find_package(PkgConfig)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(PULSE libpulse)
-    if(PULSE_FOUND)
-      set(HAVE_PULSE 1)
-      list(APPEND EXTRA_OBJS src/audio/outputs/pulse.c)
-      include_directories(${PULSE_INCLUDE_DIRS})
-      list(APPEND EXTRA_LIBS ${PULSE_LIBRARIES})
-      list(APPEND SOUND_DRIVERS "PULSE")
-    endif()
+  pkg_check_modules(PULSE libpulse)
+  if(PULSE_FOUND)
+    set(HAVE_PULSE 1)
+    list(APPEND EXTRA_OBJS src/audio/outputs/pulse.c)
+    include_directories(${PULSE_INCLUDE_DIRS})
+    list(APPEND EXTRA_LIBS ${PULSE_LIBRARIES})
+    list(APPEND SOUND_DRIVERS "PULSE")
   endif()
 endif()
 
 if(WITH_ALSA)
-  find_package(PkgConfig)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(ALSA alsa>=1.0.11)
-    if(ALSA_FOUND)
-      set(HAVE_ALSA 1)
-      list(APPEND EXTRA_OBJS src/audio/outputs/alsa.c)
-      include_directories(${ALSA_INCLUDE_DIRS})
-      list(APPEND EXTRA_LIBS ${ALSA_LIBRARIES})
-      list(APPEND SOUND_DRIVERS "ALSA")
-    endif()
+  pkg_check_modules(ALSA alsa>=1.0.11)
+  if(ALSA_FOUND)
+    set(HAVE_ALSA 1)
+    list(APPEND EXTRA_OBJS src/audio/outputs/alsa.c)
+    include_directories(${ALSA_INCLUDE_DIRS})
+    list(APPEND EXTRA_LIBS ${ALSA_LIBRARIES})
+    list(APPEND SOUND_DRIVERS "ALSA")
   endif()
 endif()
 
 if(WITH_JACK)
-  find_package(PkgConfig)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(JACK jack>=0.4)
-    if(JACK_FOUND)
-      set(HAVE_JACK 1)
-      list(APPEND EXTRA_OBJS src/audio/outputs/jack.c)
-      include_directories(${JACK_INCLUDE_DIRS})
-      list(APPEND EXTRA_LIBS ${JACK_LIBRARIES})
-      list(APPEND SOUND_DRIVERS "JACK")
+  pkg_check_modules(JACK jack>=0.4)
+  if(JACK_FOUND)
+    set(HAVE_JACK 1)
+    list(APPEND EXTRA_OBJS src/audio/outputs/jack.c)
+    include_directories(${JACK_INCLUDE_DIRS})
+    list(APPEND EXTRA_LIBS ${JACK_LIBRARIES})
+    list(APPEND SOUND_DRIVERS "JACK")
 
-      set(CMAKE_REQUIRED_LIBRARIES ${JACK_LIBRARIES})
-      check_symbol_exists(jack_client_open "jack/jack.h" HAVE_JACK_CLIENT_OPEN)
-      if(HAVE_JACK_CLIENT_OPEN)
-        set(HAVE_JACK_CLIENT_OPEN 1)
-      endif()
+    set(CMAKE_REQUIRED_LIBRARIES ${JACK_LIBRARIES})
+    check_symbol_exists(jack_client_open "jack/jack.h" HAVE_JACK_CLIENT_OPEN)
+    if(HAVE_JACK_CLIENT_OPEN)
+      set(HAVE_JACK_CLIENT_OPEN 1)
     endif()
   endif()
 endif()
@@ -357,7 +342,7 @@ target_include_directories(
   mocf PRIVATE ${CMAKE_SOURCE_DIR}/src
                ${CMAKE_BINARY_DIR}/src/audio
                ${CURSES_INCLUDE_DIRS}
-               ${POPT_INCLUDE_DIR})
+               ${POPT_INCLUDE_DIRS})
 
 target_compile_definitions(
   mocf
@@ -368,7 +353,7 @@ target_link_libraries(
   mocf
   PRIVATE ${CMAKE_THREAD_LIBS_INIT}
           ${CURSES_LIBRARIES}
-          ${POPT_LIBRARY}
+          ${POPT_LIBRARIES}
           Iconv::Iconv
           m
           ${DECODER_LIBS}
