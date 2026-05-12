@@ -641,7 +641,7 @@ static int get_tags_setting()
   {
     needed_tags |= TAGS_COMMENTS;
   }
-  if (!strcasecmp(options_get_symb("ShowTime"), "yes"))
+  if (strcasecmp(options_get_symb("ShowTime"), "no"))
   {
     needed_tags |= TAGS_TIME;
   }
