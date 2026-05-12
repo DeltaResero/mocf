@@ -29,6 +29,7 @@
 #include "audio/decoder.h"
 #include "io/io.h"
 #include "core/log.h"
+#include "core/options.h"
 #include "library/files.h"
 
 /* FAAD_MIN_STREAMSIZE == 768, 6 == # of channels */
@@ -314,7 +315,8 @@ static struct aac_data *aac_open_internal(struct io_stream *stream,
   neaac_cfg = NeAACDecGetCurrentConfiguration(data->decoder);
   neaac_cfg->outputFormat = FAAD_FMT_16BIT; /* force 16 bit audio */
   neaac_cfg->downMatrix = 0;                /* disable downmixing */
-  neaac_cfg->dontUpSampleImplicitSBR = 1;   /* don't upsample, please! */
+  neaac_cfg->dontUpSampleImplicitSBR =
+      options_get_bool("AAC_HEAACUpsampling") ? 0 : 1;
   NeAACDecSetConfiguration(data->decoder, neaac_cfg);
 
   if (stream)
