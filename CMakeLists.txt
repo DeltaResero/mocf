@@ -339,6 +339,10 @@ set(MOCF_SOURCES
 
 add_executable(mocf ${MOCF_SOURCES})
 
+# Define the list of compiled decoders for the -V output
+string(REPLACE ";" " " PLUGINS_LIST_STR "${DECODER_PLUGINS}")
+target_compile_definitions(mocf PRIVATE PLUGINS_LIST=" ${PLUGINS_LIST_STR}")
+
 target_include_directories(
   mocf PRIVATE ${CMAKE_SOURCE_DIR}/src
                ${CMAKE_BINARY_DIR}/src/audio

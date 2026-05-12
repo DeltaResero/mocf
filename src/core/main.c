@@ -407,16 +407,16 @@ static void show_version()
   struct utsname uts;
 
   putchar('\n');
-  printf("          This is : %s\n", PACKAGE_NAME);
-  printf("          Version : %s\n", PACKAGE_VERSION);
+  printf("          This is: %s\n", PACKAGE_NAME);
+  printf("          Version: %s\n", PACKAGE_VERSION);
 
 #ifdef PACKAGE_REVISION
-  printf("         Revision : %s\n", PACKAGE_REVISION);
+  printf("         Revision: %s\n", PACKAGE_REVISION);
 #endif
 
   /* Show build time */
 #ifdef __DATE__
-  printf("            Built : %s", __DATE__);
+  printf("            Built: %s", __DATE__);
 #ifdef __TIME__
   printf(" %s", __TIME__);
 #endif
@@ -424,7 +424,7 @@ static void show_version()
 #endif
 
   /* Show compiled-in components */
-  printf("    Compiled with :");
+  printf("    Compiled with:");
 #ifdef HAVE_OSS
   printf(" OSS");
 #endif
@@ -448,19 +448,23 @@ static void show_version()
 #endif
   putchar('\n');
 
+#ifdef PLUGINS_LIST
+  printf("  Decoder plugins:%s\n", PLUGINS_LIST);
+#endif
+
   rc = uname(&uts);
   if (rc == 0)
   {
-    printf("       Running on : %s %s %s\n", uts.sysname, uts.release,
+    printf("       Running on: %s %s %s\n", uts.sysname, uts.release,
            uts.machine);
   }
 
-  printf("           Author : DeltaResero (Original MOC by Damian Pietras)\n");
-  printf("         Homepage : %s\n", PACKAGE_URL);
-  printf("      Bug reports : %s\n", PACKAGE_BUGREPORT);
-  printf("        Copyright : (C) 2025-2026 DeltaResero\n");
-  printf("                    (C) 2003-2026 Damian Pietras and others\n");
-  printf("          License : GNU General Public License, version 3 or later\n");
+  printf("           Author: DeltaResero (Original MOC by Damian Pietras)\n");
+  printf("         Homepage: %s\n", PACKAGE_URL);
+  printf("      Bug reports: %s\n", PACKAGE_BUGREPORT);
+  printf("        Copyright: (C) 2025-2026 DeltaResero\n");
+  printf("                   (C) 2003-2026 Damian Pietras and others\n");
+  printf("          License: GNU General Public License, version 3 or later\n");
   putchar('\n');
 }
 
