@@ -768,10 +768,10 @@ void options_init()
   add_int("OutputBuffer", 128, CHECK_RANGE(1), 128, INT_MAX);
 
 #ifdef OPENBSD
-  add_list("SoundDriver", "SNDIO:JACK:OSS", CHECK_DISCRETE(5), "SNDIO",
+  add_list("SoundDriver", "SNDIO:JACK:OSS", CHECK_DISCRETE(6), "SNDIO",
            "PulseAudio", "Jack", "ALSA", "OSS", "null");
 #else
-  add_list("SoundDriver", "PulseAudio:Jack:ALSA:OSS", CHECK_DISCRETE(5),
+  add_list("SoundDriver", "PulseAudio:Jack:ALSA:OSS", CHECK_DISCRETE(6),
            "SNDIO", "PulseAudio", "Jack", "ALSA", "OSS", "null");
 #endif
 
