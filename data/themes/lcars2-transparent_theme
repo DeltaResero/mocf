@@ -1,6 +1,6 @@
 ###############################################################################
 #
-# Lcars Theme (Star Trek Inspired)
+# Lcars 2 Transparent Theme (Star Trek Inspired)
 # by Tomasz Golinski <tomaszg@math.uwb.edu.pl>
 #
 # FORMAT: element = foreground background attributes
@@ -15,82 +15,82 @@
 # =============================================================================
 
 # --- Core UI Elements (window, frame, background) ---
-background           = black   black
-frame                = yellow  black
-window_title         = magenta black
+background           = default default
+frame                = yellow  black   reverse
+window_title         = magenta black   reverse
 
 # =============================================================================
 # FILE BROWSER & PLAYLIST
 # =============================================================================
 
 # --- Directories (folder display) ---
-directory            = blue    black
-selected_directory   = white   black
+directory            = blue    default
+selected_directory   = black   red
 
 # --- Playlists (playlist display) ---
-playlist             = magenta black
-selected_playlist    = white   black
+playlist             = magenta default
+selected_playlist    = black   red
 
 # --- Files (file browser) ---
-file                 = green   black
-selected_file        = white   black
+file                 = green   default
+selected_file        = black   red
 
 # --- Currently Playing Track (marked items) ---
-marked_file          = red     black
-marked_selected_file = yellow  black
+marked_file          = red     default
+marked_selected_file = white   red
 
 # =============================================================================
 # INFORMATION DISPLAY
 # =============================================================================
 
 # --- File Info (duration, format - right side) ---
-info                 = blue    black
-marked_info          = blue    black
-marked_selected_info = yellow  black
-selected_info        = white   black
+info                 = blue    default
+marked_info          = blue    default
+marked_selected_info = white   red
+selected_info        = black   red
 
 # --- Status Bar (bottom status line) ---
-state                = red     black
-status               = red     black
-title                = yellow  black
+state                = red     default
+status               = red     default
+title                = yellow  default
 
 # =============================================================================
 # TIME DISPLAY
 # =============================================================================
 
 # --- Time Elements (elapsed, remaining, total) ---
-current_time         = white   black
-plist_time           = blue    black
-time_left            = white   black
-time_total_frames    = white   black
-total_time           = white   black
+current_time         = white   default
+plist_time           = blue    default
+time_left            = white   default
+time_total_frames    = white   default
+total_time           = white   default
 
 # =============================================================================
 # AUDIO PARAMETERS
 # =============================================================================
 
 # --- Audio Information (rate, bitrate, channels) ---
-sound_parameters     = blue    black
+sound_parameters     = blue    default
 
 # =============================================================================
 # MENU & OPTIONS
 # =============================================================================
 
 # --- Menu Elements (options, legend) ---
-legend               = blue    black
-disabled             = blue    black
-enabled              = red     black
+legend               = blue    default
+disabled             = blue    default
+enabled              = yellow  default reverse
 
 # =============================================================================
 # PROGRESS BARS
 # =============================================================================
 
 # --- Volume Mixer Bar (bottom right) ---
-empty_mixer_bar      = black   black
+empty_mixer_bar      = black   default
 filled_mixer_bar     = white   red
 
 # --- Time Progress Bar (bottom left) ---
-empty_time_bar       = black   black
+empty_time_bar       = black   default
 filled_time_bar      = black   red
 
 # =============================================================================
@@ -98,11 +98,11 @@ filled_time_bar      = black   red
 # =============================================================================
 
 # --- Text Entry (input prompts) ---
-entry                = cyan    black
+entry                = cyan    default
 entry_title          = black   cyan
 
 # --- Messages (errors, notifications) ---
-error                = yellow  black
-message              = red     black
+error                = yellow  default
+message              = red     default
 
 # EOF
