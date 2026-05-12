@@ -89,6 +89,7 @@ background           = white   blue
 frame                = white   blue
 window_title         = white   blue
 
+
 # =============================================================================
 # FILE BROWSER & PLAYLIST
 # =============================================================================
@@ -109,6 +110,7 @@ selected_file        = white   black
 marked_file          = green   blue    bold
 marked_selected_file = green   black   bold
 
+
 # =============================================================================
 # INFORMATION DISPLAY
 # =============================================================================
@@ -124,6 +126,7 @@ state                = white   blue    bold
 status               = white   blue
 title                = white   blue    bold
 
+
 # =============================================================================
 # TIME DISPLAY
 # =============================================================================
@@ -135,12 +138,14 @@ time_left            = white   blue    bold
 time_total_frames    = white   blue
 total_time           = white   blue    bold
 
+
 # =============================================================================
 # AUDIO PARAMETERS
 # =============================================================================
 
 # --- Audio Information (rate, bitrate, channels) ---
 sound_parameters     = white   blue    bold
+
 
 # =============================================================================
 # MENU & OPTIONS
@@ -150,6 +155,7 @@ sound_parameters     = white   blue    bold
 legend               = white   blue
 disabled             = blue    blue    bold
 enabled              = white   blue    bold
+
 
 # =============================================================================
 # PROGRESS BARS
@@ -163,6 +169,7 @@ filled_mixer_bar     = black   cyan
 empty_time_bar       = white   blue
 filled_time_bar      = black   cyan
 
+
 # =============================================================================
 # MESSAGES & INPUT
 # =============================================================================
@@ -174,5 +181,6 @@ entry_title          = black   cyan
 # --- Messages (errors, notifications) ---
 error                = red     blue    bold
 message              = green   blue    bold
+
 
 # EOF

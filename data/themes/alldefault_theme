@@ -20,6 +20,7 @@ background           = default default
 frame                = default default
 window_title         = default default
 
+
 # =============================================================================
 # FILE BROWSER & PLAYLIST
 # =============================================================================
@@ -40,6 +41,7 @@ selected_file        = default default reverse
 marked_file          = default default bold
 marked_selected_file = default default bold,reverse
 
+
 # =============================================================================
 # INFORMATION DISPLAY
 # =============================================================================
@@ -55,6 +57,7 @@ state                = default default
 status               = default default
 title                = default default bold
 
+
 # =============================================================================
 # TIME DISPLAY
 # =============================================================================
@@ -66,12 +69,14 @@ time_left            = default default bold
 time_total_frames    = default default
 total_time           = default default bold
 
+
 # =============================================================================
 # AUDIO PARAMETERS
 # =============================================================================
 
 # --- Audio Information (rate, bitrate, channels) ---
 sound_parameters     = default default bold
+
 
 # =============================================================================
 # MENU & OPTIONS
@@ -81,6 +86,7 @@ sound_parameters     = default default bold
 legend               = default default
 disabled             = default default
 enabled              = default default bold
+
 
 # =============================================================================
 # PROGRESS BARS
@@ -94,6 +100,7 @@ filled_mixer_bar     = default default reverse
 empty_time_bar       = default default
 filled_time_bar      = default default reverse
 
+
 # =============================================================================
 # MESSAGES & INPUT
 # =============================================================================
@@ -105,5 +112,6 @@ entry_title          = default default
 # --- Messages (errors, notifications) ---
 error                = default default bold
 message              = default default
+
 
 # EOF

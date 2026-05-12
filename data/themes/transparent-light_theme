@@ -20,6 +20,7 @@ background           = default default normal
 frame                = blue    default bold
 window_title         = blue    default bold
 
+
 # =============================================================================
 # FILE BROWSER & PLAYLIST
 # =============================================================================
@@ -40,6 +41,7 @@ selected_file        = white   black   bold
 marked_file          = blue    default bold
 marked_selected_file = cyan    black   bold
 
+
 # =============================================================================
 # INFORMATION DISPLAY
 # =============================================================================
@@ -55,6 +57,7 @@ state                = red     default bold,blink
 status               = black   cyan    bold
 title                = blue    default normal
 
+
 # =============================================================================
 # TIME DISPLAY
 # =============================================================================
@@ -66,12 +69,14 @@ time_left            = cyan    default normal
 time_total_frames    = black   default normal
 total_time           = black   default bold
 
+
 # =============================================================================
 # AUDIO PARAMETERS
 # =============================================================================
 
 # --- Audio Information (rate, bitrate, channels) ---
 sound_parameters     = black   default bold
+
 
 # =============================================================================
 # MENU & OPTIONS
@@ -81,6 +86,7 @@ sound_parameters     = black   default bold
 legend               = black   default normal
 disabled             = cyan    default bold
 enabled              = blue    default bold
+
 
 # =============================================================================
 # PROGRESS BARS
@@ -94,6 +100,7 @@ filled_mixer_bar     = white   cyan    bold
 empty_time_bar       = white   default normal
 filled_time_bar      = white   cyan    bold
 
+
 # =============================================================================
 # MESSAGES & INPUT
 # =============================================================================
@@ -105,5 +112,6 @@ entry_title          = black   cyan    normal
 # --- Messages (errors, notifications) ---
 error                = red     default normal
 message              = magenta default normal
+
 
 # EOF

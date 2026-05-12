@@ -20,6 +20,7 @@ background           = white   black
 frame                = grey    black   bold
 window_title         = red     black
 
+
 # =============================================================================
 # FILE BROWSER & PLAYLIST
 # =============================================================================
@@ -40,6 +41,7 @@ selected_file        = red     black
 marked_file          = red     black   bold
 marked_selected_file = red     black   reverse
 
+
 # =============================================================================
 # INFORMATION DISPLAY
 # =============================================================================
@@ -55,6 +57,7 @@ state                = red     black   bold
 status               = white   black
 title                = red     black   bold
 
+
 # =============================================================================
 # TIME DISPLAY
 # =============================================================================
@@ -66,12 +69,14 @@ time_left            = white   black   bold
 time_total_frames    = white   black
 total_time           = white   black   bold
 
+
 # =============================================================================
 # AUDIO PARAMETERS
 # =============================================================================
 
 # --- Audio Information (rate, bitrate, channels) ---
 sound_parameters     = white   black   bold
+
 
 # =============================================================================
 # MENU & OPTIONS
@@ -81,6 +86,7 @@ sound_parameters     = white   black   bold
 legend               = white   black
 disabled             = red     black   bold
 enabled              = white   black   bold
+
 
 # =============================================================================
 # PROGRESS BARS
@@ -94,6 +100,7 @@ filled_mixer_bar     = black   red
 empty_time_bar       = white   black
 filled_time_bar      = black   red
 
+
 # =============================================================================
 # MESSAGES & INPUT
 # =============================================================================
@@ -105,5 +112,6 @@ entry_title          = grey    black   bold
 # --- Messages (errors, notifications) ---
 error                = red     black   bold
 message              = red     black   bold
+
 
 # EOF

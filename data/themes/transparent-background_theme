@@ -19,6 +19,7 @@ background           = default default
 frame                = white   default
 window_title         = white   default
 
+
 # =============================================================================
 # FILE BROWSER & PLAYLIST
 # =============================================================================
@@ -39,6 +40,7 @@ selected_file        = white   blue
 marked_file          = green   default bold
 marked_selected_file = green   blue    bold
 
+
 # =============================================================================
 # INFORMATION DISPLAY
 # =============================================================================
@@ -51,6 +53,7 @@ state                = white   default bold
 status               = white   default
 title                = white   default bold
 
+
 # =============================================================================
 # TIME DISPLAY
 # =============================================================================
@@ -62,12 +65,14 @@ time_left            = white   default bold
 time_total_frames    = white   default
 total_time           = white   default bold
 
+
 # =============================================================================
 # AUDIO PARAMETERS
 # =============================================================================
 
 # --- Audio Information (rate, bitrate, channels) ---
 sound_parameters     = white   default bold
+
 
 # =============================================================================
 # MENU & OPTIONS
@@ -77,6 +82,7 @@ sound_parameters     = white   default bold
 legend               = white   default
 disabled             = blue    default bold
 enabled              = white   default bold
+
 
 # =============================================================================
 # PROGRESS BARS
@@ -90,6 +96,7 @@ filled_mixer_bar     = black   cyan
 empty_time_bar       = white   default
 filled_time_bar      = black   cyan
 
+
 # =============================================================================
 # MESSAGES & INPUT
 # =============================================================================
@@ -101,5 +108,6 @@ entry_title          = black   cyan
 # --- Messages (errors, notifications) ---
 error                = red     default bold
 message              = green   default bold
+
 
 # EOF

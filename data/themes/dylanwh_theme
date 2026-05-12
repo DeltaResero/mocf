@@ -20,6 +20,7 @@ background           = default default
 frame                = default default
 window_title         = default default
 
+
 # =============================================================================
 # FILE BROWSER & PLAYLIST
 # =============================================================================
@@ -40,6 +41,7 @@ selected_file        = white   black
 marked_file          = cyan    default bold
 marked_selected_file = white   black
 
+
 # =============================================================================
 # INFORMATION DISPLAY
 # =============================================================================
@@ -55,6 +57,7 @@ state                = default default
 status               = default default
 title                = default default
 
+
 # =============================================================================
 # TIME DISPLAY
 # =============================================================================
@@ -66,12 +69,14 @@ time_left            = white   default bold
 time_total_frames    = white   default
 total_time           = white   default bold
 
+
 # =============================================================================
 # AUDIO PARAMETERS
 # =============================================================================
 
 # --- Audio Information (rate, bitrate, channels) ---
 sound_parameters     = white   default bold
+
 
 # =============================================================================
 # MENU & OPTIONS
@@ -81,6 +86,7 @@ sound_parameters     = white   default bold
 legend               = white   default
 disabled             = default default bold
 enabled              = white   default bold
+
 
 # =============================================================================
 # PROGRESS BARS
@@ -94,6 +100,7 @@ filled_mixer_bar     = black   yellow
 empty_time_bar       = white   default
 filled_time_bar      = black   yellow
 
+
 # =============================================================================
 # MESSAGES & INPUT
 # =============================================================================
@@ -105,5 +112,6 @@ entry_title          = black   cyan
 # --- Messages (errors, notifications) ---
 error                = red     default
 message              = green   default
+
 
 # EOF

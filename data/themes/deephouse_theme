@@ -19,6 +19,7 @@ background           = yellow  default
 frame                = white   default
 window_title         = white   default underline,dim
 
+
 # =============================================================================
 # FILE BROWSER & PLAYLIST
 # =============================================================================
@@ -39,6 +40,7 @@ selected_file        = grey    default bold
 marked_file          = white   default bold
 marked_selected_file = white   default bold,underline
 
+
 # =============================================================================
 # INFORMATION DISPLAY
 # =============================================================================
@@ -54,6 +56,7 @@ state                = white   default
 status               = white   default
 title                = white   default
 
+
 # =============================================================================
 # TIME DISPLAY
 # =============================================================================
@@ -65,12 +68,14 @@ time_left            = white   default
 time_total_frames    = white   default
 total_time           = white   default
 
+
 # =============================================================================
 # AUDIO PARAMETERS
 # =============================================================================
 
 # --- Audio Information (rate, bitrate, channels) ---
 sound_parameters     = white   default
+
 
 # =============================================================================
 # MENU & OPTIONS
@@ -80,6 +85,7 @@ sound_parameters     = white   default
 legend               = white   default
 disabled             = white   default dim
 enabled              = white   default bold
+
 
 # =============================================================================
 # PROGRESS BARS
@@ -93,6 +99,7 @@ filled_mixer_bar     = black   cyan
 empty_time_bar       = white   default
 filled_time_bar      = default white
 
+
 # =============================================================================
 # MESSAGES & INPUT
 # =============================================================================
@@ -104,5 +111,6 @@ entry_title          = white   default bold
 # --- Messages (errors, notifications) ---
 error                = yellow  default
 message              = white   default
+
 
 # EOF
