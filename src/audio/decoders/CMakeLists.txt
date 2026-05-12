@@ -33,8 +33,10 @@ function(add_decoder_plugin NAME)
 endfunction()
 
 # Check for id3tag (needed by mp3 and aac)
-find_package(PkgConfig)
-check_library_exists(z gzopen "" HAVE_ZLIB)
+if(ZLIB_FOUND)
+  set(HAVE_ZLIB TRUE)
+endif()
+
 check_library_exists(id3tag id3_file_open "" HAVE_LIBID3TAG)
 check_include_file(id3tag.h HAVE_ID3TAG_H)
 
@@ -61,24 +63,22 @@ if(WITH_MP3)
       LIBRARIES
       mad
       id3tag
-      z)
+      ZLIB::ZLIB)
   endif()
 endif()
 
 # MPG123 decoder
 if(WITH_MPG123)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(MPG123 libmpg123>=1.14)
-    if(MPG123_FOUND)
-      add_decoder_plugin(
-        mpg123
-        SOURCES
-        mpg123/mpg123.c
-        LIBRARIES
-        ${MPG123_LIBRARIES}
-        INCLUDE_DIRS
-        ${MPG123_INCLUDE_DIRS})
-    endif()
+  pkg_check_modules(MPG123 libmpg123>=1.14)
+  if(MPG123_FOUND)
+    add_decoder_plugin(
+      mpg123
+      SOURCES
+      mpg123/mpg123.c
+      LIBRARIES
+      ${MPG123_LIBRARIES}
+      INCLUDE_DIRS
+      ${MPG123_INCLUDE_DIRS})
   endif()
 endif()
 
@@ -97,65 +97,59 @@ if(WITH_AAC)
       LIBRARIES
       faad
       id3tag
-      z)
+      ZLIB::ZLIB)
   endif()
 endif()
 
 # Vorbis decoder
 if(WITH_VORBIS)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(VORBIS ogg>=1.0 vorbis>=1.0 vorbisfile>=1.0)
-    if(VORBIS_FOUND)
-      add_decoder_plugin(
-        vorbis
-        SOURCES
-        vorbis/vorbis.c
-        LIBRARIES
-        ${VORBIS_LIBRARIES}
-        INCLUDE_DIRS
-        ${VORBIS_INCLUDE_DIRS})
-    endif()
+  pkg_check_modules(VORBIS ogg>=1.0 vorbis>=1.0 vorbisfile>=1.0)
+  if(VORBIS_FOUND)
+    add_decoder_plugin(
+      vorbis
+      SOURCES
+      vorbis/vorbis.c
+      LIBRARIES
+      ${VORBIS_LIBRARIES}
+      INCLUDE_DIRS
+      ${VORBIS_INCLUDE_DIRS})
   endif()
 endif()
 
 # Opus decoder
 if(WITH_OPUS)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(OPUS opusfile>=0.1)
-    if(OPUS_FOUND)
-      check_library_exists(opusfile op_read_float "" HAVE_OPUSFILE_FLOAT)
-      set(OPUS_DEFS "")
-      if(HAVE_OPUSFILE_FLOAT)
-        list(APPEND OPUS_DEFS HAVE_OPUSFILE_FLOAT=1)
-      endif()
-      add_decoder_plugin(
-        opus
-        SOURCES
-        opus/opus.c
-        LIBRARIES
-        ${OPUS_LIBRARIES}
-        INCLUDE_DIRS
-        ${OPUS_INCLUDE_DIRS}
-        COMPILE_DEFINITIONS
-        ${OPUS_DEFS})
+  pkg_check_modules(OPUS opusfile>=0.1)
+  if(OPUS_FOUND)
+    check_library_exists(opusfile op_read_float "" HAVE_OPUSFILE_FLOAT)
+    set(OPUS_DEFS "")
+    if(HAVE_OPUSFILE_FLOAT)
+      list(APPEND OPUS_DEFS HAVE_OPUSFILE_FLOAT=1)
     endif()
+    add_decoder_plugin(
+      opus
+      SOURCES
+      opus/opus.c
+      LIBRARIES
+      ${OPUS_LIBRARIES}
+      INCLUDE_DIRS
+      ${OPUS_INCLUDE_DIRS}
+      COMPILE_DEFINITIONS
+      ${OPUS_DEFS})
   endif()
 endif()
 
 # FLAC decoder
 if(WITH_FLAC)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(FLAC flac>=1.1.3)
-    if(FLAC_FOUND)
-      add_decoder_plugin(
-        flac
-        SOURCES
-        flac/flac.c
-        LIBRARIES
-        ${FLAC_LIBRARIES}
-        INCLUDE_DIRS
-        ${FLAC_INCLUDE_DIRS})
-    endif()
+  pkg_check_modules(FLAC flac>=1.1.3)
+  if(FLAC_FOUND)
+    add_decoder_plugin(
+      flac
+      SOURCES
+      flac/flac.c
+      LIBRARIES
+      ${FLAC_LIBRARIES}
+      INCLUDE_DIRS
+      ${FLAC_INCLUDE_DIRS})
   endif()
 endif()
 
@@ -210,127 +204,115 @@ endif()
 
 # WavPack decoder
 if(WITH_WAVPACK)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(WAVPACK wavpack>=4.31)
-    if(WAVPACK_FOUND)
-      add_decoder_plugin(
-        wavpack
-        SOURCES
-        wavpack/wavpack.c
-        LIBRARIES
-        ${WAVPACK_LIBRARIES}
-        INCLUDE_DIRS
-        ${WAVPACK_INCLUDE_DIRS})
-    endif()
+  pkg_check_modules(WAVPACK wavpack>=4.31)
+  if(WAVPACK_FOUND)
+    add_decoder_plugin(
+      wavpack
+      SOURCES
+      wavpack/wavpack.c
+      LIBRARIES
+      ${WAVPACK_LIBRARIES}
+      INCLUDE_DIRS
+      ${WAVPACK_INCLUDE_DIRS})
   endif()
 endif()
 
 # libsndfile decoder
 if(WITH_SNDFILE)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(SNDFILE sndfile>=1.0.0)
-    if(SNDFILE_FOUND)
-      check_library_exists(sndfile sf_current_byterate "" HAVE_SNDFILE_BYTERATE)
-      set(SNDFILE_DEFS "")
-      if(HAVE_SNDFILE_BYTERATE)
-        list(APPEND SNDFILE_DEFS HAVE_SNDFILE_BYTERATE=1)
-      endif()
-      add_decoder_plugin(
-        sndfile
-        SOURCES
-        sndfile/sndfile.c
-        LIBRARIES
-        ${SNDFILE_LIBRARIES}
-        INCLUDE_DIRS
-        ${SNDFILE_INCLUDE_DIRS}
-        COMPILE_DEFINITIONS
-        ${SNDFILE_DEFS})
+  pkg_check_modules(SNDFILE sndfile>=1.0.0)
+  if(SNDFILE_FOUND)
+    check_library_exists(sndfile sf_current_byterate "" HAVE_SNDFILE_BYTERATE)
+    set(SNDFILE_DEFS "")
+    if(HAVE_SNDFILE_BYTERATE)
+      list(APPEND SNDFILE_DEFS HAVE_SNDFILE_BYTERATE=1)
     endif()
+    add_decoder_plugin(
+      sndfile
+      SOURCES
+      sndfile/sndfile.c
+      LIBRARIES
+      ${SNDFILE_LIBRARIES}
+      INCLUDE_DIRS
+      ${SNDFILE_INCLUDE_DIRS}
+      COMPILE_DEFINITIONS
+      ${SNDFILE_DEFS})
   endif()
 endif()
 
 # ModPlug decoder
 if(WITH_MODPLUG)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(MODPLUG libmodplug>=0.7)
-    if(MODPLUG_FOUND)
-      add_decoder_plugin(
-        modplug
-        SOURCES
-        modplug/modplug.c
-        LIBRARIES
-        ${MODPLUG_LIBRARIES}
-        INCLUDE_DIRS
-        ${MODPLUG_INCLUDE_DIRS})
-    endif()
+  pkg_check_modules(MODPLUG libmodplug>=0.7)
+  if(MODPLUG_FOUND)
+    add_decoder_plugin(
+      modplug
+      SOURCES
+      modplug/modplug.c
+      LIBRARIES
+      ${MODPLUG_LIBRARIES}
+      INCLUDE_DIRS
+      ${MODPLUG_INCLUDE_DIRS})
   endif()
 endif()
 
 # Speex decoder
 if(WITH_SPEEX)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(SPEEX ogg>=1.0 speex>=1.0.0)
-    if(SPEEX_FOUND)
-      add_decoder_plugin(
-        speex
-        SOURCES
-        speex/speex.c
-        LIBRARIES
-        ${SPEEX_LIBRARIES}
-        INCLUDE_DIRS
-        ${SPEEX_INCLUDE_DIRS})
-    endif()
+  pkg_check_modules(SPEEX ogg>=1.0 speex>=1.0.0)
+  if(SPEEX_FOUND)
+    add_decoder_plugin(
+      speex
+      SOURCES
+      speex/speex.c
+      LIBRARIES
+      ${SPEEX_LIBRARIES}
+      INCLUDE_DIRS
+      ${SPEEX_INCLUDE_DIRS})
   endif()
 endif()
 
 # Timidity decoder
 if(WITH_TIMIDITY)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(TIMIDITY libtimidity>=0.1.0)
-    if(TIMIDITY_FOUND)
-      add_decoder_plugin(
-        timidity
-        SOURCES
-        timidity/timidity.c
-        LIBRARIES
-        ${TIMIDITY_LIBRARIES}
-        INCLUDE_DIRS
-        ${TIMIDITY_INCLUDE_DIRS})
-    endif()
+  pkg_check_modules(TIMIDITY libtimidity>=0.1.0)
+  if(TIMIDITY_FOUND)
+    add_decoder_plugin(
+      timidity
+      SOURCES
+      timidity/timidity.c
+      LIBRARIES
+      ${TIMIDITY_LIBRARIES}
+      INCLUDE_DIRS
+      ${TIMIDITY_INCLUDE_DIRS})
   endif()
 endif()
 
 # SIDPlay2 decoder
 if(WITH_SIDPLAY2)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(SIDPLAY2 libsidplay2>=2.1.1)
-    pkg_check_modules(SIDUTILS libsidutils>=1.0.4)
+  pkg_check_modules(SIDPLAY2 libsidplay2>=2.1.1)
+  pkg_check_modules(SIDUTILS libsidutils>=1.0.4)
 
-    if(SIDPLAY2_FOUND AND SIDUTILS_FOUND)
-      execute_process(
-        COMMAND ${PKG_CONFIG_EXECUTABLE} --variable=builders libsidplay2
-        OUTPUT_VARIABLE SIDPLAY2_BUILDERS
-        OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(SIDPLAY2_FOUND AND SIDUTILS_FOUND)
+    execute_process(
+      COMMAND ${PKG_CONFIG_EXECUTABLE} --variable=builders libsidplay2
+      OUTPUT_VARIABLE SIDPLAY2_BUILDERS
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-      if(SIDPLAY2_BUILDERS)
-        check_include_file(sidplay/builders/resid.h HAVE_RESID_H)
-        if(HAVE_RESID_H)
-          add_decoder_plugin(
-            sidplay2
-            SOURCES
-            sidplay2/sidplay2.cc
-            sidplay2/sidplay2.h
-            LIBRARIES
-            ${SIDPLAY2_LIBRARIES}
-            ${SIDUTILS_LIBRARIES}
-            resid-builder
-            INCLUDE_DIRS
-            ${SIDPLAY2_INCLUDE_DIRS}
-            ${SIDUTILS_INCLUDE_DIRS})
-          target_link_directories(sidplay2_decoder PRIVATE ${SIDPLAY2_BUILDERS})
-          # Propagate the link search path so the root target can find resid-builder
-          list(APPEND DECODER_LINK_DIRS ${SIDPLAY2_BUILDERS})
-        endif()
+    if(SIDPLAY2_BUILDERS)
+      check_include_file(sidplay/builders/resid.h HAVE_RESID_H)
+      if(HAVE_RESID_H)
+        add_decoder_plugin(
+          sidplay2
+          SOURCES
+          sidplay2/sidplay2.cc
+          sidplay2/sidplay2.h
+          LIBRARIES
+          ${SIDPLAY2_LIBRARIES}
+          ${SIDUTILS_LIBRARIES}
+          resid-builder
+          INCLUDE_DIRS
+          ${SIDPLAY2_INCLUDE_DIRS}
+          ${SIDUTILS_INCLUDE_DIRS})
+        target_link_directories(sidplay2_decoder PRIVATE ${SIDPLAY2_BUILDERS})
+        # Propagate the link search path so the root target can find resid-builder
+        list(APPEND DECODER_LINK_DIRS ${SIDPLAY2_BUILDERS})
       endif()
     endif()
   endif()
@@ -338,87 +320,72 @@ endif()
 
 # FFmpeg/LibAV decoder
 if(WITH_FFMPEG)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(FFMPEG libavutil libavcodec libavformat)
-    if(FFMPEG_FOUND)
-      execute_process(
-        COMMAND ${PKG_CONFIG_EXECUTABLE} --modversion libavcodec
-        OUTPUT_VARIABLE AVCODEC_VERSION
-        OUTPUT_STRIP_TRAILING_WHITESPACE)
+  pkg_check_modules(FFMPEG libavutil libavcodec libavformat)
+  if(FFMPEG_FOUND)
+    set(AVCODEC_VERSION ${FFMPEG_libavcodec_VERSION})
+    if(AVCODEC_VERSION VERSION_GREATER "53.47")
+      set(FFMPEG_DEFS "")
 
-      string(REGEX MATCH "^[0-9]+" AVCODEC_MAJOR "${AVCODEC_VERSION}")
-      string(REGEX MATCH "\\.[0-9]+" AVCODEC_MINOR_MATCH "${AVCODEC_VERSION}")
-      string(REGEX REPLACE "^\\." "" AVCODEC_MINOR "${AVCODEC_MINOR_MATCH}")
-
-      if(AVCODEC_MAJOR GREATER 53 OR (AVCODEC_MAJOR EQUAL 53 AND AVCODEC_MINOR
-                                                                 GREATER 47))
-        set(FFMPEG_DEFS "")
-
-        string(REGEX MATCH "\\.([0-9]+)$" AVCODEC_PATCH_MATCH
-                     "${AVCODEC_VERSION}")
-        string(REGEX REPLACE "^\\." "" AVCODEC_PATCH "${AVCODEC_PATCH_MATCH}")
-
-        if(AVCODEC_PATCH GREATER 99)
-          list(APPEND FFMPEG_DEFS HAVE_FFMPEG=1)
-        else()
-          list(APPEND FFMPEG_DEFS HAVE_LIBAV=1)
-        endif()
-
-        include(CheckStructHasMember)
-        set(CMAKE_REQUIRED_INCLUDES ${FFMPEG_INCLUDE_DIRS})
-        set(CMAKE_REQUIRED_LIBRARIES ${FFMPEG_LIBRARIES})
-
-        check_symbol_exists(av_packet_alloc "libavcodec/avcodec.h"
-                            HAVE_AV_PACKET_FNS)
-        check_symbol_exists(av_frame_alloc "libavutil/frame.h"
-                            HAVE_AV_FRAME_FNS)
-        check_symbol_exists(avcodec_free_context "libavcodec/avcodec.h"
-                            HAVE_AVCODEC_FREE_CONTEXT)
-        check_symbol_exists(avcodec_receive_frame "libavcodec/avcodec.h"
-                            HAVE_AVCODEC_RECEIVE_FRAME)
-        check_include_file(libavutil/channel_layout.h
-                           HAVE_LIBAVUTIL_CHANNEL_LAYOUT_H)
-
-        check_struct_has_member(
-          "struct AVStream" codecpar "libavformat/avformat.h"
-          HAVE_STRUCT_AVSTREAM_CODECPAR)
-        check_struct_has_member(
-          "struct AVProbeData" mime_type "libavformat/avformat.h"
-          HAVE_STRUCT_AVPROBEDATA_MIME_TYPE)
-
-        if(HAVE_AV_PACKET_FNS)
-          list(APPEND FFMPEG_DEFS HAVE_AV_PACKET_FNS=1)
-        endif()
-        if(HAVE_AV_FRAME_FNS)
-          list(APPEND FFMPEG_DEFS HAVE_AV_FRAME_FNS=1)
-        endif()
-        if(HAVE_AVCODEC_FREE_CONTEXT)
-          list(APPEND FFMPEG_DEFS HAVE_AVCODEC_FREE_CONTEXT=1)
-        endif()
-        if(HAVE_AVCODEC_RECEIVE_FRAME)
-          list(APPEND FFMPEG_DEFS HAVE_AVCODEC_RECEIVE_FRAME=1)
-        endif()
-        if(HAVE_LIBAVUTIL_CHANNEL_LAYOUT_H)
-          list(APPEND FFMPEG_DEFS HAVE_LIBAVUTIL_CHANNEL_LAYOUT_H=1)
-        endif()
-        if(HAVE_STRUCT_AVSTREAM_CODECPAR)
-          list(APPEND FFMPEG_DEFS HAVE_STRUCT_AVSTREAM_CODECPAR=1)
-        endif()
-        if(HAVE_STRUCT_AVPROBEDATA_MIME_TYPE)
-          list(APPEND FFMPEG_DEFS HAVE_STRUCT_AVPROBEDATA_MIME_TYPE=1)
-        endif()
-
-        add_decoder_plugin(
-          ffmpeg
-          SOURCES
-          ffmpeg/ffmpeg.c
-          LIBRARIES
-          ${FFMPEG_LIBRARIES}
-          INCLUDE_DIRS
-          ${FFMPEG_INCLUDE_DIRS}
-          COMPILE_DEFINITIONS
-          ${FFMPEG_DEFS})
+      if(AVCODEC_VERSION MATCHES "\\.([0-9]+)$" AND CMAKE_MATCH_1 GREATER 99)
+        list(APPEND FFMPEG_DEFS HAVE_FFMPEG=1)
+      else()
+        list(APPEND FFMPEG_DEFS HAVE_LIBAV=1)
       endif()
+
+      include(CheckStructHasMember)
+      set(CMAKE_REQUIRED_INCLUDES ${FFMPEG_INCLUDE_DIRS})
+      set(CMAKE_REQUIRED_LIBRARIES ${FFMPEG_LIBRARIES})
+
+      check_symbol_exists(av_packet_alloc "libavcodec/avcodec.h"
+                          HAVE_AV_PACKET_FNS)
+      check_symbol_exists(av_frame_alloc "libavutil/frame.h"
+                          HAVE_AV_FRAME_FNS)
+      check_symbol_exists(avcodec_free_context "libavcodec/avcodec.h"
+                          HAVE_AVCODEC_FREE_CONTEXT)
+      check_symbol_exists(avcodec_receive_frame "libavcodec/avcodec.h"
+                          HAVE_AVCODEC_RECEIVE_FRAME)
+      check_include_file(libavutil/channel_layout.h
+                         HAVE_LIBAVUTIL_CHANNEL_LAYOUT_H)
+
+      check_struct_has_member(
+        "struct AVStream" codecpar "libavformat/avformat.h"
+        HAVE_STRUCT_AVSTREAM_CODECPAR)
+      check_struct_has_member(
+        "struct AVProbeData" mime_type "libavformat/avformat.h"
+        HAVE_STRUCT_AVPROBEDATA_MIME_TYPE)
+
+      if(HAVE_AV_PACKET_FNS)
+        list(APPEND FFMPEG_DEFS HAVE_AV_PACKET_FNS=1)
+      endif()
+      if(HAVE_AV_FRAME_FNS)
+        list(APPEND FFMPEG_DEFS HAVE_AV_FRAME_FNS=1)
+      endif()
+      if(HAVE_AVCODEC_FREE_CONTEXT)
+        list(APPEND FFMPEG_DEFS HAVE_AVCODEC_FREE_CONTEXT=1)
+      endif()
+      if(HAVE_AVCODEC_RECEIVE_FRAME)
+        list(APPEND FFMPEG_DEFS HAVE_AVCODEC_RECEIVE_FRAME=1)
+      endif()
+      if(HAVE_LIBAVUTIL_CHANNEL_LAYOUT_H)
+        list(APPEND FFMPEG_DEFS HAVE_LIBAVUTIL_CHANNEL_LAYOUT_H=1)
+      endif()
+      if(HAVE_STRUCT_AVSTREAM_CODECPAR)
+        list(APPEND FFMPEG_DEFS HAVE_STRUCT_AVSTREAM_CODECPAR=1)
+      endif()
+      if(HAVE_STRUCT_AVPROBEDATA_MIME_TYPE)
+        list(APPEND FFMPEG_DEFS HAVE_STRUCT_AVPROBEDATA_MIME_TYPE=1)
+      endif()
+
+      add_decoder_plugin(
+        ffmpeg
+        SOURCES
+        ffmpeg/ffmpeg.c
+        LIBRARIES
+        ${FFMPEG_LIBRARIES}
+        INCLUDE_DIRS
+        ${FFMPEG_INCLUDE_DIRS}
+        COMPILE_DEFINITIONS
+        ${FFMPEG_DEFS})
     endif()
   endif()
 endif()

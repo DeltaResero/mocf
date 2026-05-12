@@ -98,6 +98,7 @@ find_package(Threads REQUIRED)
 find_package(Curses REQUIRED)
 find_package(Iconv REQUIRED)
 find_package(PkgConfig REQUIRED)
+find_package(ZLIB)
 
 # Iconv Check
 if(Iconv_FOUND)
