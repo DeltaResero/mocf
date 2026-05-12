@@ -154,6 +154,9 @@ static int set_capabilities(struct output_driver_caps *caps)
     caps->formats = SFMT_S8 | SFMT_S16 | SFMT_NE;
   }
 
+  caps->min_rate = AUDIO_RATE_MIN;
+  caps->max_rate = AUDIO_RATE_MAX;
+
   caps->min_channels = caps->max_channels = 1;
   if (ioctl(dsp_fd, SNDCTL_DSP_CHANNELS, &caps->min_channels))
   {

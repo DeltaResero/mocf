@@ -60,6 +60,8 @@ extern "C"
 #define U24_MAX (1 << 24)
 #define S24_MAX (1 << 23) - 1
 #define S24_MIN -(1 << 23)
+#define AUDIO_RATE_MIN 0
+#define AUDIO_RATE_MAX 192000
 
 /** @name Masks for the sample format.
  *

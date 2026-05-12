@@ -45,8 +45,8 @@ static int sndio_init(struct output_driver_caps *caps)
   caps->formats = SFMT_S8 | SFMT_U8 | SFMT_U16 | SFMT_S16 | SFMT_NE;
   caps->min_channels = 1;
   caps->max_channels = 6;
-  caps->min_rate = 0;
-  caps->max_rate = 192000;
+  caps->min_rate = AUDIO_RATE_MIN;
+  caps->max_rate = AUDIO_RATE_MAX;
 
   return 1;
 }
