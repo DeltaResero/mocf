@@ -28,7 +28,7 @@
 #include "core/log.h"
 #include "io/io.h"
 
-#define MAX_SUPPORTED_CHANNELS 6
+#define MAX_SUPPORTED_CHANNELS 8
 
 #define SAMPLES_PER_WRITE 512
 #define SAMPLE_BUFFER_SIZE                                                     \
