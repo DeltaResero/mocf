@@ -46,7 +46,6 @@ struct modplug_data
 {
   ModPlugFile *modplugfile;
   int length;
-  char *filedata;
   struct decoder_error error;
 };
 
@@ -101,7 +100,6 @@ static struct modplug_data *make_modplug_data(const char *file)
   data = (struct modplug_data *)xmalloc(sizeof(struct modplug_data));
 
   data->modplugfile = NULL;
-  data->filedata = NULL;
   decoder_error_init(&data->error);
 
   struct io_stream *s = io_open(file, 0);
@@ -128,16 +126,20 @@ static struct modplug_data *make_modplug_data(const char *file)
   //    enough ? (%s)", file); return data;
   //  }
 
-  data->filedata = (char *)xmalloc((size_t)size);
+  char *filedata = (char *)xmalloc((size_t)size);
 
-  io_read(s, data->filedata, (size_t)size);
+  io_read(s, filedata, (size_t)size);
   io_close(s);
 
-  data->modplugfile = ModPlug_Load(data->filedata, (int)size);
+  data->modplugfile = ModPlug_Load(filedata, (int)size);
+
+  /* libmodplug copies everything it needs during ModPlug_Load; the source
+   * buffer is not referenced afterwards and can be freed immediately.
+   * This halves the steady-state RAM cost during playback. */
+  free(filedata);
 
   if (data->modplugfile == NULL)
   {
-    free(data->filedata);
     decoder_error(&data->error, ERROR_FATAL, 0, "Can't load module: %s", file);
     return data;
   }
@@ -174,7 +176,6 @@ static void modplug_close(void *void_data)
   if (data->modplugfile)
   {
     ModPlug_Unload(data->modplugfile);
-    free(data->filedata);
   }
 
   decoder_error_clear(&data->error);
