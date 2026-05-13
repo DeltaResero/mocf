@@ -570,23 +570,19 @@
 # Otherwise set it to the name of a specific file.
 #TiMidity_Config =
 
-# Self-describing SidPlay2 audio characteristic options.
+# Self-describing SidPlayFP audio characteristic options.
 #SidPlay2_DefaultSongLength = 180   # If not in database (in seconds)
 #SidPlay2_MinimumSongLength = 0     # Play at least n (in seconds)
 #SidPlay2_Frequency = 48000         # 4000 to 48000
-#SidPlay2_Bits = 16                 # 8 or 16
-#SidPlay2_Optimisation = 0          # 0 (worst quality) to 2 (best quality)
+
+# The SID chip model to use:
+# 0 = Auto (trust tune header)
+# 1 = MOS6581
+# 2 = MOS8580
+#SidPlayFP_SIDModel = 0
 
 # Set path to a HVSC-compatible database (if not set, database is disabled).
 #SidPlay2_Database =
-
-# SidPlay2 playback Mode:
-#
-#     "M": Mono (best for many SIDs)
-#     "S": Stereo
-#     "L"/"R": Left / Right
-#
-#SidPlay2_PlayMode = "M"
 
 # Use start-song information from SID ('yes') or start at first song
 # ('no').  Songs before the start-song won't be played.

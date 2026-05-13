@@ -843,14 +843,6 @@ void options_init()
   add_int("SeekTime", 1, CHECK_RANGE(1), 1, INT_MAX);
   add_int("SilentSeekTime", 5, CHECK_RANGE(1), 1, INT_MAX);
 
-  add_int("SidPlay2_DefaultSongLength", 180, CHECK_RANGE(1), 0, INT_MAX);
-  add_int("SidPlay2_MinimumSongLength", 0, CHECK_RANGE(1), 0, INT_MAX);
-  add_path("SidPlay2_Database", "", CHECK_NONE);
-  add_int("SidPlay2_Frequency", 44100, CHECK_RANGE(1), 0, INT_MAX);
-  add_bool("SidPlay2_StartAtStart", true);
-  add_bool("SidPlay2_PlaySubTunes", true);
-  add_int("SidPlayFP_SIDModel", 0, CHECK_RANGE(1), 0, 2);
-
   add_list("PreferredDecoders",
            "aac(aac,ffmpeg):m4a(ffmpeg):"
            "mpc(musepack,*,ffmpeg):mpc8(musepack,*,ffmpeg):"
@@ -926,11 +918,9 @@ void options_init()
   add_int("SidPlay2_MinimumSongLength", 0, CHECK_RANGE(1), 0, INT_MAX);
   add_str("SidPlay2_Database", NULL, CHECK_NONE);
   add_int("SidPlay2_Frequency", 48000, CHECK_RANGE(1), 4000, 48000);
-  add_int("SidPlay2_Bits", 16, CHECK_DISCRETE(2), 8, 16);
-  add_int("SidPlay2_Optimisation", 0, CHECK_RANGE(1), 0, 2);
-  add_symb("SidPlay2_PlayMode", "M", CHECK_SYMBOL(4), "M", "S", "L", "R");
   add_bool("SidPlay2_StartAtStart", true);
   add_bool("SidPlay2_PlaySubTunes", true);
+  add_int("SidPlayFP_SIDModel", 0, CHECK_RANGE(1), 0, 2);
 
   add_bool("AAC_HEAACUpsampling", true);
 
