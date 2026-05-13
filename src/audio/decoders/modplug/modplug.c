@@ -188,6 +188,7 @@ static void modplug_info(const char *file_name, struct file_tags *info,
 
   if (data->modplugfile == NULL)
   {
+    modplug_close(data);
     return;
   }
 
