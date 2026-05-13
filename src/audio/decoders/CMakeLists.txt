@@ -284,37 +284,25 @@ if(WITH_TIMIDITY)
   endif()
 endif()
 
-# SIDPlay2 decoder
-if(WITH_SIDPLAY2)
-  pkg_check_modules(SIDPLAY2 libsidplay2>=2.1.1)
-  pkg_check_modules(SIDUTILS libsidutils>=1.0.4)
+# SIDPlayFP decoder (replaces old libsidplay2 + ReSID decoder)
+# Requires: libsidplayfp >= 2.0 (Arch: libsidplayfp)
+# CMake option: -DWITH_SIDPLAYFP=ON  (replaces -DWITH_SIDPLAY2=ON)
+if(WITH_SIDPLAYFP)
+  pkg_check_modules(SIDPLAYFP libsidplayfp>=2.0)
 
-  if(SIDPLAY2_FOUND AND SIDUTILS_FOUND)
-    execute_process(
-      COMMAND ${PKG_CONFIG_EXECUTABLE} --variable=builders libsidplay2
-      OUTPUT_VARIABLE SIDPLAY2_BUILDERS
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-    if(SIDPLAY2_BUILDERS)
-      check_include_file(sidplay/builders/resid.h HAVE_RESID_H)
-      if(HAVE_RESID_H)
-        add_decoder_plugin(
-          sidplay2
-          SOURCES
-          sidplay2/sidplay2.cc
-          sidplay2/sidplay2.h
-          LIBRARIES
-          ${SIDPLAY2_LIBRARIES}
-          ${SIDUTILS_LIBRARIES}
-          resid-builder
-          INCLUDE_DIRS
-          ${SIDPLAY2_INCLUDE_DIRS}
-          ${SIDUTILS_INCLUDE_DIRS})
-        target_link_directories(sidplay2_decoder PRIVATE ${SIDPLAY2_BUILDERS})
-        # Propagate the link search path so the root target can find resid-builder
-        list(APPEND DECODER_LINK_DIRS ${SIDPLAY2_BUILDERS})
-      endif()
-    endif()
+  if(SIDPLAYFP_FOUND)
+    # residfp.h is a C++ header; check_include_file (C-only) would
+    # reject it even when installed. pkg-config finding the library is
+    # sufficient confirmation that the headers are present.
+    add_decoder_plugin(
+      sidplayfp
+      SOURCES
+      sidplayfp/sidplayfp.cc
+      sidplayfp/sidplayfp.h
+      LIBRARIES
+      ${SIDPLAYFP_LIBRARIES}
+      INCLUDE_DIRS
+      ${SIDPLAYFP_INCLUDE_DIRS})
   endif()
 endif()
 

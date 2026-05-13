@@ -46,6 +46,10 @@
 #define _POSIX_C_SOURCE 200112L
 #endif
 
+#ifdef __cplusplus
+#define restrict __restrict
+#endif
+
 #endif
 
 // EOF

@@ -843,10 +843,18 @@ void options_init()
   add_int("SeekTime", 1, CHECK_RANGE(1), 1, INT_MAX);
   add_int("SilentSeekTime", 5, CHECK_RANGE(1), 1, INT_MAX);
 
+  add_int("SidPlay2_DefaultSongLength", 180, CHECK_RANGE(1), 0, INT_MAX);
+  add_int("SidPlay2_MinimumSongLength", 0, CHECK_RANGE(1), 0, INT_MAX);
+  add_path("SidPlay2_Database", "", CHECK_NONE);
+  add_int("SidPlay2_Frequency", 44100, CHECK_RANGE(1), 0, INT_MAX);
+  add_bool("SidPlay2_StartAtStart", true);
+  add_bool("SidPlay2_PlaySubTunes", true);
+  add_int("SidPlayFP_SIDModel", 0, CHECK_RANGE(1), 0, 2);
+
   add_list("PreferredDecoders",
            "aac(aac,ffmpeg):m4a(ffmpeg):"
            "mpc(musepack,*,ffmpeg):mpc8(musepack,*,ffmpeg):"
-           "sid(sidplay2):mus(sidplay2):"
+           "sid(sidplayfp,*,sidplay2):mus(sidplayfp,*,sidplay2):"
            "wav(sndfile,*,ffmpeg):"
            "wv(wavpack,*,ffmpeg):"
            "audio/aac(aac):audio/aacp(aac):audio/m4a(ffmpeg):"
