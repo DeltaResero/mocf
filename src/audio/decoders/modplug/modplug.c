@@ -34,12 +34,6 @@
 #include "library/files.h"
 #include "core/options.h"
 
-// Limiting maximum size for loading a module was suggested by Damian.
-// I've never seen such a large module so this should be a safe limit...
-#ifndef MAXMODSIZE
-#define MAXMODSIZE 1024 * 1024 * 42
-#endif
-
 ModPlug_Settings settings;
 
 struct modplug_data
@@ -120,11 +114,18 @@ static struct modplug_data *make_modplug_data(const char *file)
     return data;
   }
 
-  //  if(size>MAXMODSIZE) {
-  //    io_close(s);
-  //    decoder_error(&data->error, ERROR_FATAL, 0, "Module to big! 42M ain't
-  //    enough ? (%s)", file); return data;
-  //  }
+  int max_size = options_get_int("ModPlug_MaxFileSize");
+  if (size > (off_t)max_size)
+  {
+    io_close(s);
+    decoder_error(&data->error, ERROR_FATAL, 0,
+                  "Module file too large (%ldMB). Increase ModPlug_MaxFileSize "
+                  "in config (currently %dMB). See config for implications "
+                  "before raising this on low-RAM systems.",
+                  (long)size / (1024 * 1024),
+                  max_size / (1024 * 1024));
+    return data;
+  }
 
   char *filedata = (char *)xmalloc((size_t)size);
 

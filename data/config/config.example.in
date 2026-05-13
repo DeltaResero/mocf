@@ -557,6 +557,26 @@
 #ModPlug_SurroundDelay = 0          # Surround delay in ms, usually 5-40ms.
 #ModPlug_LoopCount = 0              # 0 (never), n (times) or -1 (forever)
 
+# Maximum size in bytes for loading a module file (MOD/XM/IT/S3M etc.).
+#
+# Module formats have no streaming API - the entire file must be allocated
+# in RAM before playback can begin, meaning file size directly translates to
+# a memory spike at load time on top of the player's normal footprint.
+#
+# Default: 16777216 (16MB) - safe for low-RAM systems including Wii Linux
+# (~64MB total RAM). Covers the vast majority of real-world module files.
+#
+# If you hit this limit on a modern system with ample RAM, raising to
+# 67108864 (64MB) or higher is fine. On constrained hardware, be aware that
+# the actual RAM spike during load exceeds the file size, as the decoder
+# decompresses and parses samples into internal structures simultaneously.
+#
+# This limit exists to prevent runaway allocation from malformed or
+# intentionally oversized files. Other decoders stream their data and are
+# not affected by this setting.
+#
+#ModPlug_MaxFileSize = 16777216
+
 # Self-describing TiMidity audio characteristic options.
 #TiMidity_Rate = 48000              # Between 8000 and 48000
 #TiMidity_Bits = 16                 # 8 or 16

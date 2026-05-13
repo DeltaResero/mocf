@@ -907,6 +907,7 @@ void options_init()
   add_int("ModPlug_SurroundDepth", 0, CHECK_RANGE(1), 0, 100);
   add_int("ModPlug_SurroundDelay", 0, CHECK_RANGE(1), 0, INT_MAX);
   add_int("ModPlug_LoopCount", 0, CHECK_RANGE(1), -1, INT_MAX);
+  add_int("ModPlug_MaxFileSize", 16 * 1024 * 1024, CHECK_RANGE(1), 1, INT_MAX);
 
   add_int("TiMidity_Rate", 48000, CHECK_RANGE(1), 8000, 48000);
   add_int("TiMidity_Bits", 16, CHECK_DISCRETE(2), 8, 16);
