@@ -70,7 +70,7 @@ option(WITH_MODPLUG "Enable libmodplug support" ON)
 option(WITH_FFMPEG "Enable ffmpeg/libav support" ON)
 option(WITH_SPEEX "Enable Speex support" ON)
 option(WITH_TIMIDITY "Enable libtimidity support" ON)
-option(WITH_SIDPLAY2 "Enable libsidplay2 support" ON)
+option(WITH_SIDPLAYFP "Enable libsidplayfp support" ON)
 
 # Dependencies
 include(CheckIncludeFile)
@@ -365,7 +365,7 @@ target_link_libraries(
           ${EXTRA_LIBS})
 
 # Propagate any extra library search paths needed by decoder dependencies
-# (currently only sidplay2's resid-builder path, when enabled).
+# (e.g., specific builder paths, when enabled).
 if(DECODER_LINK_DIRS)
   target_link_directories(mocf PRIVATE ${DECODER_LINK_DIRS})
 endif()

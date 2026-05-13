@@ -846,7 +846,7 @@ void options_init()
   add_list("PreferredDecoders",
            "aac(aac,ffmpeg):m4a(ffmpeg):"
            "mpc(musepack,*,ffmpeg):mpc8(musepack,*,ffmpeg):"
-           "sid(sidplayfp,*,sidplay2):mus(sidplayfp,*,sidplay2):"
+           "sid(sidplayfp,*):mus(sidplayfp,*):"
            "wav(sndfile,*,ffmpeg):"
            "wv(wavpack,*,ffmpeg):"
            "audio/aac(aac):audio/aacp(aac):audio/m4a(ffmpeg):"
@@ -914,12 +914,12 @@ void options_init()
   add_int("TiMidity_Volume", 100, CHECK_RANGE(1), 0, 800);
   add_str("TiMidity_Config", NULL, CHECK_NONE);
 
-  add_int("SidPlay2_DefaultSongLength", 180, CHECK_RANGE(1), 0, INT_MAX);
-  add_int("SidPlay2_MinimumSongLength", 0, CHECK_RANGE(1), 0, INT_MAX);
-  add_str("SidPlay2_Database", NULL, CHECK_NONE);
-  add_int("SidPlay2_Frequency", 48000, CHECK_RANGE(1), 4000, 48000);
-  add_bool("SidPlay2_StartAtStart", true);
-  add_bool("SidPlay2_PlaySubTunes", true);
+  add_int("SidPlayFP_DefaultSongLength", 180, CHECK_RANGE(1), 0, INT_MAX);
+  add_int("SidPlayFP_MinimumSongLength", 0, CHECK_RANGE(1), 0, INT_MAX);
+  add_str("SidPlayFP_Database", NULL, CHECK_NONE);
+  add_int("SidPlayFP_Frequency", 48000, CHECK_RANGE(1), 4000, 48000);
+  add_bool("SidPlayFP_StartAtStart", true);
+  add_bool("SidPlayFP_PlaySubTunes", true);
   add_int("SidPlayFP_SIDModel", 0, CHECK_RANGE(1), 0, 2);
 
   add_bool("AAC_HEAACUpsampling", true);

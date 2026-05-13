@@ -44,7 +44,7 @@ This project uses the **CMake** build system.
     libsamplerate, libmagic, BerkeleyDB.
 *   **Decoder Libraries:** libmad, libmpg123, libfaad2, libvorbis, opusfile,
     libflac, libmpcdec, libwavpack, libsndfile, libmodplug, ffmpeg/libav,
-    libspeex, libtimidity, libsidplay2.
+    libspeex, libtimidity, libsidplayfp.
 
 ### Quick Start
 
@@ -94,7 +94,7 @@ You can configure the build by passing `-DOPTION=ON/OFF` to cmake.
 | `WITH_FFMPEG` | Enable ffmpeg/libav support | `ON` |
 | `WITH_SPEEX` | Enable Speex support | `ON` |
 | `WITH_TIMIDITY` | Enable libtimidity support | `ON` |
-| `WITH_SIDPLAY2` | Enable libsidplay2 support | `ON` |
+| `WITH_SIDPLAYFP` | Enable libsidplayfp support | `ON` |
 
 ### Installation Directories
 

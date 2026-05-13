@@ -359,7 +359,7 @@
 #
 #PreferredDecoders  = aac(aac,ffmpeg):m4a(ffmpeg)
 #PreferredDecoders += mpc(musepack,*,ffmpeg):mpc8(musepack,*,ffmpeg)
-#PreferredDecoders += sid(sidplay2):mus(sidplay2)
+#PreferredDecoders += sid(sidplayfp):mus(sidplayfp)
 #PreferredDecoders += wav(sndfile,*,ffmpeg)
 #PreferredDecoders += wv(wavpack,*,ffmpeg)
 
@@ -571,9 +571,9 @@
 #TiMidity_Config =
 
 # Self-describing SidPlayFP audio characteristic options.
-#SidPlay2_DefaultSongLength = 180   # If not in database (in seconds)
-#SidPlay2_MinimumSongLength = 0     # Play at least n (in seconds)
-#SidPlay2_Frequency = 48000         # 4000 to 48000
+#SidPlayFP_DefaultSongLength = 180   # If not in database (in seconds)
+#SidPlayFP_MinimumSongLength = 0     # Play at least n (in seconds)
+#SidPlayFP_Frequency = 48000         # 4000 to 48000
 
 # The SID chip model to use:
 # 0 = Auto (trust tune header)
@@ -582,14 +582,14 @@
 #SidPlayFP_SIDModel = 0
 
 # Set path to a HVSC-compatible database (if not set, database is disabled).
-#SidPlay2_Database =
+#SidPlayFP_Database =
 
 # Use start-song information from SID ('yes') or start at first song
 # ('no').  Songs before the start-song won't be played.
-#SidPlay2_StartAtStart = yes
+#SidPlayFP_StartAtStart = yes
 
 # Play sub-tunes.
-#SidPlay2_PlaySubTunes = yes
+#SidPlayFP_PlaySubTunes = yes
 
 # Run the OnStop command (full path, no arguments) when MOCF changes state
 # to stopped (i.e., when user stopped playing or changes a song).

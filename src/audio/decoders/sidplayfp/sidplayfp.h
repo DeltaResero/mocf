@@ -38,14 +38,14 @@ extern "C" {
 #include <sidplayfp/builders/residfp.h>
 #include <sidplayfp/SidDatabase.h>
 
-// Option keys — kept compatible with the old sidplay2 keys so existing
-// config files continue to work. New key added for chip model selection.
-#define OPT_DEFLEN    "SidPlay2_DefaultSongLength"   // seconds (int)
-#define OPT_MINLEN    "SidPlay2_MinimumSongLength"   // seconds (int)
-#define OPT_DATABASE  "SidPlay2_Database"            // path (str)
-#define OPT_FREQ      "SidPlay2_Frequency"           // Hz    (int)
-#define OPT_START     "SidPlay2_StartAtStart"        // bool
-#define OPT_SUBTUNES  "SidPlay2_PlaySubTunes"        // bool
+// Option keys — updated from old sidplay2 keys
+// New key added for chip model selection.
+#define OPT_DEFLEN    "SidPlayFP_DefaultSongLength"   // seconds (int)
+#define OPT_MINLEN    "SidPlayFP_MinimumSongLength"   // seconds (int)
+#define OPT_DATABASE  "SidPlayFP_Database"            // path (str)
+#define OPT_FREQ      "SidPlayFP_Frequency"           // Hz    (int)
+#define OPT_START     "SidPlayFP_StartAtStart"        // bool
+#define OPT_SUBTUNES  "SidPlayFP_PlaySubTunes"        // bool
 // 0 = honour tune header (default), 1 = force 6581, 2 = force 8580
 #define OPT_SID_MODEL "SidPlayFP_SIDModel"           // int
 
