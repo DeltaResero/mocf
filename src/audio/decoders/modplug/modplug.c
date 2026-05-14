@@ -119,11 +119,8 @@ static struct modplug_data *make_modplug_data(const char *file)
   {
     io_close(s);
     decoder_error(&data->error, ERROR_FATAL, 0,
-                  "Module file too large (%ldMB). Increase ModPlug_MaxFileSize "
-                  "in config (currently %dMB). See config for implications "
-                  "before raising this on low-RAM systems.",
-                  (long)size / (1024 * 1024),
-                  max_size / (1024 * 1024));
+                  "Module file too large (%ldMB). Increase ModPlug_MaxFileSize in config.",
+                  (long)size / (1024 * 1024));
     return data;
   }
 
