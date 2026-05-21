@@ -161,95 +161,57 @@ static void check_moc_dir()
   }
 }
 
+struct server_thread_args {
+  int internal_sock;
+  int debug;
+  int foreground;
+};
+
+static void *server_thread_func(void *arg)
+{
+  struct server_thread_args *args = (struct server_thread_args *)arg;
+  set_me_server();
+  server_init(args->internal_sock, args->debug, args->foreground);
+  server_loop();
+  free(args);
+  return NULL;
+}
+
 /* Run client and the server if needed. */
 static void start_moc(const struct parameters *params, lists_t_strs *args)
 {
-  int server_sock;
+  int sv[2];
+  pthread_t server_thread;
+  struct server_thread_args *th_args;
 
-  if (params->foreground)
+  if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == -1)
   {
-    set_me_server();
-    server_init(params->debug, params->foreground);
-    server_loop();
-    return;
+    fatal("socketpair() failed: %s", xstrerror(errno));
   }
 
-  server_sock = server_connect();
+  th_args = (struct server_thread_args *)xmalloc(sizeof(*th_args));
+  th_args->internal_sock = sv[0];
+  th_args->debug = params->debug;
+  th_args->foreground = 1;
 
-  if (server_sock != -1 && params->only_server)
+  if (pthread_create(&server_thread, NULL, server_thread_func, th_args) != 0)
   {
-    fatal("Server is already running!");
+    fatal("pthread_create() failed: %s", xstrerror(errno));
   }
 
-  if (server_sock == -1)
+  xsignal(SIGPIPE, SIG_IGN);
+
+  if (!ping_server(sv[1]))
   {
-    int i = 0;
-    int notify_pipe[2];
-    ssize_t rc;
-
-    printf("Running the server...\n");
-
-    /* To notify the client that the server socket is ready */
-    if (pipe(notify_pipe))
-    {
-      fatal("pipe() failed: %s", xstrerror(errno));
-    }
-
-    switch (fork())
-    {
-      case 0: /* child - start server */
-        set_me_server();
-        server_init(params->debug, params->foreground);
-        rc = write(notify_pipe[1], &i, sizeof(i));
-        if (rc < 0)
-        {
-          fatal("write() to notify pipe failed: %s", xstrerror(errno));
-        }
-        close(notify_pipe[0]);
-        close(notify_pipe[1]);
-        server_loop();
-        options_free();
-        decoder_cleanup();
-        io_cleanup();
-        files_cleanup();
-        common_cleanup();
-        exit(EXIT_SUCCESS);
-      case -1:
-        fatal("fork() failed: %s", xstrerror(errno));
-      default:
-        close(notify_pipe[1]);
-        if (read(notify_pipe[0], &i, sizeof(i)) != sizeof(i))
-        {
-          fatal("Server exited!");
-        }
-        close(notify_pipe[0]);
-        server_sock = server_connect();
-        if (server_sock == -1)
-        {
-          perror("server_connect()");
-          fatal("Can't connect to the server!");
-        }
-    }
+    fatal("Can't connect to the server!");
   }
 
-  if (params->only_server)
-  {
-    send_int(server_sock, CMD_DISCONNECT);
-  }
-  else
-  {
-    xsignal(SIGPIPE, SIG_IGN);
-    if (!ping_server(server_sock))
-    {
-      fatal("Can't connect to the server!");
-    }
+  init_interface(sv[1], params->debug, args);
+  interface_loop();
+  interface_end();
 
-    init_interface(server_sock, params->debug, args);
-    interface_loop();
-    interface_end();
-  }
-
-  close(server_sock);
+  close(sv[1]);
+  pthread_join(server_thread, NULL);
 }
 
 /* Send commands requested in params to the server. */
@@ -599,9 +561,9 @@ static struct poptOption general_opts[] = {
     {"set-option", 'O', POPT_ARG_STRING, NULL, CL_SETOPTION,
      "Override the configuration option NAME with VALUE", "'NAME=VALUE'"},
     {"foreground", 'F', POPT_ARG_NONE, &params.foreground, CL_HANDLED,
-     "Run the server in foreground (logging to stdout)", NULL},
+     "OBSOLETE (Ignored)", NULL},
     {"server", 'S', POPT_ARG_NONE, &params.only_server, CL_HANDLED,
-     "Only run the server", NULL},
+     "OBSOLETE (Ignored)", NULL},
     {"sound-driver", 'R', POPT_ARG_STRING, NULL, CL_SDRIVER,
      "Use the first valid sound driver", "DRIVERS"},
     {"ascii", 'A', POPT_ARG_NONE, NULL, CL_ASCII,
@@ -1448,9 +1410,9 @@ int main(int argc, const char *argv[])
   args = process_command_line(deferred_overrides);
   log_popt_command_line();
 
-  if (!params.allow_iface && params.only_server)
+  if (!params.allow_iface)
   {
-    fatal("Server command options can't be used with --server!");
+    fatal("Server command options are no longer supported in single-process mode!");
   }
 
   if (!params.no_config_file)
@@ -1479,14 +1441,7 @@ int main(int argc, const char *argv[])
   decoder_init(params.debug);
   srand(time(NULL));
 
-  if (params.allow_iface)
-  {
-    start_moc(&params, args);
-  }
-  else
-  {
-    server_command(&params, args);
-  }
+  start_moc(&params, args);
 
   lists_strs_free(args);
   options_free();

@@ -383,28 +383,11 @@ static void run_extern_cmd(const char *event)
 }
 
 /* Initialize the server - return fd of the listening socket or -1 on error */
-void server_init(int debugging, int foreground)
+void server_init(int internal_sock, int debugging, int foreground)
 {
-  struct sockaddr_un sock_name;
-  pid_t pid;
-
   logit("Starting MOC Server");
 
   assert(server_sock == -1);
-
-  pid = check_pid_file();
-  if (pid && valid_pid(pid))
-  {
-    fprintf(stderr,
-            "\nIt seems that the server is already running"
-            " with pid %d.\n",
-            pid);
-    fprintf(stderr,
-            "If it is not true, remove the pid file (%s)"
-            " and try again.\n",
-            create_file_name(PID_FILE));
-    fatal("Exiting!");
-  }
 
   if (foreground)
   {
@@ -431,30 +414,7 @@ void server_init(int debugging, int foreground)
     fatal("pipe() failed: %s", xstrerror(errno));
   }
 
-  unlink(socket_name());
-
-  /* Create a socket.
-   * For reasons why AF_UNIX is the correct constant to use in both
-   * cases, see the commentary the SVN log for commit r9999. */
-  server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (server_sock == -1)
-  {
-    fatal("Can't create socket: %s", xstrerror(errno));
-  }
-  sock_name.sun_family = AF_UNIX;
-  snprintf(sock_name.sun_path, sizeof(sock_name.sun_path), "%s", socket_name());
-
-  /* Bind to socket */
-  if (bind(server_sock, (struct sockaddr *)&sock_name, SUN_LEN(&sock_name)) ==
-      -1)
-  {
-    fatal("Can't bind() to the socket: %s", xstrerror(errno));
-  }
-
-  if (listen(server_sock, 1) == -1)
-  {
-    fatal("listen() failed: %s", xstrerror(errno));
-  }
+  server_sock = internal_sock;
 
   /* Log stack sizes so stack overflows can be debugged. */
   log_process_stack_size();
@@ -472,16 +432,6 @@ void server_init(int debugging, int foreground)
   xsignal(SIGQUIT, sig_exit);
   xsignal(SIGPIPE, SIG_IGN);
   xsignal(SIGCHLD, sig_chld);
-
-  write_pid_file();
-
-  if (!foreground)
-  {
-    setsid();
-    redirect_output(stdin);
-    redirect_output(stdout);
-    redirect_output(stderr);
-  }
 
   logit("Running OnServerStart");
   run_extern_cmd("OnServerStart");
@@ -663,8 +613,6 @@ static void server_shutdown()
   tags_cache = NULL;
   logit("Running OnServerStop");
   run_extern_cmd("OnServerStop");
-  unlink(socket_name());
-  unlink(create_file_name(PID_FILE));
   close(wake_up_pipe[0]);
   close(wake_up_pipe[1]);
   logit("Server exited");
@@ -1880,6 +1828,8 @@ void server_loop()
   logit("MOC server started, pid: %d", getpid());
 
   assert(server_sock != -1);
+  add_client(server_sock);
+  server_sock = -1;
 
   log_circular_start();
 
@@ -1890,14 +1840,13 @@ void server_loop()
 
     FD_ZERO(&fds_read);
     FD_ZERO(&fds_write);
-    FD_SET(server_sock, &fds_read);
     FD_SET(wake_up_pipe[0], &fds_read);
     add_clients_fds(&fds_read, &fds_write);
 
     res = 0;
     if (!server_quit)
     {
-      res = select(max_fd(server_sock) + 1, &fds_read, &fds_write, NULL, NULL);
+      res = select(max_fd(-1) + 1, &fds_read, &fds_write, NULL, NULL);
     }
 
     if (res == -1 && errno != EINTR && !server_quit)
@@ -1907,25 +1856,6 @@ void server_loop()
 
     if (!server_quit && res >= 0)
     {
-      if (FD_ISSET(server_sock, &fds_read))
-      {
-        int client_sock;
-
-        debug("accept()ing connection...");
-        client_sock =
-            accept(server_sock, (struct sockaddr *)&client_name, &name_len);
-
-        if (client_sock == -1)
-        {
-          fatal("accept() failed: %s", xstrerror(errno));
-        }
-        logit("Incoming connection");
-        if (!add_client(client_sock))
-        {
-          busy(client_sock);
-        }
-      }
-
       if (FD_ISSET(wake_up_pipe[0], &fds_read))
       {
         int w;
@@ -1954,8 +1884,6 @@ void server_loop()
 
   close_clients();
   clients_cleanup();
-  close(server_sock);
-  server_sock = -1;
   server_shutdown();
 }
 

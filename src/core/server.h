@@ -20,7 +20,7 @@ extern "C"
 
 #define CLIENTS_MAX 10
 
-  void server_init(int debug, int foreground);
+  void server_init(int internal_sock, int debug, int foreground);
   void server_loop();
   void server_error(const char *file, int line, const char *function,
                     const char *msg);

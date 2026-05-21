@@ -3925,14 +3925,7 @@ void interface_end()
 {
   save_curr_dir();
   save_playlist_in_moc();
-  if (want_quit == QUIT_SERVER)
-  {
-    send_int_to_srv(CMD_QUIT);
-  }
-  else
-  {
-    send_int_to_srv(CMD_DISCONNECT);
-  }
+  send_int_to_srv(CMD_QUIT);
   srv_sock = -1;
 
 #ifdef HAVE_SYS_INOTIFY_H
