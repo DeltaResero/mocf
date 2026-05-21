@@ -32,6 +32,7 @@ static void draw_item(const struct menu *menu, const struct menu_item *mi,
   int ix, x;
   int y ATTR_UNUSED; /* OpenBSD flags this as unused. */
   char buf[32];
+  int title_attr, info_attr;
 
   assert(menu != NULL);
   assert(mi != NULL);
@@ -43,44 +44,35 @@ static void draw_item(const struct menu *menu, const struct menu_item *mi,
 
   wmove(menu->win, pos, menu->posx);
 
+  if (draw_selected && mi == menu->selected && mi == menu->marked)
+  {
+    title_attr = mi->attr_sel_marked;
+    info_attr = menu->info_attr_sel_marked;
+  }
+  else if (draw_selected && mi == menu->selected)
+  {
+    title_attr = mi->attr_sel;
+    info_attr = menu->info_attr_sel;
+  }
+  else if (mi == menu->marked)
+  {
+    title_attr = mi->attr_marked;
+    info_attr = menu->info_attr_marked;
+  }
+  else
+  {
+    title_attr = mi->attr_normal;
+    info_attr = menu->info_attr_normal;
+  }
+
   if (number_space)
   {
-    if (draw_selected && mi == menu->selected && mi == menu->marked)
-    {
-      wattrset(menu->win, menu->info_attr_sel_marked);
-    }
-    else if (draw_selected && mi == menu->selected)
-    {
-      wattrset(menu->win, menu->info_attr_sel);
-    }
-    else if (mi == menu->marked)
-    {
-      wattrset(menu->win, menu->info_attr_marked);
-    }
-    else
-    {
-      wattrset(menu->win, menu->info_attr_normal);
-    }
+    wattrset(menu->win, info_attr);
     xwprintw(menu->win, "%*d ", number_space - 1, mi->num + 1);
   }
 
   /* Set attributes */
-  if (draw_selected && mi == menu->selected && mi == menu->marked)
-  {
-    wattrset(menu->win, mi->attr_sel_marked);
-  }
-  else if (draw_selected && mi == menu->selected)
-  {
-    wattrset(menu->win, mi->attr_sel);
-  }
-  else if (mi == menu->marked)
-  {
-    wattrset(menu->win, mi->attr_marked);
-  }
-  else
-  {
-    wattrset(menu->win, mi->attr_normal);
-  }
+  wattrset(menu->win, title_attr);
 
   /* Compute the length of the queue position if nonzero */
   if (mi->queue_pos)
@@ -118,22 +110,7 @@ static void draw_item(const struct menu *menu, const struct menu_item *mi,
   }
 
   /* Description. */
-  if (draw_selected && mi == menu->selected && mi == menu->marked)
-  {
-    wattrset(menu->win, menu->info_attr_sel_marked);
-  }
-  else if (draw_selected && mi == menu->selected)
-  {
-    wattrset(menu->win, menu->info_attr_sel);
-  }
-  else if (mi == menu->marked)
-  {
-    wattrset(menu->win, menu->info_attr_marked);
-  }
-  else
-  {
-    wattrset(menu->win, menu->info_attr_normal);
-  }
+  wattrset(menu->win, info_attr);
   wmove(menu->win, pos, item_info_pos - queue_pos_len);
 
   /* Position in queue. */
@@ -156,7 +133,16 @@ static void draw_item(const struct menu *menu, const struct menu_item *mi,
       {
         xwprintw(menu->win, "|");
       }
-      xwprintw(menu->win, "%5s", mi->time);
+      if (!strcmp(mi->time, "ERROR"))
+      {
+        wattrset(menu->win, mi->attr_normal);
+        xwprintw(menu->win, "%5s", mi->time);
+        wattrset(menu->win, info_attr);
+      }
+      else
+      {
+        xwprintw(menu->win, "%5s", mi->time);
+      }
       first = 0;
     }
     if (menu->show_format && *mi->format)

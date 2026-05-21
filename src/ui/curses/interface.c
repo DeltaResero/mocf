@@ -1034,8 +1034,31 @@ static void event_queue_add(const struct plist_item *item)
   }
 }
 
-/* Get error message from the server and show it. */
-static void update_error(char *err) { error("%s", err); }
+/* Get error message from the server and show it.  If the message carries an
+ * embedded file path (format: "\x01<path>\x01<message>"), mark that file in
+ * the menu and display only the message portion.  This prefix is added by
+ * play_file() when a fatal open error occurs so we know which file failed
+ * even after the server has already moved on to the next track. */
+static void update_error(char *err)
+{
+  if (err[0] == '\x01')
+  {
+    char *sep = strchr(err + 1, '\x01');
+    if (sep)
+    {
+      *sep = '\0';
+      const char *failed_file = err + 1;
+      const char *message     = sep + 1;
+
+      error("%s", message);
+      iface_mark_file_error(failed_file);
+      *sep = '\x01'; /* restore for caller's free() */
+      return;
+    }
+  }
+
+  error("%s", err);
+}
 
 /* Send the playlist to the server to be forwarded to another client. */
 static void forward_playlist()

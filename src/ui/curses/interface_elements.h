@@ -159,6 +159,7 @@ extern "C"
                                         struct plist *dir_list);
   void iface_update_attrs();
   void iface_update_theme_selection(const char *file);
+  void iface_mark_file_error(const char *file);
 
 #ifdef __cplusplus
 }

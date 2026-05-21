@@ -4768,4 +4768,47 @@ void iface_update_queue_position_last(const struct plist *queue,
   iface_refresh_screen();
 }
 
+/* Mark a file as failed in all visible menus.  Called when the server reports
+ * a fatal playback error so the user can see at a glance which item failed.
+ * Sets the time field to "ERROR" and applies CLR_ERROR to all colour states
+ * (normal, selected, marked, marked+selected) for the duration of the
+ * session. */
+void iface_mark_file_error(const char *file)
+{
+  int i;
+
+  assert(file != NULL);
+
+  for (i = 0; i < 3; i++)
+  {
+    struct side_menu *m = &main_win.menus[i];
+    struct menu_item *mi;
+
+    if (!m->visible)
+      continue;
+    if (m->type != MENU_DIR && m->type != MENU_PLAYLIST)
+      continue;
+
+    if ((mi = menu_find(m->menu.list.main, file)))
+    {
+      menu_item_set_time(mi, "ERROR");
+      menu_item_set_attr_normal(mi, get_color(CLR_ERROR));
+      menu_item_set_attr_sel(mi, get_color(CLR_ERROR) | A_REVERSE);
+      menu_item_set_attr_marked(mi, get_color(CLR_ERROR));
+      menu_item_set_attr_sel_marked(mi, get_color(CLR_ERROR) | A_REVERSE);
+    }
+
+    if (m->menu.list.copy && (mi = menu_find(m->menu.list.copy, file)))
+    {
+      menu_item_set_time(mi, "ERROR");
+      menu_item_set_attr_normal(mi, get_color(CLR_ERROR));
+      menu_item_set_attr_sel(mi, get_color(CLR_ERROR) | A_REVERSE);
+      menu_item_set_attr_marked(mi, get_color(CLR_ERROR));
+      menu_item_set_attr_sel_marked(mi, get_color(CLR_ERROR) | A_REVERSE);
+    }
+  }
+
+  iface_refresh_screen();
+}
+
 // EOF
