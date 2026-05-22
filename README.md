@@ -13,7 +13,7 @@ built, saved, and exported as m3u files.
 
 ### Key Features
 
-*   Client-server architecture for persistent playback
+*   Single-process player: audio engine runs in-process and exits with the UI
 *   Gapless playback via song precaching
 *   Native PulseAudio backend and modern FFmpeg (> 4.0) support
 *   Support for OSS, ALSA, SNDIO, and JACK output drivers

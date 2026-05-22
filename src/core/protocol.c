@@ -29,10 +29,6 @@
 #include "library/playlist.h"
 #include "library/files.h"
 
-/* Maximal socket name. */
-#define UNIX_PATH_MAX 108
-#define SOCKET_NAME "socket2"
-
 #define nonblocking(fn, result, sock, buf, len)                                \
   do                                                                           \
   {                                                                            \
@@ -56,19 +52,6 @@ struct packet_buf
   size_t allocated;
   size_t len;
 };
-
-/* Create a socket name, return NULL if the name could not be created. */
-char *socket_name()
-{
-  char *socket_name = create_file_name(SOCKET_NAME);
-
-  if (strlen(socket_name) > UNIX_PATH_MAX)
-  {
-    fatal("Can't create socket name!");
-  }
-
-  return socket_name;
-}
 
 /* Get an integer value from the socket, return == 0 on error. */
 int get_int(int sock, int *i)

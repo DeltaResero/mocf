@@ -58,10 +58,6 @@
 # afterwards (which gives the choice of whether the configured values are
 # replaced or added to).
 
-# Remember that the client and server are separate processes and the
-# server will retain the configuration values formed from the environment
-# within which it was originally started.
-
 # Show file titles (title, author, album) instead of file names?
 #ReadTags = yes
 
@@ -74,16 +70,16 @@
 #MusicDir =
 
 # Start in the music directory by default?  If set to 'no', start
-# in the directory being viewed when the was client last active or,
-# as a last resort, the directory in which the client is being started.
+# in the directory being viewed when mocf last exited, or, as a last resort,
+# the directory from which mocf is being started.
 # A single directory on the command line takes precedence.
 #StartInMusicDir = no
 
 # The number of lines which are retained in an in-memory circular logging
 # buffer.  A value of zero indicates that lines will be written directly
 # to the log file, otherwise the latest CircularLogSize lines are retained
-# in memory and not written to the log file until the MOCF client or server
-# are shutdown.  If the client or server terminates abnormally then the
+# in memory and not written to the log file until mocf exits.  If mocf
+# terminates abnormally then the
 # log lines are lost.
 #
 # This option is intended to help identify problems which occur infrequently
@@ -230,7 +226,7 @@
 #
 #XTermTheme =
 
-# MOCF directory (where pid file, socket and state files are stored).
+# MOCF directory (config, playlist, cache, and other state files).
 # You can use ~ at the beginning.
 #MOCDir = ~/.mocf
 
@@ -263,8 +259,7 @@
 # Remember the playlist after exit?
 #SavePlaylist = yes
 
-# When using more than one client (interface) at a time, do they share
-# the playlist?
+# Use the in-memory playlist managed by the audio engine (legacy option).
 #SyncPlaylist = yes
 
 # Should MOCF load and save tags in playlist files? Setting it to "no"
@@ -470,9 +465,8 @@
 # played file is visible?
 #FollowPlayedFile = yes
 
-# What to do if the interface was started and the server is already playing
-# something from the playlist?  If CanStartInPlaylist is set to 'yes', the
-# interface will switch to the playlist.  When set to 'no' it will start
+# When opening mocf while playback is already active, switch to the playlist
+# pane if CanStartInPlaylist is set to 'yes'.  When set to 'no', start in
 # from the last directory.
 #CanStartInPlaylist = yes
 
@@ -619,9 +613,8 @@
 #
 #OnStop =
 
-# Run the OnServerStart or OnServerStop commands (full path, no arguments)
-# when MOCF server is started or terminated respectively.  The server will
-# not wait for the commands to complete before continuing.
+# Run OnServerStart or OnServerStop (full path, no arguments) when the audio
+# engine starts or stops.  MOCF does not wait for the commands to finish.
 #OnServerStart =
 #OnServerStop =
 

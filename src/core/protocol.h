@@ -163,7 +163,6 @@ playlist */
 #define CMD_QUEUE_CLEAR 0x3e /* clear the queue */
 #define CMD_GET_QUEUE 0x3f   /* request the queue from the server */
 
-  char *socket_name();
   int get_int(int sock, int *i);
   enum noblock_io_status get_int_noblock(int sock, int *i);
   int send_int(int sock, int i);

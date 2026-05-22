@@ -22,7 +22,6 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/socket.h>
-#include <sys/un.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 #include <signal.h>
@@ -61,58 +60,7 @@ struct parameters
   char *config_file;
   int no_config_file;
   int debug;
-  int only_server;
-  int foreground;
-  int append;
-  int enqueue;
-  int clear;
-  int play;
-  int allow_iface;
-  int stop;
-  int exit;
-  int pause;
-  int unpause;
-  int next;
-  int previous;
-  int get_file_info;
-  int toggle_pause;
-  int playit;
-  int seek_by;
-  char jump_type;
-  int jump_to;
-  char *formatted_info_param;
-  int get_formatted_info;
-  char *adj_volume;
-  char *toggle;
-  char *on;
-  char *off;
 };
-
-/* Connect to the server, return fd of the socket or -1 on error. */
-static int server_connect()
-{
-  struct sockaddr_un sock_name;
-  int sock;
-
-  /* Create a socket.
-   * For reasons why AF_UNIX is the correct constant to use in both
-   * cases, see the commentary the SVN log for commit r2833. */
-  if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
-  {
-    return -1;
-  }
-
-  sock_name.sun_family = AF_UNIX;
-  snprintf(sock_name.sun_path, sizeof(sock_name.sun_path), "%s", socket_name());
-
-  if (connect(sock, (struct sockaddr *)&sock_name, SUN_LEN(&sock_name)) == -1)
-  {
-    close(sock);
-    return -1;
-  }
-
-  return sock;
-}
 
 /* Ping the server.
  * Return 1 if the server responds with EV_PONG, otherwise 0. */
@@ -212,155 +160,6 @@ static void start_moc(const struct parameters *params, lists_t_strs *args)
 
   close(sv[1]);
   pthread_join(server_thread, NULL);
-}
-
-/* Send commands requested in params to the server. */
-static void server_command(struct parameters *params, lists_t_strs *args)
-{
-  int sock;
-
-  if ((sock = server_connect()) == -1)
-  {
-    fatal("The server is not running!");
-  }
-
-  xsignal(SIGPIPE, SIG_IGN);
-  if (!ping_server(sock))
-  {
-    fatal("Can't connect to the server!");
-  }
-
-  if (params->playit)
-  {
-    interface_cmdline_playit(sock, args);
-  }
-  if (params->clear)
-  {
-    interface_cmdline_clear_plist(sock);
-  }
-  if (params->append)
-  {
-    interface_cmdline_append(sock, args);
-  }
-  if (params->enqueue)
-  {
-    interface_cmdline_enqueue(sock, args);
-  }
-  if (params->play)
-  {
-    interface_cmdline_play_first(sock);
-  }
-  if (params->get_file_info)
-  {
-    interface_cmdline_file_info(sock);
-  }
-  if (params->seek_by)
-  {
-    interface_cmdline_seek_by(sock, params->seek_by);
-  }
-  if (params->jump_type == '%')
-  {
-    interface_cmdline_jump_to_percent(sock, params->jump_to);
-  }
-  if (params->jump_type == 's')
-  {
-    interface_cmdline_jump_to(sock, params->jump_to);
-  }
-  if (params->get_formatted_info)
-  {
-    interface_cmdline_formatted_info(sock, params->formatted_info_param);
-  }
-  if (params->adj_volume)
-  {
-    interface_cmdline_adj_volume(sock, params->adj_volume);
-  }
-  if (params->toggle)
-  {
-    interface_cmdline_set(sock, params->toggle, 2);
-  }
-  if (params->on)
-  {
-    interface_cmdline_set(sock, params->on, 1);
-  }
-  if (params->off)
-  {
-    interface_cmdline_set(sock, params->off, 0);
-  }
-  if (params->exit)
-  {
-    if (!send_int(sock, CMD_QUIT))
-    {
-      fatal("Can't send command!");
-    }
-  }
-  else if (params->stop)
-  {
-    if (!send_int(sock, CMD_STOP) || !send_int(sock, CMD_DISCONNECT))
-    {
-      fatal("Can't send commands!");
-    }
-  }
-  else if (params->pause)
-  {
-    if (!send_int(sock, CMD_PAUSE) || !send_int(sock, CMD_DISCONNECT))
-    {
-      fatal("Can't send commands!");
-    }
-  }
-  else if (params->next)
-  {
-    if (!send_int(sock, CMD_NEXT) || !send_int(sock, CMD_DISCONNECT))
-    {
-      fatal("Can't send commands!");
-    }
-  }
-  else if (params->previous)
-  {
-    if (!send_int(sock, CMD_PREV) || !send_int(sock, CMD_DISCONNECT))
-    {
-      fatal("Can't send commands!");
-    }
-  }
-  else if (params->unpause)
-  {
-    if (!send_int(sock, CMD_UNPAUSE) || !send_int(sock, CMD_DISCONNECT))
-    {
-      fatal("Can't send commands!");
-    }
-  }
-  else if (params->toggle_pause)
-  {
-    int state, ev, cmd = -1;
-
-    if (!send_int(sock, CMD_GET_STATE))
-    {
-      fatal("Can't send commands!");
-    }
-    if (!get_int(sock, &ev) || ev != EV_DATA || !get_int(sock, &state))
-    {
-      fatal("Can't get data from the server!");
-    }
-
-    if (state == STATE_PAUSE)
-    {
-      cmd = CMD_UNPAUSE;
-    }
-    else if (state == STATE_PLAY)
-    {
-      cmd = CMD_PAUSE;
-    }
-
-    if (cmd != -1 && !send_int(sock, cmd))
-    {
-      fatal("Can't send commands!");
-    }
-    if (!send_int(sock, CMD_DISCONNECT))
-    {
-      fatal("Can't send commands!");
-    }
-  }
-
-  close(sock);
 }
 
 static void show_version()
@@ -526,17 +325,12 @@ static void show_misc_cb(poptContext ctx,
 enum
 {
   CL_HANDLED = 0,
-  CL_NOIFACE,
   CL_SDRIVER,
   CL_MUSICDIR,
   CL_THEME,
   CL_SETOPTION,
   CL_MOCDIR,
-  CL_SYNCPL,
-  CL_NOSYNC,
-  CL_ASCII,
-  CL_JUMP,
-  CL_GETINFO
+  CL_ASCII
 };
 
 static struct parameters params;
@@ -560,10 +354,6 @@ static struct poptOption general_opts[] = {
      NULL},
     {"set-option", 'O', POPT_ARG_STRING, NULL, CL_SETOPTION,
      "Override the configuration option NAME with VALUE", "'NAME=VALUE'"},
-    {"foreground", 'F', POPT_ARG_NONE, &params.foreground, CL_HANDLED,
-     "OBSOLETE (Ignored)", NULL},
-    {"server", 'S', POPT_ARG_NONE, &params.only_server, CL_HANDLED,
-     "OBSOLETE (Ignored)", NULL},
     {"sound-driver", 'R', POPT_ARG_STRING, NULL, CL_SDRIVER,
      "Use the first valid sound driver", "DRIVERS"},
     {"ascii", 'A', POPT_ARG_NONE, NULL, CL_ASCII,
@@ -572,56 +362,6 @@ static struct poptOption general_opts[] = {
      "Use the selected theme file (read from ~/.moc/themes if the path is not "
      "absolute)",
      "FILE"},
-    {"sync", 'y', POPT_ARG_NONE, NULL, CL_SYNCPL,
-     "Synchronize the playlist with other clients", NULL},
-    {"nosync", 'n', POPT_ARG_NONE, NULL, CL_NOSYNC,
-     "Don't synchronize the playlist with other clients", NULL},
-    POPT_TABLEEND};
-
-static struct poptOption server_opts[] = {
-    {"pause", 'P', POPT_ARG_NONE, &params.pause, CL_NOIFACE, "Pause", NULL},
-    {"unpause", 'U', POPT_ARG_NONE, &params.unpause, CL_NOIFACE, "Unpause",
-     NULL},
-    {"toggle-pause", 'G', POPT_ARG_NONE, &params.toggle_pause, CL_NOIFACE,
-     "Toggle between playing and paused", NULL},
-    {"stop", 's', POPT_ARG_NONE, &params.stop, CL_NOIFACE, "Stop playing",
-     NULL},
-    {"next", 'f', POPT_ARG_NONE, &params.next, CL_NOIFACE, "Play the next song",
-     NULL},
-    {"previous", 'r', POPT_ARG_NONE, &params.previous, CL_NOIFACE,
-     "Play the previous song", NULL},
-    {"seek", 'k', POPT_ARG_INT, &params.seek_by, CL_NOIFACE,
-     "Seek by N seconds (can be negative)", "N"},
-    {"jump", 'j', POPT_ARG_STRING, NULL, CL_JUMP,
-     "Jump to some position in the current track", "N{%,s}"},
-    {"volume", 'v', POPT_ARG_STRING, &params.adj_volume, CL_NOIFACE,
-     "Adjust the PCM volume", "[+,-]LEVEL"},
-    {"exit", 'x', POPT_ARG_NONE, &params.exit, CL_NOIFACE,
-     "Shutdown the server", NULL},
-    {"append", 'a', POPT_ARG_NONE, &params.append, CL_NOIFACE,
-     "Append the files/directories/playlists passed in "
-     "the command line to playlist",
-     NULL},
-    {"recursively", 'e', POPT_ARG_NONE, &params.append, CL_NOIFACE,
-     "Alias for --append", NULL},
-    {"enqueue", 'q', POPT_ARG_NONE, &params.enqueue, CL_NOIFACE,
-     "Add the files given on command line to the queue", NULL},
-    {"clear", 'c', POPT_ARG_NONE, &params.clear, CL_NOIFACE,
-     "Clear the playlist", NULL},
-    {"play", 'p', POPT_ARG_NONE, &params.play, CL_NOIFACE,
-     "Start playing from the first item on the playlist", NULL},
-    {"playit", 'l', POPT_ARG_NONE, &params.playit, CL_NOIFACE,
-     "Play files given on command line without modifying the playlist", NULL},
-    {"toggle", 't', POPT_ARG_STRING, &params.toggle, CL_NOIFACE,
-     "Toggle a control (shuffle, autonext, repeat)", "CONTROL"},
-    {"on", 'o', POPT_ARG_STRING, &params.on, CL_NOIFACE,
-     "Turn on a control (shuffle, autonext, repeat)", "CONTROL"},
-    {"off", 'u', POPT_ARG_STRING, &params.off, CL_NOIFACE,
-     "Turn off a control (shuffle, autonext, repeat)", "CONTROL"},
-    {"info", 'i', POPT_ARG_NONE, &params.get_file_info, CL_NOIFACE,
-     "Print information about the file currently playing", NULL},
-    {"format", 'Q', POPT_ARG_STRING, &params.formatted_info_param, CL_GETINFO,
-     "Print formatted information about the file currently playing", "FORMAT"},
     POPT_TABLEEND};
 
 static struct poptOption misc_opts[] = {
@@ -636,8 +376,7 @@ static struct poptOption misc_opts[] = {
 
 static struct poptOption mocf_opts[] = {
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, general_opts, 0,
-     "General options:", NULL},
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, server_opts, 0, "Server commands:", NULL},
+     "Options:", NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, misc_opts, 0,
      "Miscellaneous options:", NULL},
     POPT_AUTOALIAS POPT_TABLEEND};
@@ -1105,24 +844,6 @@ error:
   fatal("Malformed override option: %s", arg);
 }
 
-static long get_num_param(const char *p, const char **last)
-{
-  char *e;
-  long val;
-
-  val = strtol(p, &e, 10);
-  if ((*e && last == NULL) || e == p)
-  {
-    fatal("The parameter should be a number!");
-  }
-
-  if (last)
-  {
-    *last = e;
-  }
-  return val;
-}
-
 /* Process the command line options. */
 static void process_options(poptContext ctx, lists_t_strs *deferred)
 {
@@ -1130,7 +851,7 @@ static void process_options(poptContext ctx, lists_t_strs *deferred)
 
   while ((rc = poptGetNextOpt(ctx)) >= 0)
   {
-    const char *jump_type, *arg;
+    const char *arg;
 
     arg = poptGetOptArg(ctx);
 
@@ -1148,9 +869,6 @@ static void process_options(poptContext ctx, lists_t_strs *deferred)
         options_set_bool("StartInMusicDir", true);
         options_ignore_config("StartInMusicDir");
         break;
-      case CL_NOIFACE:
-        params.allow_iface = 0;
-        break;
       case CL_THEME:
         options_set_str("ForceTheme", arg);
         break;
@@ -1161,38 +879,9 @@ static void process_options(poptContext ctx, lists_t_strs *deferred)
         options_set_path("MOCDir", arg);
         options_ignore_config("MOCDir");
         break;
-      case CL_SYNCPL:
-        options_set_bool("SyncPlaylist", true);
-        options_ignore_config("SyncPlaylist");
-        break;
-      case CL_NOSYNC:
-        options_set_bool("SyncPlaylist", false);
-        options_ignore_config("SyncPlaylist");
-        break;
       case CL_ASCII:
         options_set_bool("ASCIILines", true);
         options_ignore_config("ASCIILines");
-        break;
-      case CL_JUMP:
-        params.jump_to = get_num_param(arg, &jump_type);
-        if (*jump_type)
-        {
-          if (!jump_type[1])
-          {
-            if (*jump_type == '%' || tolower(*jump_type) == 's')
-            {
-              params.jump_type = tolower(*jump_type);
-              params.allow_iface = 0;
-              break;
-            }
-          }
-        }
-        fprintf(stderr, "mocf: invalid argument for --jump: '%s' (expected N%% or Ns, e.g. 50%% or 30s)\n", arg);
-        fprintf(stderr, "Try 'mocf --help' for more information.\n");
-        exit(EXIT_FAILURE);
-      case CL_GETINFO:
-        params.get_formatted_info = 1;
-        params.allow_iface = 0;
         break;
       default:
         show_usage(ctx);
@@ -1241,11 +930,6 @@ static lists_t_strs *process_command_line(lists_t_strs *deferred)
   read_popt_config(ctx);
   prepend_mocf_opts(ctx);
   process_options(ctx, deferred);
-
-  if (params.foreground)
-  {
-    params.only_server = 1;
-  }
 
   result = lists_strs_new(4);
   rest = poptGetArgs(ctx);
@@ -1395,7 +1079,6 @@ int main(int argc, const char *argv[])
   }
 
   memset(&params, 0, sizeof(params));
-  params.allow_iface = 1;
   options_init();
   deferred_overrides = lists_strs_new(4);
 
@@ -1409,11 +1092,6 @@ int main(int argc, const char *argv[])
   log_command_line();
   args = process_command_line(deferred_overrides);
   log_popt_command_line();
-
-  if (!params.allow_iface)
-  {
-    fatal("Server command options are no longer supported in single-process mode!");
-  }
 
   if (!params.no_config_file)
   {
