@@ -18,7 +18,7 @@ extern "C"
 
 #include "library/playlist.h"
 
-#define CLIENTS_MAX 10
+#define CLIENTS_MAX 1
 
   void server_init(int internal_sock, int debug, int foreground);
   void server_loop();

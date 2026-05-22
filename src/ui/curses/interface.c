@@ -1270,10 +1270,6 @@ static void server_event(const int event, void *data)
 
   switch (event)
   {
-    case EV_BUSY:
-      interface_fatal("The server is busy; "
-                      "too many other clients are connected!");
-      break;
     case EV_CTIME:
       update_ctime();
       break;

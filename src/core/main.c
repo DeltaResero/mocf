@@ -68,9 +68,7 @@ static int ping_server(int sock)
 {
   int event;
 
-  send_int(sock, CMD_PING); /* ignore errors - the server could have
-             already closed the connection and sent
-             EV_BUSY */
+  send_int(sock, CMD_PING);
   if (!get_int(sock, &event))
   {
     fatal("Error when receiving pong response!");

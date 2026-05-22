@@ -21,7 +21,6 @@
 #ifdef HAVE_GETRLIMIT
 #include <sys/resource.h>
 #endif
-#include <sys/un.h>
 #include <time.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -49,7 +48,6 @@
 #include "audio/processing/equalizer.h"
 
 #define SERVER_LOG "mocf_server_log"
-#define PID_FILE "pid"
 
 struct client
 {
@@ -71,7 +69,7 @@ static pthread_t server_tid;
 /* Pipe used to wake up the server from select() from another thread. */
 static int wake_up_pipe[2];
 
-/* Socket used to accept incoming client connections. */
+/* Internal socketpair end passed from main (UI connection). */
 static int server_sock = -1;
 
 /* Set to 1 when a signal arrived causing the program to exit. */
@@ -89,41 +87,6 @@ static struct
 static struct tags_cache *tags_cache;
 
 extern char **environ;
-
-static void write_pid_file()
-{
-  char *fname = create_file_name(PID_FILE);
-  FILE *file;
-
-  if ((file = fopen(fname, "w")) == NULL)
-  {
-    fatal("Can't open pid file for writing: %s", xstrerror(errno));
-  }
-  fprintf(file, "%d\n", getpid());
-  fclose(file);
-}
-
-/* Check if there is a pid file and if it is valid, return the pid, else 0 */
-static pid_t check_pid_file()
-{
-  FILE *file;
-  pid_t pid;
-  char *fname = create_file_name(PID_FILE);
-
-  /* Read the pid file */
-  if ((file = fopen(fname, "r")) == NULL)
-  {
-    return 0;
-  }
-  if (fscanf(file, "%d", &pid) != 1)
-  {
-    fclose(file);
-    return 0;
-  }
-  fclose(file);
-
-  return pid;
-}
 
 static void sig_chld(int sig LOGIT_ONLY)
 {
@@ -179,31 +142,21 @@ static void clients_cleanup()
   }
 }
 
-/* Add a client to the list, return 1 if ok, 0 on error (max clients exceeded)
- */
-static int add_client(int sock)
+/* Register the single UI connection. */
+static void add_client(int sock)
 {
-  int i;
+  assert(clients[0].socket == -1);
 
-  for (i = 0; i < CLIENTS_MAX; i++)
-  {
-    if (clients[i].socket == -1)
-    {
-      clients[i].wants_plist_events = 0;
-      LOCK(clients[i].events_mtx);
-      event_queue_free(&clients[i].events);
-      event_queue_init(&clients[i].events);
-      UNLOCK(clients[i].events_mtx);
-      clients[i].socket = sock;
-      clients[i].requests_plist = 0;
-      clients[i].can_send_plist = 0;
-      clients[i].lock = 0;
-      tags_cache_clear_queue(tags_cache, i);
-      return 1;
-    }
-  }
-
-  return 0;
+  clients[0].wants_plist_events = 0;
+  LOCK(clients[0].events_mtx);
+  event_queue_free(&clients[0].events);
+  event_queue_init(&clients[0].events);
+  UNLOCK(clients[0].events_mtx);
+  clients[0].socket = sock;
+  clients[0].requests_plist = 0;
+  clients[0].can_send_plist = 0;
+  clients[0].lock = 0;
+  tags_cache_clear_queue(tags_cache, 0);
 }
 
 /* Return index of a client that has a lock acquired. Return -1 if there is no
@@ -280,8 +233,6 @@ static void del_client(struct client *cli)
 }
 
 /* Check if the process with given PID exists. Return != 0 if so. */
-static int valid_pid(const pid_t pid) { return kill(pid, 0) == 0 ? 1 : 0; }
-
 static void wake_up_server()
 {
   int w = 1;
@@ -382,7 +333,7 @@ static void run_extern_cmd(const char *event)
   }
 }
 
-/* Initialize the server - return fd of the listening socket or -1 on error */
+/* Initialize the audio engine thread. */
 void server_init(int internal_sock, int debugging, int foreground)
 {
   logit("Starting MOC Server");
@@ -617,14 +568,6 @@ static void server_shutdown()
   close(wake_up_pipe[1]);
   logit("Server exited");
   log_close();
-}
-
-/* Send EV_BUSY message and close the connection. */
-static void busy(int sock)
-{
-  logit("Closing connection due to maximum number of clients reached");
-  send_int(sock, EV_BUSY);
-  close(sock);
 }
 
 /* Handle CMD_LIST_ADD, return 1 if ok or 0 on error. */
@@ -1475,11 +1418,6 @@ static void handle_command(const int client_id)
         err = 1;
       }
       break;
-    case CMD_DISCONNECT:
-      logit("Client disconnected");
-      close(cli->socket);
-      del_client(cli);
-      break;
     case CMD_PAUSE:
       audio_pause();
       break;
@@ -1819,12 +1757,9 @@ static void close_clients()
   }
 }
 
-/* Handle incoming connections */
+/* Run the audio engine event loop until quit. */
 void server_loop()
 {
-  struct sockaddr_un client_name;
-  socklen_t name_len = sizeof(client_name);
-
   logit("MOC server started, pid: %d", getpid());
 
   assert(server_sock != -1);

@@ -58,7 +58,6 @@ extern "C"
 #define EV_STATE 0x01        /* server has changed the state */
 #define EV_CTIME 0x02        /* current time of the song has changed */
 #define EV_SRV_ERROR 0x04    /* an error occurred */
-#define EV_BUSY 0x05         /* another client is connected to the server */
 #define EV_DATA 0x06         /* data in response to a request will arrive */
 #define EV_BITRATE 0x07      /* the bitrate has changed */
 #define EV_RATE 0x08         /* the rate has changed */
@@ -109,7 +108,6 @@ extern "C"
 #define CMD_QUIT 0x11              /* shutdown the server */
 #define CMD_SEEK 0x12              /* seek in the current stream */
 #define CMD_GET_STATE 0x13         /* get the state */
-#define CMD_DISCONNECT 0x15        /* disconnect from the server */
 #define CMD_GET_BITRATE 0x16       /* get the bitrate */
 #define CMD_GET_RATE 0x17          /* get the rate */
 #define CMD_GET_CHANNELS 0x18      /* get the number of channels */
