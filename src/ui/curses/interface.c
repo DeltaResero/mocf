@@ -1060,41 +1060,20 @@ static void update_error(char *err)
   error("%s", err);
 }
 
-/* Send the playlist to the server to be forwarded to another client. */
-static void forward_playlist()
-{
-  int i;
-
-  debug("Forwarding the playlist...");
-
-  send_int_to_srv(CMD_SEND_PLIST);
-  send_int_to_srv(plist_get_serial(playlist));
-
-  for (i = 0; i < playlist->num; i++)
-  {
-    if (!plist_deleted(playlist, i))
-    {
-      send_item_to_srv(&playlist->items[i]);
-    }
-  }
-
-  send_item_to_srv(NULL);
-}
-
 static int recv_server_plist(struct plist *plist)
 {
   int end_of_list = 0;
   struct plist_item *item;
 
-  logit("Asking server for the playlist from other client.");
+  logit("Asking server for the playlist.");
   send_int_to_srv(CMD_GET_PLIST);
   logit("Waiting for response");
   wait_for_data();
 
   if (!get_int_from_srv())
   {
-    debug("There is no playlist");
-    return 0; /* there are no other clients with a playlist */
+    debug("The server playlist is empty");
+    return 0;
   }
 
   logit("There is a playlist, getting...");
@@ -1293,9 +1272,6 @@ static void server_event(const int event, void *data)
       break;
     case EV_OPTIONS:
       get_server_options();
-      break;
-    case EV_SEND_PLIST:
-      forward_playlist();
       break;
     case EV_PLIST_ADD:
       if (options_get_bool("SyncPlaylist"))
@@ -1668,8 +1644,7 @@ static void enter_first_dir()
   first_run = 0;
 }
 
-/* Request the playlist from the server (given by another client).  Make
- * the titles.  Return 0 if such a list doesn't exist. */
+/* Request the playlist from the audio engine. Return 0 if empty. */
 static int get_server_playlist(struct plist *plist)
 {
   iface_set_status("Getting the playlist...");
@@ -1694,8 +1669,7 @@ static int get_server_playlist(struct plist *plist)
   return 0;
 }
 
-/* Get the playlist from another client and use it as our playlist.
- * Return 0 if there is no client with a playlist. */
+/* Load the playlist from the audio engine. Return 0 if it is empty. */
 static int use_server_playlist()
 {
   if (get_server_playlist(playlist))
@@ -3735,9 +3709,7 @@ void init_interface(const int sock, const int logging, lists_t_strs *args)
 
       /* We have made the playlist from command line. */
 
-      /* The playlist should be now clear, but this will give
-       * us the serial number of the playlist used by other
-       * clients. */
+      /* Pick up the engine playlist serial before replacing it. */
       plist_init(&tmp_plist);
       get_server_playlist(&tmp_plist);
 
@@ -3751,7 +3723,7 @@ void init_interface(const int sock, const int logging, lists_t_strs *args)
 
       change_srv_plist_serial();
 
-      iface_set_status("Notifying clients...");
+      iface_set_status("Updating playlist...");
       send_items_to_clients(playlist);
       iface_set_status("");
       plist_clear(playlist);
@@ -3775,11 +3747,6 @@ void init_interface(const int sock, const int logging, lists_t_strs *args)
 
   /* Ask the server for queue. */
   use_server_queue();
-
-  if (options_get_bool("SyncPlaylist"))
-  {
-    send_int_to_srv(CMD_CAN_SEND_PLIST);
-  }
 
   update_state();
 

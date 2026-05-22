@@ -65,7 +65,6 @@ extern "C"
 #define EV_EXIT 0x0a         /* the server is about to exit */
 #define EV_PONG 0x0b         /* response for CMD_PING */
 #define EV_OPTIONS 0x0c      /* the options has changed */
-#define EV_SEND_PLIST 0x0d   /* request for sending the playlist */
 #define EV_TAGS 0x0e         /* tags for the current file have changed */
 #define EV_STATUS_MSG 0x0f   /* followed by a status message */
 #define EV_MIXER_CHANGE 0x10 /* the mixer channel was changed */
@@ -117,11 +116,7 @@ extern "C"
 #define CMD_DELETE 0x1c            /* delete an item from the playlist */
 #define CMD_SEND_PLIST_EVENTS 0x1d /* request for playlist events */
 #define CMD_PREV 0x20       /* start playing previous song if available */
-#define CMD_SEND_PLIST 0x21 /* send the playlist to the requesting client */
-#define CMD_GET_PLIST 0x22  /* get the playlist from one of the clients */
-#define CMD_CAN_SEND_PLIST                                                     \
-  0x23                         /* mark the client as able to send              \
-        playlist */
+#define CMD_GET_PLIST 0x22 /* get the playlist from the audio engine */
 #define CMD_CLI_PLIST_ADD 0x24 /* add an item to the client's playlist */
 #define CMD_CLI_PLIST_DEL                                                      \
   0x25                           /* delete an item from the client's           \

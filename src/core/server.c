@@ -55,8 +55,6 @@ struct client
   int wants_plist_events; /* requested playlist events? */
   struct event_queue events;
   pthread_mutex_t events_mtx;
-  int requests_plist; /* is the client waiting for the playlist? */
-  int can_send_plist; /* can this client send a playlist? */
   int lock;           /* is this client locking us? */
   int serial;         /* used for generating unique serial numbers */
 };
@@ -153,8 +151,6 @@ static void add_client(int sock)
   event_queue_init(&clients[0].events);
   UNLOCK(clients[0].events_mtx);
   clients[0].socket = sock;
-  clients[0].requests_plist = 0;
-  clients[0].can_send_plist = 0;
   clients[0].lock = 0;
   tags_cache_clear_queue(tags_cache, 0);
 }
@@ -833,158 +829,66 @@ static int req_queue_del(const struct client *cli)
   return 1;
 }
 
-/* Return the index of the first client able to send the playlist or -1 if
- * there isn't any. */
-static int find_sending_plist()
+/* Handle CMD_GET_PLIST: send the audio engine playlist to the UI. */
+static int req_get_plist(struct client *cli)
 {
   int i;
+  struct plist *ap;
+  int has_items = 0;
 
-  for (i = 0; i < CLIENTS_MAX; i++)
+  ap = audio_plist_get_contents();
+  for (i = 0; i < ap->num; i++)
   {
-    if (clients[i].socket != -1 && clients[i].can_send_plist)
+    if (!plist_deleted(ap, i))
     {
-      return i;
+      has_items = 1;
+      break;
     }
   }
-  return -1;
-}
 
-/* Handle CMD_GET_PLIST. Return 0 on error. */
-static int get_client_plist(struct client *cli)
-{
-  int first;
-
-  debug("Client with fd %d requests the playlist", cli->socket);
-
-  /* Find the first connected client, and ask it to send the playlist.
-   * Here, send 1 if there is a client with the playlist, or 0 if there
-   * isn't. */
-
-  cli->requests_plist = 1;
-
-  first = find_sending_plist();
-  if (first == -1)
+  if (!send_data_int(cli, has_items))
   {
-    debug("No clients with the playlist");
-    cli->requests_plist = 0;
-    if (!send_data_int(cli, 0))
-    {
-      return 0;
-    }
-    return 1;
-  }
-
-  if (!send_data_int(cli, 1))
-  {
+    plist_free(ap);
+    free(ap);
     return 0;
   }
 
-  if (!send_int(clients[first].socket, EV_SEND_PLIST))
+  if (!has_items)
+  {
+    plist_free(ap);
+    free(ap);
+    return 1;
+  }
+
+  if (!send_data_int(cli, audio_plist_get_serial()))
+  {
+    plist_free(ap);
+    free(ap);
+    return 0;
+  }
+
+  for (i = 0; i < ap->num; i++)
+  {
+    if (!plist_deleted(ap, i))
+    {
+      if (!send_item(cli->socket, &ap->items[i]))
+      {
+        plist_free(ap);
+        free(ap);
+        return 0;
+      }
+    }
+  }
+
+  plist_free(ap);
+  free(ap);
+
+  if (!send_item(cli->socket, NULL))
   {
     return 0;
   }
 
   return 1;
-}
-
-/* Find the client requesting the playlist. */
-static int find_cli_requesting_plist()
-{
-  int i;
-
-  for (i = 0; i < CLIENTS_MAX; i++)
-  {
-    if (clients[i].requests_plist)
-    {
-      return i;
-    }
-  }
-  return -1;
-}
-
-/* Handle CMD_SEND_PLIST. Some client requested to get the playlist, so we asked
- * another client to send it (EV_SEND_PLIST). */
-static int req_send_plist(struct client *cli)
-{
-  int requesting = find_cli_requesting_plist();
-  int send_fd;
-  struct plist_item *item;
-  int serial;
-
-  debug("Client with fd %d wants to send its playlists", cli->socket);
-
-  if (requesting == -1)
-  {
-    logit("No clients are requesting the playlist");
-    send_fd = -1;
-  }
-  else
-  {
-    send_fd = clients[requesting].socket;
-    if (!send_int(send_fd, EV_DATA))
-    {
-      logit("Error while sending response; disconnecting the client");
-      close(send_fd);
-      del_client(&clients[requesting]);
-      send_fd = -1;
-    }
-  }
-
-  if (!get_int(cli->socket, &serial))
-  {
-    logit("Error while getting serial");
-    return 0;
-  }
-
-  if (send_fd != -1 && !send_int(send_fd, serial))
-  {
-    error("Error while sending serial; disconnecting the client");
-    close(send_fd);
-    del_client(&clients[requesting]);
-    send_fd = -1;
-  }
-
-  /* Even if no clients are requesting the playlist, we must read it,
-   * because there is no way to say that we don't need it. */
-  while ((item = recv_item(cli->socket)) && item->file[0])
-  {
-    if (send_fd != -1 && !send_item(send_fd, item))
-    {
-      logit("Error while sending item; disconnecting the client");
-      close(send_fd);
-      del_client(&clients[requesting]);
-      send_fd = -1;
-    }
-    plist_free_item_fields(item);
-    free(item);
-  }
-
-  if (item)
-  {
-    plist_free_item_fields(item);
-    free(item);
-    logit("Playlist sent");
-  }
-  else
-  {
-    logit("Error while receiving item");
-  }
-
-  if (send_fd != -1 && !send_item(send_fd, NULL))
-  {
-    logit("Error while sending end of playlist mark; "
-          "disconnecting the client");
-    close(send_fd);
-    del_client(&clients[requesting]);
-    return 0;
-  }
-
-  if (requesting != -1)
-  {
-    clients[requesting].requests_plist = 0;
-  }
-
-  return item ? 1 : 0;
 }
 
 /* Client requested we send the queue so we get it from audio.c and
@@ -1528,19 +1432,10 @@ static void handle_command(const int client_id)
       logit("Request for events");
       break;
     case CMD_GET_PLIST:
-      if (!get_client_plist(cli))
+      if (!req_get_plist(cli))
       {
         err = 1;
       }
-      break;
-    case CMD_SEND_PLIST:
-      if (!req_send_plist(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_CAN_SEND_PLIST:
-      cli->can_send_plist = 1;
       break;
     case CMD_CLI_PLIST_ADD:
     case CMD_CLI_PLIST_DEL:

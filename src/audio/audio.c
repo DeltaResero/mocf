@@ -1747,6 +1747,19 @@ void audio_queue_move(const char *file1, const char *file2)
   UNLOCK(plist_mtx);
 }
 
+/* Return a copy of the server's playlist (for the UI thread). */
+struct plist *audio_plist_get_contents()
+{
+  struct plist *ret = (struct plist *)xmalloc(sizeof(struct plist));
+
+  plist_init(ret);
+  LOCK(plist_mtx);
+  plist_cat(ret, &playlist);
+  UNLOCK(plist_mtx);
+
+  return ret;
+}
+
 /* Return a copy of the song queue.  We cannot just return constant
  * pointer, because it will be used in a different thread.
  * It obviously needs to be freed after use. */
