@@ -259,9 +259,6 @@
 # Remember the playlist after exit?
 #SavePlaylist = yes
 
-# Use the in-memory playlist managed by the audio engine (legacy option).
-#SyncPlaylist = yes
-
 # Should MOCF load and save tags in playlist files? Setting it to "no"
 # disables the use of Extended M3U tags. It will also speed up MOCF shutdown.
 #SavePlaylistTags = no

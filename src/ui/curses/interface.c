@@ -82,7 +82,6 @@ static volatile int want_resize = 0;
 #endif
 
 /* Are we waiting for the playlist we have loaded and sent to the clients? */
-static int waiting_for_plist_load = 0;
 
 /* Information about the currently played file. */
 static struct file_info curr_file;
@@ -264,17 +263,14 @@ static void *get_event_data(const int type)
 {
   switch (type)
   {
-    case EV_PLIST_ADD:
     case EV_QUEUE_ADD:
       return recv_item_from_srv();
-    case EV_PLIST_DEL:
     case EV_QUEUE_DEL:
     case EV_STATUS_MSG:
     case EV_SRV_ERROR:
       return get_str_from_srv();
     case EV_FILE_TAGS:
       return recv_tags_data_from_srv();
-    case EV_PLIST_MOVE:
     case EV_QUEUE_MOVE:
       return recv_move_ev_data_from_srv();
   }
@@ -349,20 +345,6 @@ static int send_tags_request(const char *file, const int tags_sel)
   }
 }
 
-/* Send all items from this playlist to other clients. */
-static void send_items_to_clients(const struct plist *plist)
-{
-  int i;
-
-  for (i = 0; i < plist->num; i++)
-  {
-    if (!plist_deleted(plist, i))
-    {
-      send_int_to_srv(CMD_CLI_PLIST_ADD);
-      send_item_to_srv(&plist->items[i]);
-    }
-  }
-}
 
 static void init_playlists()
 {
@@ -960,7 +942,7 @@ static void update_state()
   update_ctime();
 }
 
-/* Handle EV_PLIST_ADD. */
+/* Update playlist with a new item. */
 static void event_plist_add(const struct plist_item *item)
 {
   if (plist_find_fname(playlist, item->file) == -1)
@@ -994,27 +976,13 @@ static void event_plist_add(const struct plist_item *item)
                       options_get_bool("HideFileExtension"));
     }
 
-    /* Just calling iface_update_queue_positions (queue, playlist,
-     * NULL, NULL) is too slow in cases when we receive a large
-     * number of items from server (e.g., loading playlist w/
-     * SyncPlaylist on).  Since we know the filename in question,
-     * we try to find it in queue and eventually update the value.
-     */
+    /* Update queue position if this file is already queued. */
     if ((i = plist_find_fname(queue, item->file)) != -1)
     {
       playlist->items[item_num].queue_pos = plist_get_position(queue, i);
     }
 
     iface_add_to_plist(playlist, item_num);
-
-    if (waiting_for_plist_load)
-    {
-      if (iface_in_dir_menu())
-      {
-        iface_switch_to_plist();
-      }
-      waiting_for_plist_load = 0;
-    }
   }
 }
 
@@ -1136,11 +1104,7 @@ static void clear_playlist()
   }
   plist_clear(playlist);
   iface_clear_plist();
-
-  if (!waiting_for_plist_load)
-  {
-    interface_message("The playlist was cleared.");
-  }
+  interface_message("The playlist was cleared.");
   iface_set_status("");
 }
 
@@ -1154,7 +1118,7 @@ static void clear_queue()
   interface_message("The queue was cleared.");
 }
 
-/* Handle EV_PLIST_DEL. */
+/* Remove an item from the playlist. */
 static void event_plist_del(char *file)
 {
   int item = plist_find_fname(playlist, file);
@@ -1222,7 +1186,7 @@ static void swap_playlist_items(const char *file1, const char *file2)
   iface_swap_plist_items(file1, file2);
 }
 
-/* Handle EV_PLIST_MOVE. */
+/* Move an item in the playlist. */
 static void event_plist_move(const struct move_ev_data *d)
 {
   assert(d != NULL);
@@ -1272,30 +1236,6 @@ static void server_event(const int event, void *data)
       break;
     case EV_OPTIONS:
       get_server_options();
-      break;
-    case EV_PLIST_ADD:
-      if (options_get_bool("SyncPlaylist"))
-      {
-        event_plist_add((struct plist_item *)data);
-      }
-      break;
-    case EV_PLIST_CLEAR:
-      if (options_get_bool("SyncPlaylist"))
-      {
-        clear_playlist();
-      }
-      break;
-    case EV_PLIST_DEL:
-      if (options_get_bool("SyncPlaylist"))
-      {
-        event_plist_del((char *)data);
-      }
-      break;
-    case EV_PLIST_MOVE:
-      if (options_get_bool("SyncPlaylist"))
-      {
-        event_plist_move((struct move_ev_data *)data);
-      }
       break;
 
     case EV_STATUS_MSG:
@@ -1560,34 +1500,12 @@ static int go_to_playlist(const char *file, const int load_serial,
   iface_set_status("Loading playlist...");
   if (plist_load(playlist, file, cwd, load_serial))
   {
-    if (options_get_bool("SyncPlaylist"))
+    if (!default_playlist)
     {
-      send_int_to_srv(CMD_LOCK);
-      if (!load_serial)
-      {
-        change_srv_plist_serial();
-      }
-      send_int_to_srv(CMD_CLI_PLIST_CLEAR);
-      iface_set_status("Notifying clients...");
-      send_items_to_clients(playlist);
-      iface_set_status("");
-      waiting_for_plist_load = 1;
-      send_int_to_srv(CMD_UNLOCK);
-
-      /* We'll use the playlist received from the
-       * server to be synchronized with other clients.
-       */
-      plist_clear(playlist);
+      toggle_menu();
     }
-    else
-    {
-      if (!default_playlist)
-      {
-        toggle_menu();
-      }
-      iface_set_dir_content(IFACE_MENU_PLIST, playlist, NULL, NULL);
-      iface_update_queue_positions(queue, playlist, NULL, NULL);
-    }
+    iface_set_dir_content(IFACE_MENU_PLIST, playlist, NULL, NULL);
+    iface_update_queue_positions(queue, playlist, NULL, NULL);
 
     interface_message("Playlist loaded.");
   }
@@ -1816,7 +1734,7 @@ static void process_args(lists_t_strs *args)
     process_multiple_args(args);
   }
 
-  if (plist_count(playlist) && !options_get_bool("SyncPlaylist"))
+  if (plist_count(playlist))
   {
     switch_titles_file(playlist);
     ask_for_tags(playlist, get_tags_setting());
@@ -1838,9 +1756,6 @@ static void load_playlist()
   if (file_type(plist_file) == F_PLAYLIST)
   {
     go_to_playlist(plist_file, 1, true);
-
-    /* We don't want to switch to the playlist after loading. */
-    waiting_for_plist_load = 0;
   }
 }
 
@@ -1949,11 +1864,8 @@ static void play_it(const char *file)
     sync_bool_option("Shuffle");
   }
 
-  send_int_to_srv(CMD_LOCK);
-
   if (plist_get_serial(curr_plist) == -1 ||
-      get_server_plist_serial() != plist_get_serial(curr_plist) ||
-      !options_get_bool("SyncPlaylist"))
+      get_server_plist_serial() != plist_get_serial(curr_plist))
   {
     int serial;
 
@@ -1966,14 +1878,8 @@ static void play_it(const char *file)
 
     send_playlist(curr_plist, 1);
   }
-  else
-  {
-    logit("The server already has my playlist");
-  }
   send_int_to_srv(CMD_PLAY);
   send_str_to_srv(file);
-
-  send_int_to_srv(CMD_UNLOCK);
 }
 
 /* Action when the user selected a file. */
@@ -2085,8 +1991,6 @@ static void add_dir_plist()
     plist_load(&plist, file, cwd, 0);
   }
 
-  send_int_to_srv(CMD_LOCK);
-
   plist_remove_common_items(&plist, playlist);
 
   /* Add the new files to the server's playlist if the server has our
@@ -2096,13 +2000,6 @@ static void add_dir_plist()
     send_playlist(&plist, 0);
   }
 
-  if (options_get_bool("SyncPlaylist"))
-  {
-    iface_set_status("Notifying clients...");
-    send_items_to_clients(&plist);
-    iface_set_status("");
-  }
-  else
   {
     int i;
 
@@ -2119,44 +2016,33 @@ static void add_dir_plist()
     plist_cat(playlist, &plist);
   }
 
-  send_int_to_srv(CMD_UNLOCK);
-
   plist_free(&plist);
   free(file);
 }
 
-/* To avoid lots of locks and unlocks, this assumes a lock is sent before
- * the first call and an unlock after the last.
- *
- * It's also assumed to be in the menu.
+/* Remove a file from the in-memory playlist and from the server's playlist
+ * if the server currently has our list.
+ * Assumed to be in the playlist menu.
  */
 static void remove_file_from_playlist(const char *file)
 {
+  int n;
+
   assert(file != NULL);
   assert(plist_count(playlist) > 0);
 
-  if (options_get_bool("SyncPlaylist"))
+  n = plist_find_fname(playlist, file);
+  assert(n != -1);
+
+  plist_delete(playlist, n);
+  iface_del_plist_item(file);
+
+  if (plist_count(playlist) == 0)
   {
-    send_int_to_srv(CMD_CLI_PLIST_DEL);
-    send_str_to_srv(file);
-  }
-  else
-  {
-    int n = plist_find_fname(playlist, file);
-
-    assert(n != -1);
-
-    plist_delete(playlist, n);
-    iface_del_plist_item(file);
-
-    if (plist_count(playlist) == 0)
-    {
-      clear_playlist();
-    }
+    clear_playlist();
   }
 
-  /* Delete this item from the server's playlist if it has our
-   * playlist. */
+  /* Delete this item from the server's playlist if it has our playlist. */
   if (get_server_plist_serial() == plist_get_serial(playlist))
   {
     send_int_to_srv(CMD_DELETE);
@@ -2176,13 +2062,11 @@ static void remove_dead_entries_plist()
     return;
   }
 
-  send_int_to_srv(CMD_LOCK);
   for (i = 0, file = plist_get_next_dead_entry(playlist, &i); file != NULL;
        file = plist_get_next_dead_entry(playlist, &i))
   {
     remove_file_from_playlist(file);
   }
-  send_int_to_srv(CMD_UNLOCK);
 }
 
 /* Add the currently selected file to the playlist. */
@@ -2218,32 +2102,19 @@ static void add_file_plist()
 
   if (plist_find_fname(playlist, file) == -1)
   {
+    int added;
     struct plist_item *item =
         &dir_plist->items[plist_find_fname(dir_plist, file)];
 
-    send_int_to_srv(CMD_LOCK);
+    added = plist_add_from_item(playlist, item);
+    iface_add_to_plist(playlist, added);
 
-    if (options_get_bool("SyncPlaylist"))
-    {
-      send_int_to_srv(CMD_CLI_PLIST_ADD);
-      send_item_to_srv(item);
-    }
-    else
-    {
-      int added;
-
-      added = plist_add_from_item(playlist, item);
-      iface_add_to_plist(playlist, added);
-    }
-
-    /* Add to the server's playlist if the server has our
-     * playlist. */
+    /* Add to the server's playlist if the server has our playlist. */
     if (get_server_plist_serial() == plist_get_serial(playlist))
     {
       send_int_to_srv(CMD_LIST_ADD);
       send_str_to_srv(file);
     }
-    send_int_to_srv(CMD_UNLOCK);
   }
   else
   {
@@ -2358,17 +2229,7 @@ static void reread_dir()
 /* Clear the playlist on user request. */
 static void cmd_clear_playlist()
 {
-  if (options_get_bool("SyncPlaylist"))
-  {
-    send_int_to_srv(CMD_LOCK);
-    send_int_to_srv(CMD_CLI_PLIST_CLEAR);
-    change_srv_plist_serial();
-    send_int_to_srv(CMD_UNLOCK);
-  }
-  else
-  {
-    clear_playlist();
-  }
+  clear_playlist();
 }
 
 static void cmd_clear_queue() { send_int_to_srv(CMD_QUEUE_CLEAR); }
@@ -2768,9 +2629,7 @@ static void delete_item()
 
   file = iface_get_curr_file();
 
-  send_int_to_srv(CMD_LOCK);
   remove_file_from_playlist(file);
-  send_int_to_srv(CMD_UNLOCK);
 
   free(file);
 }
@@ -2902,18 +2761,7 @@ static void move_item(const int direction)
 
   second_file = plist_get_file(playlist, second);
 
-  send_int_to_srv(CMD_LOCK);
-
-  if (options_get_bool("SyncPlaylist"))
-  {
-    send_int_to_srv(CMD_CLI_PLIST_MOVE);
-    send_str_to_srv(file);
-    send_str_to_srv(second_file);
-  }
-  else
-  {
-    swap_playlist_items(file, second_file);
-  }
+  swap_playlist_items(file, second_file);
 
   /* update the server's playlist */
   if (get_server_plist_serial() == plist_get_serial(playlist))
@@ -2922,8 +2770,6 @@ static void move_item(const int direction)
     send_str_to_srv(file);
     send_str_to_srv(second_file);
   }
-
-  send_int_to_srv(CMD_UNLOCK);
 
   free(second_file);
   free(file);
@@ -2956,15 +2802,11 @@ static void cmd_next()
     {
       int serial;
 
-      send_int_to_srv(CMD_LOCK);
-
       send_playlist(playlist, 1);
       serial = get_safe_serial();
       plist_set_serial(playlist, serial);
       send_int_to_srv(CMD_PLIST_SET_SERIAL);
       send_int_to_srv(plist_get_serial(playlist));
-
-      send_int_to_srv(CMD_UNLOCK);
     }
 
     send_int_to_srv(CMD_PLAY);
@@ -3697,51 +3539,12 @@ void init_interface(const int sock, const int logging, lists_t_strs *args)
 
     if (plist_count(playlist) == 0)
     {
-      if (!options_get_bool("SyncPlaylist") || !use_server_playlist())
-      {
-        load_playlist();
-      }
-      send_int_to_srv(CMD_SEND_PLIST_EVENTS);
-    }
-    else if (options_get_bool("SyncPlaylist"))
-    {
-      struct plist tmp_plist;
-
-      /* We have made the playlist from command line. */
-
-      /* Pick up the engine playlist serial before replacing it. */
-      plist_init(&tmp_plist);
-      get_server_playlist(&tmp_plist);
-
-      send_int_to_srv(CMD_SEND_PLIST_EVENTS);
-
-      send_int_to_srv(CMD_LOCK);
-      send_int_to_srv(CMD_CLI_PLIST_CLEAR);
-
-      plist_set_serial(playlist, plist_get_serial(&tmp_plist));
-      plist_free(&tmp_plist);
-
-      change_srv_plist_serial();
-
-      iface_set_status("Updating playlist...");
-      send_items_to_clients(playlist);
-      iface_set_status("");
-      plist_clear(playlist);
-      waiting_for_plist_load = 1;
-      send_int_to_srv(CMD_UNLOCK);
-
-      /* Now enter_first_dir() should not go to the music
-       * directory. */
-      options_set_bool("StartInMusicDir", false);
+      load_playlist();
     }
   }
   else
   {
-    send_int_to_srv(CMD_SEND_PLIST_EVENTS);
-    if (!options_get_bool("SyncPlaylist") || !use_server_playlist())
-    {
-      load_playlist();
-    }
+    load_playlist();
     enter_first_dir();
   }
 

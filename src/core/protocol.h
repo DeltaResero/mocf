@@ -38,7 +38,7 @@ extern "C"
     struct file_tags *tags;
   };
 
-  /* Used as data field in the event queue for EV_PLIST_MOVE. */
+  /* Used as data field in the event queue for EV_QUEUE_MOVE. */
   struct move_ev_data
   {
     /* Two files that are to be exchanged. */
@@ -73,15 +73,8 @@ extern "C"
 #define EV_AUDIO_START 0x13  /* playing of audio has started */
 #define EV_AUDIO_STOP 0x14   /* playing of audio has stopped */
 
-/* Events caused by a client that wants to modify the playlist (see
- * CMD_CLI_PLIST* commands). */
-#define EV_PLIST_ADD 0x50   /* add an item, followed by the file name */
-#define EV_PLIST_DEL 0x51   /* delete an item, followed by the file name */
-#define EV_PLIST_MOVE 0x52  /* move an item, followed by 2 file names */
-#define EV_PLIST_CLEAR 0x53 /* clear the playlist */
-
-/* These events, though similar to the four previous are caused by server
- * which takes care of clients' queue synchronization. */
+/* These events are caused by server which takes care of clients' queue
+ * synchronization. */
 #define EV_QUEUE_ADD 0x54
 #define EV_QUEUE_DEL 0x55
 #define EV_QUEUE_MOVE 0x56
@@ -114,20 +107,12 @@ extern "C"
 #define CMD_GET_MIXER 0x1a         /* get the volume level */
 #define CMD_SET_MIXER 0x1b         /* set the volume level */
 #define CMD_DELETE 0x1c            /* delete an item from the playlist */
-#define CMD_SEND_PLIST_EVENTS 0x1d /* request for playlist events */
 #define CMD_PREV 0x20       /* start playing previous song if available */
 #define CMD_GET_PLIST 0x22 /* get the playlist from the audio engine */
-#define CMD_CLI_PLIST_ADD 0x24 /* add an item to the client's playlist */
-#define CMD_CLI_PLIST_DEL                                                      \
-  0x25                           /* delete an item from the client's           \
-            playlist */
-#define CMD_CLI_PLIST_CLEAR 0x26 /* clear the client's playlist */
 #define CMD_GET_SERIAL 0x27      /* get an unique serial number */
 #define CMD_PLIST_SET_SERIAL                                                   \
   0x28                  /* assign a serial number to the server's              \
 playlist */
-#define CMD_LOCK 0x29   /* acquire a lock */
-#define CMD_UNLOCK 0x2a /* release the lock */
 #define CMD_PLIST_GET_SERIAL                                                   \
   0x2b                    /* get the serial number of the server's             \
  playlist */
@@ -138,7 +123,6 @@ playlist */
 #define CMD_ABORT_TAGS_REQUESTS                                                \
   0x30                           /* abort previous CMD_GET_FILE_TAGS           \
         requests up to some file */
-#define CMD_CLI_PLIST_MOVE 0x31  /* move an item */
 #define CMD_LIST_MOVE 0x32       /* move an item */
 #define CMD_GET_AVG_BITRATE 0x33 /* get the average bitrate */
 
