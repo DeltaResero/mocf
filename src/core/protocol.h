@@ -108,7 +108,6 @@ extern "C"
 #define CMD_SET_MIXER 0x1b         /* set the volume level */
 #define CMD_DELETE 0x1c            /* delete an item from the playlist */
 #define CMD_PREV 0x20       /* start playing previous song if available */
-#define CMD_GET_PLIST 0x22 /* get the playlist from the audio engine */
 #define CMD_GET_SERIAL 0x27      /* get an unique serial number */
 #define CMD_PLIST_SET_SERIAL                                                   \
   0x28                  /* assign a serial number to the server's              \

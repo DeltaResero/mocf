@@ -739,68 +739,6 @@ static int req_queue_del(const struct client *cli)
   return 1;
 }
 
-/* Handle CMD_GET_PLIST: send the audio engine playlist to the UI. */
-static int req_get_plist(struct client *cli)
-{
-  int i;
-  struct plist *ap;
-  int has_items = 0;
-
-  ap = audio_plist_get_contents();
-  for (i = 0; i < ap->num; i++)
-  {
-    if (!plist_deleted(ap, i))
-    {
-      has_items = 1;
-      break;
-    }
-  }
-
-  if (!send_data_int(cli, has_items))
-  {
-    plist_free(ap);
-    free(ap);
-    return 0;
-  }
-
-  if (!has_items)
-  {
-    plist_free(ap);
-    free(ap);
-    return 1;
-  }
-
-  if (!send_data_int(cli, audio_plist_get_serial()))
-  {
-    plist_free(ap);
-    free(ap);
-    return 0;
-  }
-
-  for (i = 0; i < ap->num; i++)
-  {
-    if (!plist_deleted(ap, i))
-    {
-      if (!send_item(cli->socket, &ap->items[i]))
-      {
-        plist_free(ap);
-        free(ap);
-        return 0;
-      }
-    }
-  }
-
-  plist_free(ap);
-  free(ap);
-
-  if (!send_item(cli->socket, NULL))
-  {
-    return 0;
-  }
-
-  return 1;
-}
-
 /* Client requested we send the queue so we get it from audio.c and
  * send it to the client. */
 static int req_send_queue(struct client *cli)
@@ -1270,12 +1208,6 @@ static void handle_command(const int client_id)
       break;
     case CMD_DELETE:
       if (!delete_item(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_GET_PLIST:
-      if (!req_get_plist(cli))
       {
         err = 1;
       }

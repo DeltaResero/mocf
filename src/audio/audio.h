@@ -301,7 +301,6 @@ extern "C"
   void audio_queue_delete(const char *file);
   void audio_queue_clear();
   void audio_queue_move(const char *file1, const char *file2);
-  struct plist *audio_plist_get_contents();
   struct plist *audio_queue_get_contents();
 
 #ifdef __cplusplus

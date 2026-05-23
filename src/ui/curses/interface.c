@@ -1028,46 +1028,6 @@ static void update_error(char *err)
   error("%s", err);
 }
 
-static int recv_server_plist(struct plist *plist)
-{
-  int end_of_list = 0;
-  struct plist_item *item;
-
-  logit("Asking server for the playlist.");
-  send_int_to_srv(CMD_GET_PLIST);
-  logit("Waiting for response");
-  wait_for_data();
-
-  if (!get_int_from_srv())
-  {
-    debug("The server playlist is empty");
-    return 0;
-  }
-
-  logit("There is a playlist, getting...");
-  wait_for_data();
-
-  logit("Transfer...");
-
-  plist_set_serial(plist, get_int_from_srv());
-
-  do
-  {
-    item = recv_item_from_srv();
-    if (item->file[0])
-    {
-      plist_add_from_item(plist, item);
-    }
-    else
-    {
-      end_of_list = 1;
-    }
-    plist_free_item_fields(item);
-    free(item);
-  } while (!end_of_list);
-
-  return 1;
-}
 
 static void recv_server_queue(struct plist *queue)
 {
@@ -1441,22 +1401,6 @@ static int go_to_dir(const char *dir, const int reload)
   return 1;
 }
 
-/* Make sure that the server's playlist has different serial from ours. */
-static void change_srv_plist_serial()
-{
-  int serial;
-
-  do
-  {
-    send_int_to_srv(CMD_GET_SERIAL);
-    serial = get_data_int();
-  } while (serial == plist_get_serial(playlist) ||
-           serial == plist_get_serial(dir_plist));
-
-  send_int_to_srv(CMD_PLIST_SET_SERIAL);
-  send_int_to_srv(serial);
-}
-
 static void enter_first_dir();
 
 /* Switch between the directory view and the playlist. */
@@ -1560,44 +1504,6 @@ static void enter_first_dir()
   }
 
   first_run = 0;
-}
-
-/* Request the playlist from the audio engine. Return 0 if empty. */
-static int get_server_playlist(struct plist *plist)
-{
-  iface_set_status("Getting the playlist...");
-  debug("Getting the playlist...");
-  if (recv_server_plist(plist))
-  {
-    ask_for_tags(plist, get_tags_setting());
-    if (options_get_bool("ReadTags"))
-    {
-      switch_titles_tags(plist);
-    }
-    else
-    {
-      switch_titles_file(plist);
-    }
-    iface_set_status("");
-    return 1;
-  }
-
-  iface_set_status("");
-
-  return 0;
-}
-
-/* Load the playlist from the audio engine. Return 0 if it is empty. */
-static int use_server_playlist()
-{
-  if (get_server_playlist(playlist))
-  {
-    iface_set_dir_content(IFACE_MENU_PLIST, playlist, NULL, NULL);
-    iface_update_queue_positions(queue, playlist, NULL, NULL);
-    return 1;
-  }
-
-  return 0;
 }
 
 static void use_server_queue()
