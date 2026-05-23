@@ -148,7 +148,7 @@ static void add_client(int sock)
   event_queue_init(&clients[0].events);
   UNLOCK(clients[0].events_mtx);
   clients[0].socket = sock;
-  tags_cache_clear_queue(tags_cache, 0);
+  tags_cache_clear_queue(tags_cache);
 }
 
 static void del_client(struct client *cli)
@@ -156,7 +156,7 @@ static void del_client(struct client *cli)
   cli->socket = -1;
   LOCK(cli->events_mtx);
   event_queue_free(&cli->events);
-  tags_cache_clear_queue(tags_cache, 0);
+  tags_cache_clear_queue(tags_cache);
   UNLOCK(cli->events_mtx);
 }
 
@@ -966,7 +966,7 @@ static int get_file_tags(const int cli_id)
     return 0;
   }
 
-  tags_cache_add_request(tags_cache, file, tags_sel, cli_id);
+  tags_cache_add_request(tags_cache, file, tags_sel);
   free(file);
 
   return 1;
@@ -981,7 +981,7 @@ static int abort_tags_requests(const int cli_id)
     return 0;
   }
 
-  tags_cache_clear_up_to(tags_cache, file, cli_id);
+  tags_cache_clear_up_to(tags_cache, file);
   free(file);
 
   return 1;
@@ -1423,14 +1423,12 @@ void tags_change() { add_event_all(EV_TAGS, NULL); }
 
 void status_msg(const char *msg) { add_event_all(EV_STATUS_MSG, msg); }
 
-void tags_response(const int client_id, const char *file,
-                   const struct file_tags *tags)
+void tags_response(const char *file, const struct file_tags *tags)
 {
   assert(file != NULL);
   assert(tags != NULL);
-  assert(LIMIT(client_id, CLIENTS_MAX));
 
-  if (clients[client_id].socket != -1)
+  if (clients[0].socket != -1)
   {
     struct tag_ev_response *data =
         (struct tag_ev_response *)xmalloc(sizeof(struct tag_ev_response));
@@ -1438,7 +1436,7 @@ void tags_response(const int client_id, const char *file,
     data->file = xstrdup(file);
     data->tags = tags_dup(tags);
 
-    add_event(&clients[client_id], EV_FILE_TAGS, data);
+    add_event(&clients[0], EV_FILE_TAGS, data);
     wake_up_server();
   }
 }

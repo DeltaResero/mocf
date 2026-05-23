@@ -99,8 +99,7 @@ struct tags_cache
 #endif
 
   int max_items; /* maximum number of items in the cache. */
-  struct request_queue queues[CLIENTS_MAX]; /* requests queues for each
-                 client */
+  struct request_queue queue; /* pending tag requests */
   int stop_reader_thread;      /* request for stopping read thread (if
                 non-zero) */
   pthread_cond_t request_cond; /* condition for signalizing new
@@ -418,7 +417,7 @@ typedef void *t_locked_fn(struct tags_cache *, const char *, int, int, DBT *,
  * for the key and record. */
 #ifdef HAVE_DB_H
 static void *with_db_lock(t_locked_fn fn, struct tags_cache *c,
-                          const char *file, int tags_sel, int client_id)
+                          const char *file, int tags_sel, int notify)
 {
   int rc;
   void *result;
@@ -440,7 +439,7 @@ static void *with_db_lock(t_locked_fn fn, struct tags_cache *c,
     fatal("Can't get DB lock: %s", db_strerror(rc));
   }
 
-  result = fn(c, file, tags_sel, client_id, &key, &record);
+  result = fn(c, file, tags_sel, notify, &key, &record);
 
   rc = c->db_env->lock_put(c->db_env, &lock);
   if (rc)
@@ -661,7 +660,7 @@ struct file_tags *read_missing_tags(const char *file, struct file_tags *tags,
 /* Read the selected tags for this file and add it to the cache. */
 #ifdef HAVE_DB_H
 static void *locked_read_add(struct tags_cache *c, const char *file,
-                             const int tags_sel, const int client_id, DBT *key,
+                             const int tags_sel, const int notify, DBT *key,
                              DBT *serialized_cache_rec)
 {
   int ret;
@@ -677,7 +676,7 @@ static void *locked_read_add(struct tags_cache *c, const char *file,
 
   /* If this entry is already present in the cache, we have 3 options:
    * we must read different tags (TAGS_*) or the tags are outdated
-   * or this is an immediate tags read (client_id == -1) */
+   * or this is a synchronous (non-notify) read */
   if (ret == 0)
   {
     struct cache_record rec;
@@ -692,7 +691,7 @@ static void *locked_read_add(struct tags_cache *c, const char *file,
         debug("Tags in the cache are outdated");
         tags_free(rec.tags); /* remove them and reread tags */
       }
-      else if ((rec.tags->filled & tags_sel) == tags_sel && client_id == -1)
+      else if ((rec.tags->filled & tags_sel) == tags_sel && !notify)
       {
         debug("Tags are in the cache.");
         return rec.tags;
@@ -713,11 +712,11 @@ static void *locked_read_add(struct tags_cache *c, const char *file,
 #endif
 
 /* Read the selected tags for this file and add it to the cache.
- * If client_id != -1, the server is notified using tags_response().
- * If client_id == -1, copy of file_tags is returned. */
+ * If notify is true, the server is notified using tags_response().
+ * If notify is false, a copy of file_tags is returned. */
 static struct file_tags *tags_cache_read_add(struct tags_cache *c DB_ONLY,
                                              const char *file, int tags_sel,
-                                             int client_id)
+                                             int notify)
 {
   struct file_tags *tags = NULL;
 
@@ -729,15 +728,15 @@ static struct file_tags *tags_cache_read_add(struct tags_cache *c DB_ONLY,
   if (c->max_items)
   {
     tags = (struct file_tags *)with_db_lock(locked_read_add, c, file, tags_sel,
-                                            client_id);
+                                            notify);
   }
   else
 #endif
     tags = read_missing_tags(file, tags, tags_sel);
 
-  if (client_id != -1)
+  if (notify)
   {
-    tags_response(client_id, file, tags);
+    tags_response(file, tags);
     tags_free(tags);
     tags = NULL;
   }
@@ -751,8 +750,6 @@ static struct file_tags *tags_cache_read_add(struct tags_cache *c DB_ONLY,
 static void *reader_thread(void *cache_ptr)
 {
   struct tags_cache *c;
-  int curr_queue = 0; /* index of the queue from where
-                         we will get the next request */
 
   logit("Tags reader thread started");
 
@@ -764,43 +761,23 @@ static void *reader_thread(void *cache_ptr)
 
   while (!c->stop_reader_thread)
   {
-    int i;
     char *request_file;
     int tags_sel = 0;
 
-    /* Find the queue with a request waiting.  Begin searching at
-     * curr_queue: we want to get one request from each queue,
-     * and then move to the next non-empty queue. */
-    i = curr_queue;
-    while (i < CLIENTS_MAX && request_queue_empty(&c->queues[i]))
+    if (request_queue_empty(&c->queue))
     {
-      i++;
+      debug("Queue empty, waiting");
+      pthread_cond_wait(&c->request_cond, &c->mutex);
+      continue;
     }
-    if (i == CLIENTS_MAX)
-    {
-      i = 0;
-      while (i < curr_queue && request_queue_empty(&c->queues[i]))
-      {
-        i++;
-      }
 
-      if (i == curr_queue)
-      {
-        debug("All queues empty, waiting");
-        pthread_cond_wait(&c->request_cond, &c->mutex);
-        continue;
-      }
-    }
-    curr_queue = i;
-
-    request_file = request_queue_pop(&c->queues[curr_queue], &tags_sel);
+    request_file = request_queue_pop(&c->queue, &tags_sel);
     UNLOCK(c->mutex);
 
-    tags_cache_read_add(c, request_file, tags_sel, curr_queue);
+    tags_cache_read_add(c, request_file, tags_sel, 1);
     free(request_file);
 
     LOCK(c->mutex);
-    curr_queue = (curr_queue + 1) % CLIENTS_MAX;
   }
 
   UNLOCK(c->mutex);
@@ -822,10 +799,7 @@ struct tags_cache *tags_cache_new(size_t max_size)
   result->db = NULL;
 #endif
 
-  for (i = 0; i < CLIENTS_MAX; i++)
-  {
-    request_queue_init(&result->queues[i]);
-  }
+  request_queue_init(&result->queue);
 
 #if CACHE_DB_FORMAT_VERSION
   result->max_items = max_size;
@@ -894,10 +868,7 @@ void tags_cache_free(struct tags_cache *c)
     fatal("pthread_join() on cache reader thread failed: %s", xstrerror(rc));
   }
 
-  for (i = 0; i < CLIENTS_MAX; i++)
-  {
-    request_queue_clear(&c->queues[i]);
-  }
+  request_queue_clear(&c->queue);
 
   rc = pthread_mutex_destroy(&c->mutex);
   if (rc != 0)
@@ -915,7 +886,7 @@ void tags_cache_free(struct tags_cache *c)
 
 #ifdef HAVE_DB_H
 static void *locked_add_request(struct tags_cache *c, const char *file,
-                                int tags_sel, int client_id, DBT *key,
+                                int tags_sel, int notify, DBT *key,
                                 DBT *serialized_cache_rec)
 {
   int db_ret;
@@ -942,7 +913,7 @@ static void *locked_add_request(struct tags_cache *c, const char *file,
     if (rec.mod_time == get_mtime(file) &&
         (rec.tags->filled & tags_sel) == tags_sel)
     {
-      tags_response(client_id, file, rec.tags);
+      tags_response(file, rec.tags);
       tags_free(rec.tags);
       debug("Tags are present in the cache");
       return (void *)1;
@@ -957,55 +928,51 @@ static void *locked_add_request(struct tags_cache *c, const char *file,
 #endif
 
 void tags_cache_add_request(struct tags_cache *c, const char *file,
-                            int tags_sel, int client_id)
+                            int tags_sel)
 {
   void *rc = NULL;
 
   assert(c != NULL);
   assert(file != NULL);
-  assert(LIMIT(client_id, CLIENTS_MAX));
 
-  debug("Request for tags for '%s' from client %d", file, client_id);
+  debug("Request for tags for '%s'", file);
 
 #ifdef HAVE_DB_H
   if (c->max_items)
   {
-    rc = with_db_lock(locked_add_request, c, file, tags_sel, client_id);
+    rc = with_db_lock(locked_add_request, c, file, tags_sel, 1);
   }
 #endif
 
   if (!rc)
   {
     LOCK(c->mutex);
-    request_queue_add(&c->queues[client_id], file, tags_sel);
+    request_queue_add(&c->queue, file, tags_sel);
     pthread_cond_signal(&c->request_cond);
     UNLOCK(c->mutex);
   }
 }
 
-void tags_cache_clear_queue(struct tags_cache *c, int client_id)
+void tags_cache_clear_queue(struct tags_cache *c)
 {
   assert(c != NULL);
-  assert(LIMIT(client_id, CLIENTS_MAX));
 
   LOCK(c->mutex);
-  request_queue_clear(&c->queues[client_id]);
-  debug("Cleared requests queue for client %d", client_id);
+  request_queue_clear(&c->queue);
+  debug("Cleared tags request queue");
   UNLOCK(c->mutex);
 }
 
-/* Remove all pending requests from the queue for the given client up to
- * the request associated with the given file. */
-void tags_cache_clear_up_to(struct tags_cache *c, const char *file,
-                            int client_id)
+/* Remove all pending requests from the queue up to the request associated
+ * with the given file. */
+void tags_cache_clear_up_to(struct tags_cache *c, const char *file)
 {
   assert(c != NULL);
-  assert(LIMIT(client_id, CLIENTS_MAX));
   assert(file != NULL);
 
   LOCK(c->mutex);
-  debug("Removing requests for client %d up to file %s", client_id, file);
-  request_queue_clear_up_to(&c->queues[client_id], file);
+  debug("Removing requests up to file %s", file);
+  request_queue_clear_up_to(&c->queue, file);
   UNLOCK(c->mutex);
 }
 
@@ -1404,7 +1371,7 @@ struct file_tags *tags_cache_get_immediate(struct tags_cache *c,
 
   debug("Immediate tags read for %s", file);
 
-  tags = tags_cache_read_add(c, file, tags_sel, -1);
+  tags = tags_cache_read_add(c, file, tags_sel, 0);
 
   return tags;
 }
