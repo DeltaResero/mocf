@@ -966,20 +966,4 @@ void player_unpause()
   UNLOCK(request_cond_mtx);
 }
 
-/* Return tags for the currently played file or NULL if there are no tags.
- * Tags are duplicated. */
-struct file_tags *player_get_curr_tags()
-{
-  struct file_tags *tags = NULL;
-
-  LOCK(curr_tags_mtx);
-  if (curr_tags)
-  {
-    tags = tags_dup(curr_tags);
-  }
-  UNLOCK(curr_tags_mtx);
-
-  return tags;
-}
-
 // EOF

@@ -115,7 +115,6 @@ playlist */
 #define CMD_PLIST_GET_SERIAL                                                   \
   0x2b                    /* get the serial number of the server's             \
  playlist */
-#define CMD_GET_TAGS 0x2c /* get tags for the currently played file */
 #define CMD_TOGGLE_MIXER_CHANNEL 0x2d   /* toggle the mixer channel */
 #define CMD_GET_MIXER_CHANNEL_NAME 0x2e /* get the mixer channel's name */
 #define CMD_GET_FILE_TAGS 0x2f          /* get tags for the specified file */
@@ -135,7 +134,6 @@ playlist */
 #define CMD_JUMP_TO 0x3a    /* jumps to a some position in the current stream */
 #define CMD_QUEUE_ADD 0x3b  /* add an item to the queue */
 #define CMD_QUEUE_DEL 0x3c  /* delete an item from the queue */
-#define CMD_QUEUE_MOVE 0x3d /* move an item in the queue */
 #define CMD_QUEUE_CLEAR 0x3e /* clear the queue */
 #define CMD_GET_QUEUE 0x3f   /* request the queue from the server */
 

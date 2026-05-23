@@ -1740,13 +1740,6 @@ void audio_plist_move(const char *file1, const char *file2)
   UNLOCK(plist_mtx);
 }
 
-void audio_queue_move(const char *file1, const char *file2)
-{
-  LOCK(plist_mtx);
-  plist_swap_files(&queue, file1, file2);
-  UNLOCK(plist_mtx);
-}
-
 /* Return a copy of the song queue.  We cannot just return constant
  * pointer, because it will be used in a different thread.
  * It obviously needs to be freed after use. */
@@ -1762,7 +1755,6 @@ struct plist *audio_queue_get_contents()
   return ret;
 }
 
-struct file_tags *audio_get_curr_tags() { return player_get_curr_tags(); }
 
 char *audio_get_mixer_channel_name()
 {

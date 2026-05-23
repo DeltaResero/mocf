@@ -851,35 +851,6 @@ static int send_serial(struct client *cli)
   return 1;
 }
 
-/* Send tags to the client. Return 0 on error. */
-static int req_get_tags(struct client *cli)
-{
-  struct file_tags *tags;
-  int res = 1;
-
-  debug("Sending tags to client with fd %d...", cli->socket);
-
-  if (!send_int(cli->socket, EV_DATA))
-  {
-    logit("Error when sending EV_DATA");
-    return 0;
-  }
-
-  tags = audio_get_curr_tags();
-  if (!send_tags(cli->socket, tags))
-  {
-    logit("Error when sending tags");
-    res = 0;
-  }
-
-  if (tags)
-  {
-    tags_free(tags);
-  }
-
-  return res;
-}
-
 /* Handle CMD_GET_MIXER_CHANNEL_NAME. Return 0 on error. */
 int req_get_mixer_channel_name(struct client *cli)
 {
@@ -1036,34 +1007,6 @@ static int req_list_move(struct client *cli)
 
   free(from);
   free(to);
-
-  return 1;
-}
-
-/* Handle CMD_QUEUE_MOVE. Return 0 on error. */
-static int req_queue_move(const struct client *cli)
-{
-  struct move_ev_data m;
-
-  if (!(m.from = get_str(cli->socket)))
-  {
-    return 0;
-  }
-  if (!(m.to = get_str(cli->socket)))
-  {
-    free(m.from);
-    return 0;
-  }
-
-  audio_queue_move(m.from, m.to);
-
-  logit("Swapping %s with %s in the queue", m.from, m.to);
-
-  /* Broadcast the event to clients */
-  add_event_all(EV_QUEUE_MOVE, &m);
-
-  free(m.from);
-  free(m.to);
 
   return 1;
 }
@@ -1230,12 +1173,6 @@ static void handle_command(const int client_id)
         err = 1;
       }
       break;
-    case CMD_GET_TAGS:
-      if (!req_get_tags(cli))
-      {
-        err = 1;
-      }
-      break;
     case CMD_TOGGLE_MIXER_CHANNEL:
       req_toggle_mixer_channel();
       break;
@@ -1297,12 +1234,6 @@ static void handle_command(const int client_id)
       logit("Clearing the queue");
       audio_queue_clear();
       add_event_all(EV_QUEUE_CLEAR, NULL);
-      break;
-    case CMD_QUEUE_MOVE:
-      if (!req_queue_move(cli))
-      {
-        err = 1;
-      }
       break;
     case CMD_GET_QUEUE:
       if (!req_send_queue(cli))
