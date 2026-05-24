@@ -25,7 +25,6 @@
 #include <signal.h>
 #include <ctype.h>
 #include <unistd.h>
-#include <sys/socket.h>
 #include <dirent.h>
 #include <sys/select.h>
 
@@ -43,6 +42,8 @@
 #include "library/playlist.h"
 #include "library/playlist_file.h"
 #include "core/protocol.h"
+#include "core/server.h"
+#include "audio/audio.h"
 #include "ui/input/keys.h"
 #include "core/options.h"
 #include "library/files.h"
@@ -56,8 +57,8 @@
 
 #define QUEUE_CLEAR_THRESH 128
 
-/* Socket of the server connection. */
-static int srv_sock = -1;
+/* Engine event queue (replaces the socketpair). */
+static struct engine_event_queue *g_engine_eq = NULL;
 
 static struct plist *playlist = NULL;  /* our playlist */
 static struct plist *queue = NULL;     /* our queue */
@@ -124,204 +125,20 @@ int user_wants_interrupt() { return wants_interrupt; }
 
 static void clear_interrupt() { wants_interrupt = 0; }
 
-static void send_int_to_srv(const int num)
+/* -----------------------------------------------------------------------
+ * Direct-call helpers replacing the old socketpair protocol wrappers.
+ * ----------------------------------------------------------------------- */
+
+/* Drain all pending engine events into the local event queue. */
+static void drain_engine_events()
 {
-  if (!send_int(srv_sock, num))
-  {
-    fatal("Can't send() int to the server!");
-  }
+  engine_event_queue_flush(g_engine_eq, &events);
 }
 
-static void send_bool_to_srv(const bool t)
+/* Block until at least one engine event arrives, then drain. */
+static void wait_and_drain_engine_events()
 {
-  if (!send_int(srv_sock, t ? 1 : 0))
-  {
-    fatal("Can't send() bool to the server!");
-  }
-}
-
-static void send_str_to_srv(const char *str)
-{
-  if (!send_str(srv_sock, str))
-  {
-    fatal("Can't send() string to the server!");
-  }
-}
-
-static void send_item_to_srv(const struct plist_item *item)
-{
-  if (!send_item(srv_sock, item))
-  {
-    fatal("Can't send() item to the server!");
-  }
-}
-
-static int get_int_from_srv()
-{
-  int num;
-
-  if (!get_int(srv_sock, &num))
-  {
-    fatal("Can't receive value from the server!");
-  }
-
-  return num;
-}
-
-static bool get_bool_from_srv()
-{
-  int num;
-
-  if (!get_int(srv_sock, &num))
-  {
-    fatal("Can't receive value from the server!");
-  }
-
-  return num == 1 ? true : false;
-}
-
-/* Returned memory is malloc()ed. */
-static char *get_str_from_srv()
-{
-  char *str = get_str(srv_sock);
-
-  if (!str)
-  {
-    fatal("Can't receive string from the server!");
-  }
-
-  return str;
-}
-
-static struct file_tags *recv_tags_from_srv()
-{
-  struct file_tags *tags = recv_tags(srv_sock);
-
-  if (!tags)
-  {
-    fatal("Can't receive tags from the server!");
-  }
-
-  return tags;
-}
-
-/* Noblocking version of get_int_from_srv(): return 0 if there are no data. */
-static int get_int_from_srv_noblock(int *num)
-{
-  enum noblock_io_status st;
-
-  if ((st = get_int_noblock(srv_sock, num)) == NB_IO_ERR)
-  {
-    fatal("Can't receive value from the server!");
-  }
-
-  return st == NB_IO_OK ? 1 : 0;
-}
-
-static struct plist_item *recv_item_from_srv()
-{
-  struct plist_item *item;
-
-  if (!(item = recv_item(srv_sock)))
-  {
-    fatal("Can't receive item from the server!");
-  }
-
-  return item;
-}
-
-static struct tag_ev_response *recv_tags_data_from_srv()
-{
-  struct tag_ev_response *r;
-
-  r = (struct tag_ev_response *)xmalloc(sizeof(struct tag_ev_response));
-
-  r->file = get_str_from_srv();
-  if (!(r->tags = recv_tags(srv_sock)))
-  {
-    fatal("Can't receive tags event's data from the server!");
-  }
-
-  return r;
-}
-
-static struct move_ev_data *recv_move_ev_data_from_srv()
-{
-  struct move_ev_data *d;
-
-  if (!(d = recv_move_ev_data(srv_sock)))
-  {
-    fatal("Can't receive move data from the server!");
-  }
-
-  return d;
-}
-
-/* Receive data for the given type of event and return them. Return NULL if
- * there is no data for the event. */
-static void *get_event_data(const int type)
-{
-  switch (type)
-  {
-    case EV_QUEUE_ADD:
-      return recv_item_from_srv();
-    case EV_QUEUE_DEL:
-    case EV_STATUS_MSG:
-    case EV_SRV_ERROR:
-      return get_str_from_srv();
-    case EV_FILE_TAGS:
-      return recv_tags_data_from_srv();
-    case EV_QUEUE_MOVE:
-      return recv_move_ev_data_from_srv();
-  }
-
-  return NULL;
-}
-
-/* Wait for EV_DATA handling other events. */
-static void wait_for_data()
-{
-  int event;
-
-  do
-  {
-    event = get_int_from_srv();
-    if (event == EV_EXIT)
-    {
-      interface_fatal("The server exited!");
-    }
-    if (event != EV_DATA)
-    {
-      event_push(&events, event, get_event_data(event));
-    }
-  } while (event != EV_DATA);
-}
-
-/* Get an integer value from the server that will arrive after EV_DATA. */
-static int get_data_int()
-{
-  wait_for_data();
-  return get_int_from_srv();
-}
-
-/* Get a boolean value from the server that will arrive after EV_DATA. */
-static bool get_data_bool()
-{
-  wait_for_data();
-  return get_bool_from_srv();
-}
-
-/* Get a string value from the server that will arrive after EV_DATA. */
-static char *get_data_str()
-{
-  wait_for_data();
-  return get_str_from_srv();
-}
-
-static struct file_tags *get_data_tags()
-{
-  wait_for_data();
-  return recv_tags_from_srv();
+  engine_event_queue_wait_flush(g_engine_eq, &events);
 }
 
 static int send_tags_request(const char *file, const int tags_sel)
@@ -331,11 +148,8 @@ static int send_tags_request(const char *file, const int tags_sel)
 
   if (file_type(file) == F_SOUND)
   {
-    send_int_to_srv(CMD_GET_FILE_TAGS);
-    send_str_to_srv(file);
-    send_int_to_srv(tags_sel);
+    engine_request_file_tags(file, tags_sel);
     debug("Asking for tags for %s", file);
-
     return 1;
   }
   else
@@ -355,9 +169,8 @@ static void init_playlists()
   queue = (struct plist *)xmalloc(sizeof(struct plist));
   plist_init(queue);
 
-  /* set serial numbers for the playlist */
-  send_int_to_srv(CMD_GET_SERIAL);
-  plist_set_serial(playlist, get_data_int());
+  /* Assign a unique serial number to the playlist. */
+  plist_set_serial(playlist, engine_gen_serial());
 }
 
 static void file_info_reset(struct file_info *f)
@@ -428,19 +241,16 @@ static void file_info_block_mark(int *marker)
   }
 }
 
-/* Get a boolean option from the server (like Shuffle) and set it. */
+/* Sync a boolean option from engine state into the UI. Since the engine and
+ * UI share the same options_* globals, we just re-read the local value and
+ * update the iface display. */
 static void sync_bool_option(const char *name)
 {
-  bool value;
-
-  send_int_to_srv(CMD_GET_OPTION);
-  send_str_to_srv(name);
-  value = get_data_bool();
-  options_set_bool(name, value);
+  bool value = options_get_bool(name);
   iface_set_option_state(name, value);
 }
 
-/* Get the server options and set our options like them. */
+/* Refresh all option display states from the shared options store. */
 static void get_server_options()
 {
   sync_bool_option("Shuffle");
@@ -450,78 +260,62 @@ static void get_server_options()
 
 static int get_server_plist_serial()
 {
-  send_int_to_srv(CMD_PLIST_GET_SERIAL);
-  return get_data_int();
+  return audio_plist_get_serial();
 }
 
 static int get_mixer_value()
 {
-  send_int_to_srv(CMD_GET_MIXER);
-  return get_data_int();
+  return audio_get_mixer();
 }
 
 static int get_state()
 {
-  send_int_to_srv(CMD_GET_STATE);
-  return get_data_int();
+  return audio_get_state();
 }
 
 static int get_channels()
 {
-  send_int_to_srv(CMD_GET_CHANNELS);
-  return get_data_int();
+  return engine_get_channels();
 }
 
 static int get_rate()
 {
-  send_int_to_srv(CMD_GET_RATE);
-  return get_data_int();
+  return engine_get_rate();
 }
 
 static int get_bitrate()
 {
-  send_int_to_srv(CMD_GET_BITRATE);
-  return get_data_int();
+  return engine_get_bitrate();
 }
 
 static int get_avg_bitrate()
 {
-  send_int_to_srv(CMD_GET_AVG_BITRATE);
-  return get_data_int();
+  return engine_get_avg_bitrate();
 }
 
 static int get_curr_time()
 {
-  send_int_to_srv(CMD_GET_CTIME);
-  return get_data_int();
+  return audio_get_time();
 }
 
 static char *get_curr_file()
 {
-  send_int_to_srv(CMD_GET_SNAME);
-  return get_data_str();
+  char *s = audio_get_sname();
+  return s ? s : xstrdup("");
 }
 
 static void update_mixer_value()
 {
-  int val;
-
-  val = get_mixer_value();
+  int val = get_mixer_value();
   iface_set_mixer_value(MAX(val, 0));
 }
 
 static void update_mixer_name()
 {
-  char *name;
-
-  send_int_to_srv(CMD_GET_MIXER_CHANNEL_NAME);
-  name = get_data_str();
+  char *name = audio_get_mixer_channel_name();
   debug("Mixer name: %s", name);
-
   iface_set_mixer_name(name);
-
   free(name);
-
   update_mixer_value();
 }
 
@@ -742,8 +536,25 @@ static void ev_file_tags(const struct tag_ev_response *data)
   debug("Received tags for %s", data->file);
 
   sanitise_string(data->tags->title);
+  if (data->tags->title && !data->tags->title[0])
+  {
+    free(data->tags->title);
+    ((struct file_tags *)data->tags)->title = NULL;
+  }
+
   sanitise_string(data->tags->artist);
+  if (data->tags->artist && !data->tags->artist[0])
+  {
+    free(data->tags->artist);
+    ((struct file_tags *)data->tags)->artist = NULL;
+  }
+
   sanitise_string(data->tags->album);
+  if (data->tags->album && !data->tags->album[0])
+  {
+    free(data->tags->album);
+    ((struct file_tags *)data->tags)->album = NULL;
+  }
 
   if ((n = plist_find_fname(dir_plist, data->file)) != -1)
   {
@@ -1029,30 +840,24 @@ static void update_error(char *err)
 }
 
 
-static void recv_server_queue(struct plist *queue)
+static void recv_server_queue(struct plist *q)
 {
-  int end_of_list = 0;
-  struct plist_item *item;
+  struct plist *engine_q;
+  int i;
 
-  logit("Asking server for the queue.");
-  send_int_to_srv(CMD_GET_QUEUE);
-  logit("Waiting for response");
-  wait_for_data(); /* There must always be (possibly empty) queue. */
+  logit("Getting queue from engine.");
+  engine_q = engine_get_queue();
+  if (!engine_q)
+    return;
 
-  do
+  for (i = 0; i < engine_q->num; i++)
   {
-    item = recv_item_from_srv();
-    if (item->file[0])
-    {
-      plist_add_from_item(queue, item);
-    }
-    else
-    {
-      end_of_list = 1;
-    }
-    plist_free_item_fields(item);
-    free(item);
-  } while (!end_of_list);
+    if (!plist_deleted(engine_q, i))
+      plist_add_from_item(q, &engine_q->items[i]);
+  }
+
+  plist_free(engine_q);
+  free(engine_q);
 }
 
 /* Clear the playlist locally. */
@@ -1253,20 +1058,25 @@ static void fill_tags(struct plist *plist, const int tags_sel,
     int type;
     void *data;
 
-    /* Event queue is not initialized if there is no interface. */
     if (!no_iface && !event_queue_empty(&events))
     {
       struct event e = *event_get_first(&events);
-
       type = e.type;
       data = e.data;
-
       event_pop(&events);
     }
     else
     {
-      type = get_int_from_srv();
-      data = get_event_data(type);
+      /* Block until at least one event arrives from the engine. */
+      wait_and_drain_engine_events();
+
+      if (event_queue_empty(&events))
+        continue;
+
+      struct event e = *event_get_first(&events);
+      type = e.type;
+      data = e.data;
+      event_pop(&events);
     }
 
     if (type == EV_FILE_TAGS)
@@ -1274,27 +1084,31 @@ static void fill_tags(struct plist *plist, const int tags_sel,
       struct tag_ev_response *ev = (struct tag_ev_response *)data;
       int n;
 
+      /* Count this response toward our pending-tags total before handing
+       * the event off to server_event(), which will call ev_file_tags()
+       * and update_item_tags() for us (and then free the data).  We must
+       * not touch data->tags after server_event() returns. */
       if ((n = plist_find_fname(plist, ev->file)) != -1)
       {
-        if ((ev->tags->filled & tags_sel))
+        if (ev->tags->filled & tags_sel)
         {
           files--;
         }
-        update_item_tags(plist, n, ev->tags);
       }
+
+      /* Delegate all update + free work to the normal event handler. */
+      if (!no_iface)
+        server_event(type, data);
+      else
+        free_event_data(type, data);
     }
     else if (no_iface)
     {
       abort(); /* can't handle other events without the interface */
     }
-
-    if (!no_iface)
-    {
-      server_event(type, data);
-    }
     else
     {
-      free_event_data(type, data);
+      server_event(type, data);
     }
   }
 
@@ -1707,24 +1521,20 @@ static void go_dir_up()
   free(dir);
 }
 
-/* Return a generated playlist serial from the server and make sure
- * it's not the same as our playlist's serial. */
+/* Return a fresh playlist serial that differs from our current playlist's. */
 static int get_safe_serial()
 {
   int serial;
 
   do
   {
-    send_int_to_srv(CMD_GET_SERIAL);
-    serial = get_data_int();
-  } while (playlist && serial == plist_get_serial(playlist)); /* check only the
-                                  playlist, because dir_plist has serial
-                                  -1 */
+    serial = engine_gen_serial();
+  } while (playlist && serial == plist_get_serial(playlist));
 
   return serial;
 }
 
-/* Send the playlist to the server. If clear != 0, clear the server's playlist
+/* Send the playlist to the engine. If clear != 0, clear the engine's playlist
  * before sending. */
 static void send_playlist(struct plist *plist, const int clear)
 {
@@ -1732,20 +1542,19 @@ static void send_playlist(struct plist *plist, const int clear)
 
   if (clear)
   {
-    send_int_to_srv(CMD_LIST_CLEAR);
+    audio_plist_clear();
   }
 
   for (i = 0; i < plist->num; i++)
   {
     if (!plist_deleted(plist, i))
     {
-      send_int_to_srv(CMD_LIST_ADD);
-      send_str_to_srv(plist->items[i].file);
+      audio_plist_add(plist->items[i].file);
     }
   }
 }
 
-/* Send the playlist to the server if necessary and request playing this
+/* Send the playlist to the engine if necessary and request playing this
  * item. */
 static void play_it(const char *file)
 {
@@ -1764,28 +1573,24 @@ static void play_it(const char *file)
 
   if (options_get_bool("ForceShufflePlaylistOnly"))
   {
-    send_int_to_srv(CMD_SET_OPTION);
-    send_str_to_srv("Shuffle");
-    send_bool_to_srv(!iface_in_dir_menu());
+    engine_set_option("Shuffle", !iface_in_dir_menu());
     sync_bool_option("Shuffle");
   }
 
   if (plist_get_serial(curr_plist) == -1 ||
-      get_server_plist_serial() != plist_get_serial(curr_plist))
+      audio_plist_get_serial() != plist_get_serial(curr_plist))
   {
     int serial;
 
-    logit("The server has different playlist");
+    logit("The engine has a different playlist");
 
     serial = get_safe_serial();
     plist_set_serial(curr_plist, serial);
-    send_int_to_srv(CMD_PLIST_SET_SERIAL);
-    send_int_to_srv(serial);
+    audio_plist_set_serial(serial);
 
     send_playlist(curr_plist, 1);
   }
-  send_int_to_srv(CMD_PLAY);
-  send_str_to_srv(file);
+  audio_play(file);
 }
 
 /* Action when the user selected a file. */
@@ -1828,10 +1633,10 @@ static void switch_pause()
   switch (curr_file.state)
   {
     case STATE_PLAY:
-      send_int_to_srv(CMD_PAUSE);
+      audio_pause();
       break;
     case STATE_PAUSE:
-      send_int_to_srv(CMD_UNPAUSE);
+      audio_unpause();
       break;
     default:
       logit("User pressed pause when not playing.");
@@ -1841,8 +1646,7 @@ static void switch_pause()
 static void set_mixer(int val)
 {
   val = CLAMP(0, val, 100);
-  send_int_to_srv(CMD_SET_MIXER);
-  send_int_to_srv(val);
+  audio_set_mixer(val);
 }
 
 static void adjust_mixer(const int diff)
@@ -1948,11 +1752,10 @@ static void remove_file_from_playlist(const char *file)
     clear_playlist();
   }
 
-  /* Delete this item from the server's playlist if it has our playlist. */
-  if (get_server_plist_serial() == plist_get_serial(playlist))
+  /* Delete this item from the engine's playlist if it has our playlist. */
+  if (audio_plist_get_serial() == plist_get_serial(playlist))
   {
-    send_int_to_srv(CMD_DELETE);
-    send_str_to_srv(file);
+    audio_plist_delete(file);
   }
 }
 
@@ -2015,11 +1818,10 @@ static void add_file_plist()
     added = plist_add_from_item(playlist, item);
     iface_add_to_plist(playlist, added);
 
-    /* Add to the server's playlist if the server has our playlist. */
-    if (get_server_plist_serial() == plist_get_serial(playlist))
+    /* Add to the engine's playlist if the engine has our playlist. */
+    if (audio_plist_get_serial() == plist_get_serial(playlist))
     {
-      send_int_to_srv(CMD_LIST_ADD);
-      send_str_to_srv(file);
+      audio_plist_add(file);
     }
   }
   else
@@ -2055,18 +1857,14 @@ static void queue_toggle_file()
 
   if (plist_find_fname(queue, file) == -1)
   {
-    /* Add item to the server's queue. */
-    send_int_to_srv(CMD_QUEUE_ADD);
-    send_str_to_srv(file);
-
+    /* Add item to the engine's queue. */
+    engine_queue_add(file);
     logit("Added to queue: %s", file);
   }
   else
   {
-    /* Delete this item from the server's queue. */
-    send_int_to_srv(CMD_QUEUE_DEL);
-    send_str_to_srv(file);
-
+    /* Delete this item from the engine's queue. */
+    engine_queue_del(file);
     logit("Removed from queue: %s", file);
   }
 
@@ -2077,9 +1875,7 @@ static void queue_toggle_file()
 
 static void toggle_option(const char *name)
 {
-  send_int_to_srv(CMD_SET_OPTION);
-  send_str_to_srv(name);
-  send_bool_to_srv(!options_get_bool(name));
+  engine_set_option(name, !options_get_bool(name));
   sync_bool_option(name);
 }
 
@@ -2138,7 +1934,7 @@ static void cmd_clear_playlist()
   clear_playlist();
 }
 
-static void cmd_clear_queue() { send_int_to_srv(CMD_QUEUE_CLEAR); }
+static void cmd_clear_queue() { engine_queue_clear(); }
 
 static void go_to_music_dir()
 {
@@ -2505,20 +2301,17 @@ static void switch_read_tags()
 
 static void seek(const int sec)
 {
-  send_int_to_srv(CMD_SEEK);
-  send_int_to_srv(sec);
+  audio_seek(sec);
 }
 
 static void jump_to(const int sec)
 {
-  send_int_to_srv(CMD_JUMP_TO);
-  send_int_to_srv(sec);
+  engine_jump_to(sec);
 }
 
 static void seek_to_percent(int percent)
 {
-  send_int_to_srv(CMD_JUMP_TO);
-  send_int_to_srv(-percent);
+  engine_jump_to(-percent);
 }
 
 static void delete_item()
@@ -2669,12 +2462,10 @@ static void move_item(const int direction)
 
   swap_playlist_items(file, second_file);
 
-  /* update the server's playlist */
-  if (get_server_plist_serial() == plist_get_serial(playlist))
+  /* update the engine's playlist */
+  if (audio_plist_get_serial() == plist_get_serial(playlist))
   {
-    send_int_to_srv(CMD_LIST_MOVE);
-    send_str_to_srv(file);
-    send_str_to_srv(second_file);
+    audio_plist_move(file, second_file);
   }
 
   free(second_file);
@@ -2699,24 +2490,22 @@ static void cmd_next()
 {
   if (curr_file.state != STATE_STOP)
   {
-    send_int_to_srv(CMD_NEXT);
+    audio_next();
   }
   else if (plist_count(playlist))
   {
     if (plist_get_serial(playlist) != -1 ||
-        get_server_plist_serial() != plist_get_serial(playlist))
+        audio_plist_get_serial() != plist_get_serial(playlist))
     {
       int serial;
 
       send_playlist(playlist, 1);
       serial = get_safe_serial();
       plist_set_serial(playlist, serial);
-      send_int_to_srv(CMD_PLIST_SET_SERIAL);
-      send_int_to_srv(plist_get_serial(playlist));
+      audio_plist_set_serial(plist_get_serial(playlist));
     }
 
-    send_int_to_srv(CMD_PLAY);
-    send_str_to_srv("");
+    audio_play("");
   }
 }
 
@@ -2913,20 +2702,27 @@ static void make_sure_tags_exist(const char *file)
 
     while (!got_it)
     {
-      int type = get_int_from_srv();
-      void *data = get_event_data(type);
+      struct event *e;
 
-      if (type == EV_FILE_TAGS)
+      /* Drain any already-queued events first, then block for more. */
+      if (event_queue_empty(&events))
+        wait_and_drain_engine_events();
+
+      while ((e = event_get_first(&events)) && !got_it)
       {
-        struct tag_ev_response *ev = (struct tag_ev_response *)data;
+        int type   = e->type;
+        void *data = e->data;
+        event_pop(&events);
 
-        if (!strcmp(ev->file, file))
+        if (type == EV_FILE_TAGS)
         {
-          got_it = 1;
+          struct tag_ev_response *ev = (struct tag_ev_response *)data;
+          if (!strcmp(ev->file, file))
+            got_it = 1;
         }
-      }
 
-      server_event(type, data);
+        server_event(type, data);
+      }
     }
   }
 }
@@ -3067,13 +2863,13 @@ static void menu_key(const struct iface_key *k)
         want_quit = QUIT_SERVER;
         break;
       case KEY_CMD_STOP:
-        send_int_to_srv(CMD_STOP);
+        audio_stop();
         break;
       case KEY_CMD_NEXT:
         cmd_next();
         break;
       case KEY_CMD_PREVIOUS:
-        send_int_to_srv(CMD_PREV);
+        audio_prev();
         break;
       case KEY_CMD_PAUSE:
         switch_pause();
@@ -3296,31 +3092,31 @@ static void menu_key(const struct iface_key *k)
         break;
       case KEY_CMD_TOGGLE_MIXER:
         debug("Toggle mixer.");
-        send_int_to_srv(CMD_TOGGLE_MIXER_CHANNEL);
+        engine_toggle_mixer_channel();
         break;
       case KEY_CMD_TOGGLE_SOFTMIXER:
         debug("Toggle softmixer.");
-        send_int_to_srv(CMD_TOGGLE_SOFTMIXER);
+        engine_toggle_softmixer();
         break;
       case KEY_CMD_TOGGLE_EQUALIZER:
         debug("Toggle equalizer.");
-        send_int_to_srv(CMD_TOGGLE_EQUALIZER);
+        engine_toggle_equalizer();
         break;
       case KEY_CMD_EQUALIZER_REFRESH:
         debug("Equalizer Refresh.");
-        send_int_to_srv(CMD_EQUALIZER_REFRESH);
+        engine_equalizer_refresh();
         break;
       case KEY_CMD_EQUALIZER_PREV:
         debug("Equalizer Prev.");
-        send_int_to_srv(CMD_EQUALIZER_PREV);
+        engine_equalizer_prev();
         break;
       case KEY_CMD_EQUALIZER_NEXT:
         debug("Equalizer Next.");
-        send_int_to_srv(CMD_EQUALIZER_NEXT);
+        engine_equalizer_next();
         break;
       case KEY_CMD_TOGGLE_MAKE_MONO:
         debug("Toggle Mono-Mixing.");
-        send_int_to_srv(CMD_TOGGLE_MAKE_MONO);
+        engine_toggle_make_mono();
         break;
       case KEY_CMD_TOGGLE_LAYOUT:
         iface_toggle_layout();
@@ -3350,18 +3146,11 @@ static void menu_key(const struct iface_key *k)
   }
 }
 
-/* Get event from the server and handle it. */
+/* Drain all pending engine events into the local queue for dequeue_events()
+ * to process.  Called when the engine event pipe fd fires in pselect(). */
 static void get_and_handle_event()
 {
-  int type;
-
-  if (!get_int_from_srv_noblock(&type))
-  {
-    debug("Getting event would block.");
-    return;
-  }
-
-  server_event(type, get_event_data(type));
+  drain_engine_events();
 }
 
 /* Handle events from the queue. */
@@ -3389,7 +3178,8 @@ static void handle_interrupt()
   }
 }
 
-void init_interface(const int sock, const int logging, lists_t_strs *args)
+void init_interface(struct engine_event_queue *eq, const int logging,
+                    lists_t_strs *args)
 {
   FILE *logfp;
 
@@ -3412,7 +3202,7 @@ void init_interface(const int sock, const int logging, lists_t_strs *args)
     logit("Could not set locale!");
   }
 
-  srv_sock = sock;
+  g_engine_eq = eq;
 
   file_info_reset(&curr_file);
   file_info_block_init(&curr_file);
@@ -3477,7 +3267,7 @@ void interface_loop()
     struct timespec timeout = {1, 0};
 
     FD_ZERO(&fds);
-    FD_SET(srv_sock, &fds);
+    FD_SET(engine_event_queue_fd(g_engine_eq), &fds);
     FD_SET(STDIN_FILENO, &fds);
 #ifdef HAVE_SYS_INOTIFY_H
     if (inotify_fd >= 0)
@@ -3489,10 +3279,11 @@ void interface_loop()
 
     dequeue_events();
 #ifdef HAVE_SYS_INOTIFY_H
-    ret = pselect(MAX(srv_sock, inotify_fd) + 1, &fds, NULL, NULL, &timeout,
-                  NULL);
+    ret = pselect(MAX(engine_event_queue_fd(g_engine_eq), inotify_fd) + 1,
+                  &fds, NULL, NULL, &timeout, NULL);
 #else
-    ret = pselect(srv_sock + 1, &fds, NULL, NULL, &timeout, NULL);
+    ret = pselect(engine_event_queue_fd(g_engine_eq) + 1, &fds, NULL, NULL,
+                  &timeout, NULL);
 #endif
     if (ret == -1 && !want_quit && errno != EINTR)
     {
@@ -3527,7 +3318,7 @@ void interface_loop()
 
       if (!want_quit)
       {
-        if (FD_ISSET(srv_sock, &fds))
+        if (FD_ISSET(engine_event_queue_fd(g_engine_eq), &fds))
         {
           get_and_handle_event();
         }
@@ -3597,8 +3388,8 @@ void interface_end()
 {
   save_curr_dir();
   save_playlist_in_moc();
-  send_int_to_srv(CMD_QUIT);
-  srv_sock = -1;
+  engine_quit();
+  g_engine_eq = NULL;
 
 #ifdef HAVE_SYS_INOTIFY_H
   if (inotify_wd >= 0)

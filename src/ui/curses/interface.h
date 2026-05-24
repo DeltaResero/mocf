@@ -12,6 +12,7 @@
 #define INTERFACE_H
 
 #include "utils/lists.h"
+#include "core/server.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -45,7 +46,8 @@ extern "C"
     int block_end;
   };
 
-  void init_interface(const int sock, const int logging, lists_t_strs *args);
+  void init_interface(struct engine_event_queue *eq, const int logging,
+                      lists_t_strs *args);
   void interface_loop();
   void interface_end();
   int user_wants_interrupt();

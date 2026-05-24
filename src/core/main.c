@@ -21,7 +21,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/socket.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 #include <signal.h>
@@ -62,20 +61,6 @@ struct parameters
   int debug;
 };
 
-/* Ping the server.
- * Return 1 if the server responds with EV_PONG, otherwise 0. */
-static int ping_server(int sock)
-{
-  int event;
-
-  send_int(sock, CMD_PING);
-  if (!get_int(sock, &event))
-  {
-    fatal("Error when receiving pong response!");
-  }
-  return event == EV_PONG ? 1 : 0;
-}
-
 /* Check if a directory ./.moc exists and create if needed. */
 static void check_moc_dir()
 {
@@ -108,7 +93,7 @@ static void check_moc_dir()
 }
 
 struct server_thread_args {
-  int internal_sock;
+  struct engine_event_queue *eq;
   int debug;
   int foreground;
 };
@@ -117,27 +102,24 @@ static void *server_thread_func(void *arg)
 {
   struct server_thread_args *args = (struct server_thread_args *)arg;
   set_me_server();
-  server_init(args->internal_sock, args->debug, args->foreground);
+  server_init(args->eq, args->debug, args->foreground);
   server_loop();
   free(args);
   return NULL;
 }
 
-/* Run client and the server if needed. */
+/* Run client and server in the same process. */
 static void start_moc(const struct parameters *params, lists_t_strs *args)
 {
-  int sv[2];
   pthread_t server_thread;
   struct server_thread_args *th_args;
+  struct engine_event_queue *eq;
 
-  if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == -1)
-  {
-    fatal("socketpair() failed: %s", xstrerror(errno));
-  }
+  eq = engine_event_queue_new();
 
   th_args = (struct server_thread_args *)xmalloc(sizeof(*th_args));
-  th_args->internal_sock = sv[0];
-  th_args->debug = params->debug;
+  th_args->eq         = eq;
+  th_args->debug      = params->debug;
   th_args->foreground = 1;
 
   if (pthread_create(&server_thread, NULL, server_thread_func, th_args) != 0)
@@ -147,17 +129,17 @@ static void start_moc(const struct parameters *params, lists_t_strs *args)
 
   xsignal(SIGPIPE, SIG_IGN);
 
-  if (!ping_server(sv[1]))
-  {
-    fatal("Can't connect to the server!");
-  }
+  /* Block until the engine thread has finished initialising. */
+  engine_wait_ready();
 
-  init_interface(sv[1], params->debug, args);
+  init_interface(eq, params->debug, args);
   interface_loop();
   interface_end();
 
-  close(sv[1]);
+  /* engine_quit() was called by interface_end(); wait for the thread. */
   pthread_join(server_thread, NULL);
+
+  engine_event_queue_free(eq);
 }
 
 static void show_version()
