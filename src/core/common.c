@@ -47,7 +47,7 @@ void internal_error(const char *file, int line, const char *function,
   msg = format_msg_va(format, va);
   va_end(va);
 
-  interface_error(msg);
+  server_error(file, line, function, msg);
 
   free(msg);
 
