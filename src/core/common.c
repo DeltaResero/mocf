@@ -54,8 +54,7 @@ void internal_error(const char *file, int line, const char *function,
   errno = saved_errno;
 }
 
-/* End program with a message. Use when an error occurs and we can't recover.
- * If we're the server, then also log the message to the system log. */
+/* End program with a message. Use when an error occurs and we can't recover. */
 void internal_fatal(const char *file LOGIT_ONLY, int line LOGIT_ONLY,
                     const char *function LOGIT_ONLY, const char *format, ...)
 {

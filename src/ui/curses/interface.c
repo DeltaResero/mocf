@@ -52,7 +52,7 @@
 #include "audio/processing/softmixer.h"
 #include "utils/utf8.h"
 
-#define INTERFACE_LOG "mocf_client_log"
+#define INTERFACE_LOG "mocf_interface_log"
 #define PLAYLIST_FILE "playlist.m3u"
 
 #define QUEUE_CLEAR_THRESH 128
@@ -64,7 +64,7 @@ static struct plist *playlist = NULL;  /* our playlist */
 static struct plist *queue = NULL;     /* our queue */
 static struct plist *dir_plist = NULL; /* contents of the current directory */
 
-/* Queue for events coming from the server. */
+/* Queue for events coming from the engine. */
 static struct event_queue events;
 
 /* Current working directory (the directory we show). */
@@ -81,8 +81,6 @@ static volatile int wants_interrupt = 0;
 /* If we get SIGWINCH. */
 static volatile int want_resize = 0;
 #endif
-
-/* Are we waiting for the playlist we have loaded and sent to the clients? */
 
 /* Information about the currently played file. */
 static struct file_info curr_file;
@@ -251,14 +249,14 @@ static void sync_bool_option(const char *name)
 }
 
 /* Refresh all option display states from the shared options store. */
-static void get_server_options()
+static void get_engine_options()
 {
   sync_bool_option("Shuffle");
   sync_bool_option("Repeat");
   sync_bool_option("AutoNext");
 }
 
-static int get_server_plist_serial()
+static int get_engine_plist_serial()
 {
   return audio_plist_get_serial();
 }
@@ -629,13 +627,13 @@ static void follow_curr_file()
   if (curr_file.file && file_type(curr_file.file) == F_SOUND &&
       last_menu_move_time <= time(NULL) - 2)
   {
-    int server_plist_serial = get_server_plist_serial();
+    int engine_plist_serial = get_engine_plist_serial();
 
-    if (server_plist_serial == plist_get_serial(playlist))
+    if (engine_plist_serial == plist_get_serial(playlist))
     {
       iface_make_visible(IFACE_MENU_PLIST, curr_file.file);
     }
-    else if (server_plist_serial == plist_get_serial(dir_plist))
+    else if (engine_plist_serial == plist_get_serial(dir_plist))
     {
       iface_make_visible(IFACE_MENU_DIR, curr_file.file);
     }
@@ -730,7 +728,7 @@ static void update_bitrate()
   iface_set_bitrate(curr_file.bitrate);
 }
 
-/* Get and show the server state. */
+/* Get and show the engine state. */
 static void update_state()
 {
   int old_state = curr_file.state;
@@ -813,11 +811,11 @@ static void event_queue_add(const struct plist_item *item)
   }
 }
 
-/* Get error message from the server and show it.  If the message carries an
+/* Get error message from the engine and show it.  If the message carries an
  * embedded file path (format: "\x01<path>\x01<message>"), mark that file in
  * the menu and display only the message portion.  This prefix is added by
  * play_file() when a fatal open error occurs so we know which file failed
- * even after the server has already moved on to the next track. */
+ * even after the engine has already moved on to the next track. */
 static void update_error(char *err)
 {
   if (err[0] == '\x01')
@@ -840,7 +838,7 @@ static void update_error(char *err)
 }
 
 
-static void recv_server_queue(struct plist *q)
+static void recv_engine_queue(struct plist *q)
 {
   struct plist *engine_q;
   int i;
@@ -909,7 +907,7 @@ static void event_plist_del(char *file)
   }
   else
   {
-    logit("Server requested deleting an item not present on the"
+    logit("Engine requested deleting an item not present on the"
           " playlist.");
   }
 }
@@ -1000,7 +998,7 @@ static void server_event(const int event, void *data)
       update_error((char *)data);
       break;
     case EV_OPTIONS:
-      get_server_options();
+      get_engine_options();
       break;
 
     case EV_STATUS_MSG:
@@ -1153,7 +1151,7 @@ static int go_to_dir(const char *dir, const int reload)
     return 0;
   }
 
-  /* TODO: use CMD_ABORT_TAGS_REQUESTS (what if we requested tags for the
+  /* TODO: call engine_abort_tags_requests() here (what if we requested tags for the
    playlist?) */
 
   plist_free(old_dir_plist);
@@ -1320,12 +1318,12 @@ static void enter_first_dir()
   first_run = 0;
 }
 
-static void use_server_queue()
+static void use_engine_queue()
 {
   iface_set_status("Getting the queue...");
   debug("Getting the queue...");
 
-  recv_server_queue(queue);
+  recv_engine_queue(queue);
   iface_set_files_in_queue(plist_count(queue));
   iface_update_queue_positions(queue, playlist, dir_plist, NULL);
   iface_set_status("");
@@ -1703,9 +1701,9 @@ static void add_dir_plist()
 
   plist_remove_common_items(&plist, playlist);
 
-  /* Add the new files to the server's playlist if the server has our
+  /* Add the new files to the engine's playlist if the engine has our
    * playlist. */
-  if (get_server_plist_serial() == plist_get_serial(playlist))
+  if (get_engine_plist_serial() == plist_get_serial(playlist))
   {
     send_playlist(&plist, 0);
   }
@@ -1730,8 +1728,8 @@ static void add_dir_plist()
   free(file);
 }
 
-/* Remove a file from the in-memory playlist and from the server's playlist
- * if the server currently has our list.
+/* Remove a file from the in-memory playlist and from the engine's playlist
+ * if the engine currently has our list.
  * Assumed to be in the playlist menu.
  */
 static void remove_file_from_playlist(const char *file)
@@ -2727,7 +2725,7 @@ static void make_sure_tags_exist(const char *file)
   }
 }
 
-/* Request tags from the server for a file in the playlist or the directory
+/* Request tags from the engine for a file in the playlist or the directory
  * menu, wait until they arrive and return them (malloc()ed). */
 static struct file_tags *get_tags(const char *file)
 {
@@ -3210,14 +3208,13 @@ void init_interface(struct engine_event_queue *eq, const int logging,
   event_queue_init(&events);
   keys_init();
   windows_init();
-  get_server_options();
+  get_engine_options();
   update_mixer_name();
 
 #ifdef HAVE_SYS_INOTIFY_H
   inotify_fd = inotify_init();
   debug("TG: initialization of inotify: %s",
         (inotify_fd == -1) ? xstrerror(errno) : "OK");
-//	debug("TG: values of fds: serv %d, inotify %d",srv_sock,inotify_fd);
 #endif
 
   xsignal(SIGQUIT, sig_quit);
@@ -3244,8 +3241,8 @@ void init_interface(struct engine_event_queue *eq, const int logging,
     enter_first_dir();
   }
 
-  /* Ask the server for queue. */
-  use_server_queue();
+  /* Ask the engine for the queue. */
+  use_engine_queue();
 
   update_state();
 

@@ -198,7 +198,7 @@ void engine_quit(void)
  * ----------------------------------------------------------------------- */
 static struct engine_event_queue *g_eq = NULL;
 
-/* Thread ID of the server thread — used in signal handling. */
+/* Thread ID of the engine thread (used in signal handling) */
 static pthread_t server_tid;
 
 /* Information about currently played file. */
@@ -378,7 +378,7 @@ static void add_event_all(const int event, const void *data)
 
 void server_init(struct engine_event_queue *eq, int debugging, int foreground)
 {
-  logit("Starting MOC Server");
+  logit("Starting MOC Engine");
 
   g_eq = eq;
 
@@ -426,19 +426,19 @@ void server_init(struct engine_event_queue *eq, int debugging, int foreground)
 
 static void server_shutdown(void)
 {
-  logit("Server exiting...");
+  logit("Engine exiting...");
   audio_exit();
   tags_cache_free(tags_cache);
   tags_cache = NULL;
   logit("Running OnServerStop");
   run_extern_cmd("OnServerStop");
-  logit("Server exited");
+  logit("Engine exited");
   log_close();
 }
 
 void server_loop(void)
 {
-  logit("MOC server started, pid: %d", getpid());
+  logit("MOC engine started, pid: %d", getpid());
 
   log_circular_start();
 
