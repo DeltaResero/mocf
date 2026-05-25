@@ -101,7 +101,6 @@ struct server_thread_args {
 static void *server_thread_func(void *arg)
 {
   struct server_thread_args *args = (struct server_thread_args *)arg;
-  set_me_server();
   server_init(args->eq, args->debug, args->foreground);
   server_loop();
   free(args);
