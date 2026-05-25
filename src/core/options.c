@@ -925,8 +925,8 @@ void options_init()
 
   add_bool("AAC_HEAACUpsampling", true);
 
-  add_path("OnServerStart", NULL, CHECK_NONE);
-  add_path("OnServerStop", NULL, CHECK_NONE);
+  add_path("OnEngineStart", NULL, CHECK_NONE);
+  add_path("OnEngineStop", NULL, CHECK_NONE);
   add_path("OnStop", NULL, CHECK_NONE);
 
   add_bool("QueueNextSongReturn", false);

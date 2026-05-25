@@ -413,8 +413,8 @@ void server_init(struct engine_event_queue *eq, int debugging, int foreground)
   xsignal(SIGPIPE, SIG_IGN);
   xsignal(SIGCHLD, sig_chld);
 
-  logit("Running OnServerStart");
-  run_extern_cmd("OnServerStart");
+  logit("Running OnEngineStart");
+  run_extern_cmd("OnEngineStart");
 
   /* Signal the main thread that we are ready to accept commands. */
   engine_signal_ready();
@@ -430,8 +430,8 @@ static void server_shutdown(void)
   audio_exit();
   tags_cache_free(tags_cache);
   tags_cache = NULL;
-  logit("Running OnServerStop");
-  run_extern_cmd("OnServerStop");
+  logit("Running OnEngineStop");
+  run_extern_cmd("OnEngineStop");
   logit("Engine exited");
   log_close();
 }

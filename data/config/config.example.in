@@ -610,10 +610,10 @@
 #
 #OnStop =
 
-# Run OnServerStart or OnServerStop (full path, no arguments) when the audio
+# Run OnEngineStart or OnEngineStop (full path, no arguments) when the audio
 # engine starts or stops.  MOCF does not wait for the commands to finish.
-#OnServerStart =
-#OnServerStop =
+#OnEngineStart =
+#OnEngineStop =
 
 # This option determines which song to play after finishing all the songs
 # in the queue.  Setting this to 'yes' causes MOCF to play the song which
