@@ -982,9 +982,6 @@ static void server_event(const int event, void *data)
     case EV_STATE:
       update_state();
       break;
-    case EV_EXIT:
-      interface_fatal("The server exited!");
-      break;
     case EV_BITRATE:
       update_bitrate();
       break;
@@ -1161,7 +1158,7 @@ static int go_to_dir(const char *dir, const int reload)
   if (!reload && inotify_wd >= 0)
   {
     int res = inotify_rm_watch(inotify_fd, inotify_wd);
-    debug("TG: removing watch: %s", (res == -1) ? xstrerror(errno) : "OK");
+    debug("removing watch: %s", (res == -1) ? xstrerror(errno) : "OK");
   }
 #endif
 
@@ -1190,7 +1187,7 @@ static int go_to_dir(const char *dir, const int reload)
     {
       inotify_wd = inotify_add_watch(inotify_fd, new_dir,
                                      IN_MODIFY | IN_CREATE | IN_DELETE);
-      debug("TG: adding watch for dir %s: %s", new_dir,
+      debug("adding watch for dir %s: %s", new_dir,
             (inotify_wd == -1) ? xstrerror(errno) : "OK");
     }
 #endif
@@ -3213,7 +3210,7 @@ void init_interface(struct engine_event_queue *eq, const int logging,
 
 #ifdef HAVE_SYS_INOTIFY_H
   inotify_fd = inotify_init();
-  debug("TG: initialization of inotify: %s",
+  debug("initialization of inotify: %s",
         (inotify_fd == -1) ? xstrerror(errno) : "OK");
 #endif
 
@@ -3324,7 +3321,7 @@ void interface_loop()
         if (FD_ISSET(inotify_fd, &fds))
         {
           //					char buffer[1024];
-          debug("TG: inotify event, refreshing");
+          debug("inotify event, refreshing");
           {
             char dummy[4096];
             ret = read(inotify_fd, dummy, sizeof(dummy));

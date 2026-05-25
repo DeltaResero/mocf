@@ -58,7 +58,6 @@ extern "C"
 #define EV_BITRATE    0x07  /* the bitrate has changed */
 #define EV_RATE       0x08  /* the rate has changed */
 #define EV_CHANNELS   0x09  /* the number of channels has changed */
-#define EV_EXIT       0x0a  /* the engine is about to exit */
 #define EV_OPTIONS    0x0c  /* an option has changed */
 #define EV_TAGS       0x0e  /* tags for the current file have changed */
 #define EV_STATUS_MSG 0x0f  /* string data: status message */
