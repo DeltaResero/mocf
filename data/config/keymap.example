@@ -61,8 +61,7 @@
 # Default key configuration for MOCF (and a list of all available commands):
 
 # MOCF control keys:
-quit_client           = q
-quit                  = Q
+quit                  = q Q
 
 # Menu and interface control keys:
 go                    = ENTER

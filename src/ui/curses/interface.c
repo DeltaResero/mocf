@@ -102,7 +102,7 @@ static int inotify_wd = -1;
 static void sig_quit(int sig LOGIT_ONLY)
 {
   log_signal(sig);
-  want_quit = QUIT_CLIENT;
+  want_quit = QUIT_APP;
 }
 
 static void sig_interrupt(int sig LOGIT_ONLY)
@@ -2839,8 +2839,8 @@ static void menu_key(const struct iface_key *k)
 
     switch (cmd)
     {
-      case KEY_CMD_QUIT_CLIENT:
-        want_quit = QUIT_CLIENT;
+      case KEY_CMD_QUIT:
+        want_quit = QUIT_APP;
         break;
       case KEY_CMD_GO:
         go_file();
@@ -2853,9 +2853,6 @@ static void menu_key(const struct iface_key *k)
       case KEY_CMD_MENU_LAST:
         iface_menu_key(cmd);
         last_menu_move_time = time(NULL);
-        break;
-      case KEY_CMD_QUIT:
-        want_quit = QUIT_SERVER;
         break;
       case KEY_CMD_STOP:
         audio_stop();

@@ -19,12 +19,11 @@ extern "C"
 {
 #endif
 
-  /* The desired state of the client (and server). */
+  /* The desired state of the application. */
   enum want_quit
   {
-    NO_QUIT,     /* don't want to quit */
-    QUIT_CLIENT, /* only quit the client */
-    QUIT_SERVER  /* quit the client and the server */
+    NO_QUIT,  /* don't want to quit */
+    QUIT_APP  /* quit the application and audio engine */
   };
 
   /* Information about the currently played file. */

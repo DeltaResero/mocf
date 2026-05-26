@@ -18,7 +18,6 @@ extern "C"
 
   enum key_cmd
   {
-    KEY_CMD_QUIT_CLIENT,
     KEY_CMD_GO,
     KEY_CMD_MENU_DOWN,
     KEY_CMD_MENU_UP,
