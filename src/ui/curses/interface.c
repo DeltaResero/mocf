@@ -52,7 +52,6 @@
 #include "audio/processing/softmixer.h"
 #include "utils/utf8.h"
 
-#define INTERFACE_LOG "mocf_interface_log"
 #define PLAYLIST_FILE "playlist.m3u"
 
 #define QUEUE_CLEAR_THRESH 128
@@ -3170,23 +3169,9 @@ static void handle_interrupt()
   }
 }
 
-void init_interface(struct engine_event_queue *eq, const int logging,
-                    lists_t_strs *args)
+void init_interface(struct engine_event_queue *eq, lists_t_strs *args)
 {
-  FILE *logfp;
-
   logit("Starting MOC Interface");
-
-  logfp = NULL;
-  if (logging)
-  {
-    logfp = fopen(INTERFACE_LOG, "a");
-    if (!logfp)
-    {
-      fatal("Can't open client log file: %s", xstrerror(errno));
-    }
-  }
-  log_init_stream(logfp, INTERFACE_LOG);
 
   /* Set locale according to the environment variables. */
   if (!setlocale(LC_CTYPE, ""))

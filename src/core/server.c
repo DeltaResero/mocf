@@ -43,8 +43,6 @@
 #include "audio/processing/softmixer.h"
 #include "audio/processing/equalizer.h"
 
-#define SERVER_LOG "mocf_server_log"
-
 /* -----------------------------------------------------------------------
  * Engine event queue — thread-safe linked-list + pipe wakeup
  * ----------------------------------------------------------------------- */
@@ -376,27 +374,11 @@ static void add_event_all(const int event, const void *data)
  * server_init — open audio, load tags cache, signal ready
  * ----------------------------------------------------------------------- */
 
-void server_init(struct engine_event_queue *eq, int debugging, int foreground)
+void server_init(struct engine_event_queue *eq, int debugging)
 {
   logit("Starting MOC Engine");
 
   g_eq = eq;
-
-  if (foreground)
-  {
-    log_init_stream(stdout, "stdout");
-  }
-  else
-  {
-    FILE *logfp = NULL;
-    if (debugging)
-    {
-      logfp = fopen(SERVER_LOG, "a");
-      if (!logfp)
-        fatal("Can't open server log file: %s", xstrerror(errno));
-    }
-    log_init_stream(logfp, SERVER_LOG);
-  }
 
   log_process_stack_size();
   log_pthread_stack_size();
@@ -407,7 +389,7 @@ void server_init(struct engine_event_queue *eq, int debugging, int foreground)
 
   server_tid = pthread_self();
   xsignal(SIGTERM, sig_exit);
-  xsignal(SIGINT, foreground ? sig_exit : SIG_IGN);
+  xsignal(SIGINT, SIG_IGN);
   xsignal(SIGHUP, SIG_IGN);
   xsignal(SIGQUIT, sig_exit);
   xsignal(SIGPIPE, SIG_IGN);

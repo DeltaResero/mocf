@@ -60,7 +60,7 @@ extern "C"
   void engine_quit(void);
 
   /* Start the engine: open audio, load tags cache, then signal ready. */
-  void server_init(struct engine_event_queue *eq, int debug, int foreground);
+  void server_init(struct engine_event_queue *eq, int debug);
 
   /* The engine thread's main loop — waits for engine_quit(), then shuts
    * down audio and tags cache. */

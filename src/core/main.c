@@ -95,13 +95,12 @@ static void check_moc_dir()
 struct server_thread_args {
   struct engine_event_queue *eq;
   int debug;
-  int foreground;
 };
 
 static void *server_thread_func(void *arg)
 {
   struct server_thread_args *args = (struct server_thread_args *)arg;
-  server_init(args->eq, args->debug, args->foreground);
+  server_init(args->eq, args->debug);
   server_loop();
   free(args);
   return NULL;
@@ -117,9 +116,18 @@ static void start_moc(const struct parameters *params, lists_t_strs *args)
   eq = engine_event_queue_new();
 
   th_args = (struct server_thread_args *)xmalloc(sizeof(*th_args));
-  th_args->eq         = eq;
-  th_args->debug      = params->debug;
-  th_args->foreground = 1;
+  th_args->eq    = eq;
+  th_args->debug = params->debug;
+
+  if (params->debug)
+  {
+    FILE *logfp = fopen(create_file_name("mocf.log"), "a");
+    if (!logfp)
+    {
+      fatal("Can't open log file: %s", xstrerror(errno));
+    }
+    log_init_stream(logfp, "mocf.log");
+  }
 
   if (pthread_create(&server_thread, NULL, server_thread_func, th_args) != 0)
   {
@@ -131,7 +139,7 @@ static void start_moc(const struct parameters *params, lists_t_strs *args)
   /* Block until the engine thread has finished initialising. */
   engine_wait_ready();
 
-  init_interface(eq, params->debug, args);
+  init_interface(eq, args);
   interface_loop();
   interface_end();
 

@@ -45,8 +45,7 @@ extern "C"
     int block_end;
   };
 
-  void init_interface(struct engine_event_queue *eq, const int logging,
-                      lists_t_strs *args);
+  void init_interface(struct engine_event_queue *eq, lists_t_strs *args);
   void interface_loop();
   void interface_end();
   int user_wants_interrupt();
