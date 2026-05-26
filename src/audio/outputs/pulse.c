@@ -398,25 +398,23 @@ static int pulse_open(struct sound_params *sound_params)
   /* Only set the global stream now that it is actually ready */
   stream = s;
 
-  /* Sync stream_volume with the value the server set on this stream.
-   * module-stream-restore (or PipeWire's equivalent) will have applied
-   * the last remembered volume; read it back so our in-memory state and
-   * the UI reflect reality rather than the stale startup default. */
+  /* Apply our saved stream_volume to the new stream.  PulseAudio's
+   * module-stream-restore (and PipeWire's equivalent) remembers volume
+   * per stream key, which encodes the sample spec (channels, rate,
+   * format).  This means a 5.1 AC3 stream and a stereo MP3 stream have
+   * independent remembered volumes on the server side, so the value
+   * restored on open will differ between formats.  We maintain a single
+   * authoritative volume in stream_volume and push it to every new
+   * stream so the user always gets a consistent level regardless of
+   * the audio format being decoded. */
   {
-    int restored_vol = 0;
-    pa_operation *op = pa_context_get_sink_input_info(
-        context, pa_stream_get_index(stream),
-        sink_input_volume_cb, &restored_vol);
-    while (pa_operation_get_state(op) == PA_OPERATION_RUNNING)
-    {
-      pa_threaded_mainloop_wait(mainloop);
-    }
+    pa_cvolume v;
+    pa_operation *op;
+    pa_cvolume_set(&v, 1, stream_volume * PA_VOLUME_NORM / 100);
+    op = pa_context_set_sink_input_volume(context, pa_stream_get_index(stream),
+                                          &v, NULL, NULL);
     pa_operation_unref(op);
-    if (restored_vol > 0)
-    {
-      stream_volume = restored_vol;
-      logit("Pulse: server-side stream volume is %d%%", stream_volume);
-    }
+    logit("Pulse: applied stream_volume %d%% to new stream", stream_volume);
   }
 
   pa_threaded_mainloop_unlock(mainloop);
