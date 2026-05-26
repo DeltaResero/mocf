@@ -3196,12 +3196,6 @@ void init_interface(struct engine_event_queue *eq, lists_t_strs *args)
   use_engine_queue();
 
   update_state();
-
-  if (options_get_bool("CanStartInPlaylist") && curr_file.file &&
-      plist_find_fname(playlist, curr_file.file) != -1)
-  {
-    iface_switch_to_plist();
-  }
 }
 
 void interface_loop()
