@@ -84,7 +84,7 @@ static void strip_string(char *str)
 
 /* Load M3U file into plist.  Return the number of items read. */
 static int plist_load_m3u(struct plist *plist, const char *fname,
-                          const char *cwd, const int load_serial)
+                          const char *cwd)
 {
   FILE *file;
   char *line = NULL;
@@ -193,24 +193,6 @@ static int plist_load_m3u(struct plist *plist, const char *fname,
       }
 
       after_extinf = 0;
-    }
-    else if (load_serial &&
-             !strncmp(line, "#MOCSERIAL: ", sizeof("#MOCSERIAL: ") - 1))
-    {
-      char *serial_str = line + sizeof("#MOCSERIAL: ") - 1;
-
-      if (serial_str[0])
-      {
-        char *err;
-        long serial;
-
-        serial = strtol(serial_str, &err, 0);
-        if (!*err)
-        {
-          plist_set_serial(plist, serial);
-          logit("Got MOCSERIAL tag with serial %ld", serial);
-        }
-      }
     }
     free(line);
   }
@@ -363,7 +345,7 @@ static int plist_load_pls(struct plist *plist, const char *fname,
     /* Assume that it is a pls file version 1 - plist_load_m3u()
      * should handle it like an m3u file without the m3u extensions. */
     fclose(file);
-    return plist_load_m3u(plist, fname, cwd, 0);
+    return plist_load_m3u(plist, fname, cwd);
   }
 
   nitems = strtol(line, &e, 10);
@@ -447,8 +429,7 @@ err:
 
 /* Load a playlist into plist. Return the number of items on the list. */
 /* The playlist may have deleted items. */
-int plist_load(struct plist *plist, const char *fname, const char *cwd,
-               const int load_serial)
+int plist_load(struct plist *plist, const char *fname, const char *cwd)
 {
   int num, read_tags;
   const char *ext;
@@ -462,7 +443,7 @@ int plist_load(struct plist *plist, const char *fname, const char *cwd,
   }
   else
   {
-    num = plist_load_m3u(plist, fname, cwd, load_serial);
+    num = plist_load_m3u(plist, fname, cwd);
   }
 
   if (read_tags)
@@ -477,12 +458,9 @@ int plist_load(struct plist *plist, const char *fname, const char *cwd,
   return num;
 }
 
-/* Save plist in m3u format. Strip paths by strip_path bytes.
- * If save_serial is not 0, the playlist serial is saved in a
- * comment. */
+/* Save plist in m3u format. Strip paths by strip_path bytes. */
 static int plist_save_m3u(struct plist *plist, const char *fname,
-                          const int strip_path, const int save_serial,
-                          const bool save_tags)
+                          const int strip_path, const bool save_tags)
 {
   FILE *file = NULL;
   int i, ret, result = 0;
@@ -510,13 +488,6 @@ static int plist_save_m3u(struct plist *plist, const char *fname,
       error_errno("Error writing playlist", errno);
       goto err;
     }
-  }
-
-  if (save_serial &&
-      fprintf(file, "#MOCSERIAL: %d\r\n", plist_get_serial(plist)) < 0)
-  {
-    error_errno("Error writing playlist", errno);
-    goto err;
   }
 
   for (i = 0; i < plist->num; i++)
@@ -579,8 +550,7 @@ err:
 
 /* Save the playlist into the file. Return 0 on error. If cwd is NULL, use
  * absolute paths. */
-int plist_save(struct plist *plist, const char *file, const int save_serial,
-               const bool save_tags)
+int plist_save(struct plist *plist, const char *file, const bool save_tags)
 {
   int offset = 0;
   char *dir, *file_copy;
@@ -614,7 +584,7 @@ int plist_save(struct plist *plist, const char *file, const int save_serial,
     free(file_copy);
   }
 
-  return plist_save_m3u(plist, file, offset, save_serial, save_tags);
+  return plist_save_m3u(plist, file, offset, save_tags);
 }
 
 // EOF

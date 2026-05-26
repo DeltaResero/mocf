@@ -1714,24 +1714,6 @@ void audio_state_started_playing()
   state_change();
 }
 
-int audio_plist_get_serial()
-{
-  int serial;
-
-  LOCK(plist_mtx);
-  serial = plist_get_serial(&playlist);
-  UNLOCK(plist_mtx);
-
-  return serial;
-}
-
-void audio_plist_set_serial(const int serial)
-{
-  LOCK(plist_mtx);
-  plist_set_serial(&playlist, serial);
-  UNLOCK(plist_mtx);
-}
-
 /* Swap 2 files on the playlist. */
 void audio_plist_move(const char *file1, const char *file2)
 {

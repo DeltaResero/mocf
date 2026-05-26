@@ -72,6 +72,14 @@ static char cwd[PATH_MAX] = "";
 /* If the user presses quit, or we receive a termination signal. */
 static volatile enum want_quit want_quit = NO_QUIT;
 
+/* Set to true when the UI playlist has been modified and differs from what
+ * the engine last received. Replaces the legacy serial-number sync logic. */
+static bool playlist_dirty = false;
+
+/* Pointer to whichever plist the engine currently has loaded (NULL = none).
+ * Used alongside playlist_dirty to decide when a full resend is needed. */
+static struct plist *engine_plist = NULL;
+
 /* If user presses CTRL-C, set this to 1.  This should interrupt long
  * operations which block the interface. */
 static volatile int wants_interrupt = 0;
@@ -165,9 +173,6 @@ static void init_playlists()
   plist_init(playlist);
   queue = (struct plist *)xmalloc(sizeof(struct plist));
   plist_init(queue);
-
-  /* Assign a unique serial number to the playlist. */
-  plist_set_serial(playlist, engine_gen_serial());
 }
 
 static void file_info_reset(struct file_info *f)
@@ -253,11 +258,6 @@ static void get_engine_options()
   sync_bool_option("Shuffle");
   sync_bool_option("Repeat");
   sync_bool_option("AutoNext");
-}
-
-static int get_engine_plist_serial()
-{
-  return audio_plist_get_serial();
 }
 
 static int get_mixer_value()
@@ -626,13 +626,11 @@ static void follow_curr_file()
   if (curr_file.file && file_type(curr_file.file) == F_SOUND &&
       last_menu_move_time <= time(NULL) - 2)
   {
-    int engine_plist_serial = get_engine_plist_serial();
-
-    if (engine_plist_serial == plist_get_serial(playlist))
+    if (plist_find_fname(playlist, curr_file.file) != -1)
     {
       iface_make_visible(IFACE_MENU_PLIST, curr_file.file);
     }
-    else if (engine_plist_serial == plist_get_serial(dir_plist))
+    else if (plist_find_fname(dir_plist, curr_file.file) != -1)
     {
       iface_make_visible(IFACE_MENU_DIR, curr_file.file);
     }
@@ -868,6 +866,7 @@ static void clear_playlist()
   iface_clear_plist();
   interface_message("The playlist was cleared.");
   iface_set_status("");
+  playlist_dirty = true;
 }
 
 static void clear_queue()
@@ -946,6 +945,7 @@ static void swap_playlist_items(const char *file1, const char *file2)
 
   plist_swap_files(playlist, file1, file2);
   iface_swap_plist_items(file1, file2);
+  playlist_dirty = true;
 }
 
 /* Move an item in the playlist. */
@@ -1237,8 +1237,7 @@ static void toggle_menu()
 }
 
 /* Load the playlist file and switch the menu to it. Return 1 on success. */
-static int go_to_playlist(const char *file, const int load_serial,
-                          bool default_playlist)
+static int go_to_playlist(const char *file, bool default_playlist)
 {
   if (plist_count(playlist))
   {
@@ -1250,7 +1249,7 @@ static int go_to_playlist(const char *file, const int load_serial,
   plist_clear(playlist);
 
   iface_set_status("Loading playlist...");
-  if (plist_load(playlist, file, cwd, load_serial))
+  if (plist_load(playlist, file, cwd))
   {
     if (!default_playlist)
     {
@@ -1285,7 +1284,7 @@ static void enter_first_dir()
     {
       set_cwd(music_dir);
       if (first_run && file_type(music_dir) == F_PLAYLIST &&
-          plist_count(playlist) == 0 && go_to_playlist(music_dir, 0, false))
+          plist_count(playlist) == 0 && go_to_playlist(music_dir, false))
       {
         cwd[0] = 0;
         first_run = 0;
@@ -1356,7 +1355,7 @@ static void process_plist_arg(const char *file)
   *slash = 0;
 
   iface_set_status("Loading playlist...");
-  plist_load(playlist, file, path, 0);
+  plist_load(playlist, file, path);
   iface_set_status("");
 }
 
@@ -1417,7 +1416,7 @@ static void process_multiple_args(lists_t_strs *args)
       assert(slash != NULL);
       *slash = 0;
 
-      plist_load(playlist, path, plist_dir, 0);
+      plist_load(playlist, path, plist_dir);
 
       free(plist_dir);
     }
@@ -1469,7 +1468,7 @@ static void load_playlist()
 
   if (file_type(plist_file) == F_PLAYLIST)
   {
-    go_to_playlist(plist_file, 1, true);
+    go_to_playlist(plist_file, true);
   }
 }
 
@@ -1515,19 +1514,6 @@ static void go_dir_up()
   free(dir);
 }
 
-/* Return a fresh playlist serial that differs from our current playlist's. */
-static int get_safe_serial()
-{
-  int serial;
-
-  do
-  {
-    serial = engine_gen_serial();
-  } while (playlist && serial == plist_get_serial(playlist));
-
-  return serial;
-}
-
 /* Send the playlist to the engine. If clear != 0, clear the engine's playlist
  * before sending. */
 static void send_playlist(struct plist *plist, const int clear)
@@ -1571,18 +1557,12 @@ static void play_it(const char *file)
     sync_bool_option("Shuffle");
   }
 
-  if (plist_get_serial(curr_plist) == -1 ||
-      audio_plist_get_serial() != plist_get_serial(curr_plist))
+  if (curr_plist == dir_plist || curr_plist != engine_plist || playlist_dirty)
   {
-    int serial;
-
-    logit("The engine has a different playlist");
-
-    serial = get_safe_serial();
-    plist_set_serial(curr_plist, serial);
-    audio_plist_set_serial(serial);
-
+    logit("Sending playlist to engine");
     send_playlist(curr_plist, 1);
+    engine_plist = curr_plist;
+    playlist_dirty = false;
   }
   audio_play(file);
 }
@@ -1615,7 +1595,7 @@ static void go_file()
   }
   else if (type == F_PLAYLIST)
   {
-    go_to_playlist(file, 0, false);
+    go_to_playlist(file, false);
   }
 
   free(file);
@@ -1692,17 +1672,14 @@ static void add_dir_plist()
   }
   else
   {
-    plist_load(&plist, file, cwd, 0);
+    plist_load(&plist, file, cwd);
   }
 
   plist_remove_common_items(&plist, playlist);
 
   /* Add the new files to the engine's playlist if the engine has our
    * playlist. */
-  if (get_engine_plist_serial() == plist_get_serial(playlist))
-  {
-    send_playlist(&plist, 0);
-  }
+  playlist_dirty = true;
 
   {
     int i;
@@ -1746,11 +1723,11 @@ static void remove_file_from_playlist(const char *file)
     clear_playlist();
   }
 
-  /* Delete this item from the engine's playlist if it has our playlist. */
-  if (audio_plist_get_serial() == plist_get_serial(playlist))
-  {
+  /* Delete this item from the engine's playlist if it currently has ours. */
+  if (engine_plist == playlist)
     audio_plist_delete(file);
-  }
+  else
+    playlist_dirty = true;
 }
 
 /* Remove all dead entries (point to non-existent or unreadable). */
@@ -1812,11 +1789,11 @@ static void add_file_plist()
     added = plist_add_from_item(playlist, item);
     iface_add_to_plist(playlist, added);
 
-    /* Add to the engine's playlist if the engine has our playlist. */
-    if (audio_plist_get_serial() == plist_get_serial(playlist))
-    {
+    /* Add to the engine's playlist if it currently has ours. */
+    if (engine_plist == playlist)
       audio_plist_add(file);
-    }
+    else
+      playlist_dirty = true;
   }
   else
   {
@@ -1951,7 +1928,7 @@ static void go_to_music_dir()
       go_to_dir(music_dir, 0);
       break;
     case F_PLAYLIST:
-      go_to_playlist(music_dir, 0, false);
+      go_to_playlist(music_dir, false);
       break;
     default:
       error("MusicDir is neither a directory nor a playlist!");
@@ -2097,7 +2074,7 @@ static void entry_key_search(const struct iface_key *k)
       }
       else if (file_type(file) == F_PLAYLIST)
       {
-        go_to_playlist(file, 0, false);
+        go_to_playlist(file, false);
       }
       else
       {
@@ -2114,7 +2091,7 @@ static void entry_key_search(const struct iface_key *k)
   }
 }
 
-static void save_playlist(const char *file, const int save_serial)
+static void save_playlist(const char *file)
 {
   iface_set_status("Saving the playlist...");
   if (options_get_bool("SavePlaylistTags"))
@@ -2127,7 +2104,7 @@ static void save_playlist(const char *file, const int save_serial)
   }
 
   if (plist_save(
-          playlist, file, save_serial,
+          playlist, file,
           (options_get_bool("SavePlaylistTags") && !user_wants_interrupt())))
   {
     interface_message("Playlist saved");
@@ -2167,7 +2144,7 @@ static void entry_key_plist_save(const struct iface_key *k)
       }
       else
       {
-        save_playlist(file, 0);
+        save_playlist(file);
 
         if (iface_in_dir_menu())
         {
@@ -2196,7 +2173,7 @@ static void entry_key_plist_overwrite(const struct iface_key *k)
 
     iface_entry_disable();
 
-    save_playlist(file, 0);
+    save_playlist(file);
     if (iface_in_dir_menu())
     {
       reread_dir();
@@ -2456,11 +2433,10 @@ static void move_item(const int direction)
 
   swap_playlist_items(file, second_file);
 
-  /* update the engine's playlist */
-  if (audio_plist_get_serial() == plist_get_serial(playlist))
-  {
+  /* Update the engine's playlist if it currently has ours. */
+  if (engine_plist == playlist)
     audio_plist_move(file, second_file);
-  }
+  /* playlist_dirty already set by swap_playlist_items */
 
   free(second_file);
   free(file);
@@ -2488,15 +2464,11 @@ static void cmd_next()
   }
   else if (plist_count(playlist))
   {
-    if (plist_get_serial(playlist) != -1 ||
-        audio_plist_get_serial() != plist_get_serial(playlist))
+    if (engine_plist != playlist || playlist_dirty)
     {
-      int serial;
-
       send_playlist(playlist, 1);
-      serial = get_safe_serial();
-      plist_set_serial(playlist, serial);
-      audio_plist_set_serial(plist_get_serial(playlist));
+      engine_plist = playlist;
+      playlist_dirty = false;
     }
 
     audio_play("");
@@ -3352,7 +3324,7 @@ static void save_playlist_in_moc()
 
   if (plist_count(playlist) && options_get_bool("SavePlaylist"))
   {
-    save_playlist(plist_file, 1);
+    save_playlist(plist_file);
   }
   else
   {

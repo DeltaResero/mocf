@@ -64,7 +64,6 @@ extern "C"
     int allocated;   /* Number of allocated elements */
     int not_deleted; /* Number of non-deleted items */
     struct plist_item *items;
-    int serial;          /* Optional serial number of this playlist */
     int total_time;      /* Total time for files on the playlist */
     int items_with_time; /* Number of items for which the time is set. */
 
@@ -106,8 +105,6 @@ extern "C"
   void plist_swap_first_fname(struct plist *plist, const char *fname);
   struct plist_item *plist_new_item();
   void plist_free_item_fields(struct plist_item *item);
-  void plist_set_serial(struct plist *plist, const int serial);
-  int plist_get_serial(const struct plist *plist);
   int plist_last(const struct plist *plist);
   int plist_find_del_fname(const struct plist *plist, const char *file);
   const char *plist_get_next_dead_entry(const struct plist *plist,

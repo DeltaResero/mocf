@@ -514,25 +514,6 @@ int engine_get_rate(void)        { return sound_info.rate; }
 int engine_get_channels(void)    { return sound_info.channels; }
 
 /* -----------------------------------------------------------------------
- * Serial number generator
- * ----------------------------------------------------------------------- */
-
-int engine_gen_serial(void)
-{
-  static int seed = 0;
-  int serial;
-
-  do
-  {
-    serial = (seed << 8);
-    seed   = (seed + 1) & 0xFF;
-  } while (serial == audio_plist_get_serial());
-
-  debug("Generated serial %d", serial);
-  return serial;
-}
-
-/* -----------------------------------------------------------------------
  * Option sync
  * ----------------------------------------------------------------------- */
 
