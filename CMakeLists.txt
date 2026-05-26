@@ -120,7 +120,6 @@ pkg_check_modules(POPT REQUIRED popt)
 
 # Header checks
 check_include_file(strings.h HAVE_STRINGS_H)
-check_include_file(sys/un.h HAVE_SYS_UN_H)
 check_include_file(sys/ioctl.h HAVE_SYS_IOCTL_H)
 check_include_file(sys/param.h HAVE_SYS_PARAM_H)
 check_include_file(byteswap.h HAVE_BYTESWAP_H)

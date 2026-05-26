@@ -11,7 +11,6 @@
 
 /* System Headers */
 #cmakedefine HAVE_STRINGS_H 1
-#cmakedefine HAVE_SYS_UN_H 1
 #cmakedefine HAVE_SYS_IOCTL_H 1
 #cmakedefine HAVE_SYS_PARAM_H 1
 #cmakedefine HAVE_BYTESWAP_H 1
