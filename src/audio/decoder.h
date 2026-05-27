@@ -62,14 +62,12 @@ extern "C"
 
     /** Initialize the plugin.
      *
-     * This function is called once at MOC startup (once for the client and
-     * once for the server). Optional. */
+     * This function is called once at application startup. Optional. */
     void (*init)();
 
     /** Cleanup the plugin.
      *
-     * This function is called once at exit (once for the client and
-     * once for the server). Optional. */
+     * This function is called once at application exit. Optional. */
     void (*destroy)();
 
     /** Open the resource.
