@@ -163,7 +163,7 @@
 
 # Save software mixer state?
 # If enabled, a file 'softmixer' will be created in '~/.mocf/' storing the
-# mixersetting set when the server is shut down.
+# mixersetting set when the player is shut down.
 # Note that there is a "hidden" 'Amplification' setting in that file.
 # Amplification (0-200) is used to scale the mixer setting (0-100).  This
 # results in a higher signal amplitude but may also produce clipping.
@@ -171,7 +171,7 @@
 
 # Save equalizer state?
 # If enabled, a file 'equalizer' will be created in '~/.mocf/' storing the
-# equalizer settings when the server is shut down.
+# equalizer settings when the player is shut down.
 # Note that there is a "hidden" 'Mixin' setting in that file.
 # Mixin (0.0-1.0) is used to determine how much of the original signal is
 # used after equalizing.  0 means to only use the equalized sound, while 1
