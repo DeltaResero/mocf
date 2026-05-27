@@ -808,30 +808,11 @@ static void event_queue_add(const struct plist_item *item)
   }
 }
 
-/* Get error message from the engine and show it.  If the message carries an
- * embedded file path (format: "\x01<path>\x01<message>"), mark that file in
- * the menu and display only the message portion.  This prefix is added by
- * play_file() when a fatal open error occurs so we know which file failed
- * even after the engine has already moved on to the next track. */
-static void update_error(char *err)
+static void update_error(struct srv_error_ev *data)
 {
-  if (err[0] == '\x01')
-  {
-    char *sep = strchr(err + 1, '\x01');
-    if (sep)
-    {
-      *sep = '\0';
-      const char *failed_file = err + 1;
-      const char *message     = sep + 1;
-
-      error("%s", message);
-      iface_mark_file_error(failed_file);
-      *sep = '\x01'; /* restore for caller's free() */
-      return;
-    }
-  }
-
-  error("%s", err);
+  error("%s", data->msg);
+  if (data->file && data->file[0])
+    iface_mark_file_error(data->file);
 }
 
 
@@ -991,7 +972,7 @@ static void server_event(const int event, void *data)
       update_channels();
       break;
     case EV_SRV_ERROR:
-      update_error((char *)data);
+      update_error((struct srv_error_ev *)data);
       break;
     case EV_OPTIONS:
       get_engine_options();

@@ -51,6 +51,13 @@ extern "C"
     char *to;
   };
 
+  /* Data carried by EV_SRV_ERROR events. */
+  struct srv_error_ev
+  {
+    char *file; /* path of the file that failed to open */
+    char *msg;  /* human-readable error message         */
+  };
+
 /* Definition of events sent by the engine to the UI. */
 #define EV_STATE      0x01  /* player state has changed */
 #define EV_CTIME      0x02  /* current time of the song has changed */

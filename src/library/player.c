@@ -815,10 +815,7 @@ static void play_file(const char *file, const struct decoder *f,
     {
       f->close(decoder_data);
       status_msg("");
-      /* Prefix with \x01<file>\x01 so the UI can identify which file
-       * failed without a protocol change.  The client strips this prefix
-       * before displaying the message. */
-      error("\x01%s\x01%s", file, err.err);
+      engine_error(file, err.err);
       decoder_error_clear(&err);
       logit("Can't open file, exiting");
       return;

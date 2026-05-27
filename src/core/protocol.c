@@ -104,8 +104,14 @@ void free_event_data(const int type, void *data)
   {
     free_tag_ev_data((struct tag_ev_response *)data);
   }
-  else if (type == EV_STATUS_MSG || type == EV_SRV_ERROR ||
-           type == EV_QUEUE_DEL)
+  else if (type == EV_SRV_ERROR)
+  {
+    struct srv_error_ev *e = (struct srv_error_ev *)data;
+    free(e->file);
+    free(e->msg);
+    free(e);
+  }
+  else if (type == EV_STATUS_MSG || type == EV_QUEUE_DEL)
   {
     free(data);
   }

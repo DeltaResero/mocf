@@ -345,10 +345,17 @@ static void add_event_all(const int event, const void *data)
       data_copy = plist_new_item();
       plist_item_copy(data_copy, data);
     }
-    else if (event == EV_QUEUE_DEL ||
-             event == EV_STATUS_MSG || event == EV_SRV_ERROR)
+    else if (event == EV_QUEUE_DEL || event == EV_STATUS_MSG)
     {
       data_copy = xstrdup(data);
+    }
+    else if (event == EV_SRV_ERROR)
+    {
+      const struct srv_error_ev *src = (const struct srv_error_ev *)data;
+      struct srv_error_ev *e = (struct srv_error_ev *)xmalloc(sizeof(*e));
+      e->file = xstrdup(src->file);
+      e->msg  = xstrdup(src->msg);
+      data_copy = e;
     }
     else if (event == EV_QUEUE_MOVE)
     {
@@ -497,11 +504,19 @@ void server_queue_pop(const char *filename)
   add_event_all(EV_QUEUE_DEL, filename);
 }
 
+void engine_error(const char *file, const char *msg)
+{
+  struct srv_error_ev *e = (struct srv_error_ev *)xmalloc(sizeof(*e));
+  e->file = xstrdup(file);
+  e->msg  = xstrdup(msg);
+  add_event_all(EV_SRV_ERROR, e);
+}
+
 void server_error(const char *file, int line, const char *function,
                   const char *msg)
 {
   internal_logit(file, line, function, "ERROR: %s", msg);
-  add_event_all(EV_SRV_ERROR, msg);
+  engine_error("", msg);
 }
 
 /* -----------------------------------------------------------------------

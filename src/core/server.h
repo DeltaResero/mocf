@@ -71,6 +71,7 @@ extern "C"
    * ----------------------------------------------------------------------- */
   void server_error(const char *file, int line, const char *function,
                     const char *msg);
+  void engine_error(const char *file, const char *msg);
   void state_change(void);
   void set_info_rate(const int rate);
   void set_info_channels(const int channels);
