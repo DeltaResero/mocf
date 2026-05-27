@@ -876,7 +876,6 @@ void options_init()
   add_list("Layout3", NULL, CHECK_FUNCTION);
 
   add_bool("FollowPlayedFile", true);
-  add_bool("CanStartInPlaylist", true);
 
   add_bool("UseCursorSelection", false);
   add_bool("SetXtermTitle", true);

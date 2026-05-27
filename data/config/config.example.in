@@ -462,12 +462,6 @@
 # played file is visible?
 #FollowPlayedFile = yes
 
-# When opening mocf while playback is already active, switch to the playlist
-# pane if CanStartInPlaylist is set to 'yes'.  When set to 'no', start in
-# from the last directory.
-#CanStartInPlaylist = yes
-
-
 # Display the cursor in the line with the selected file.  Some braille
 # readers (the Handy Tech modular series ZMU 737, for example) use the
 # cursor to focus and can make use of it to present the file line even
