@@ -748,50 +748,6 @@ static void update_state()
   update_ctime();
 }
 
-/* Update playlist with a new item. */
-static void event_plist_add(const struct plist_item *item)
-{
-  if (plist_find_fname(playlist, item->file) == -1)
-  {
-    int item_num = plist_add_from_item(playlist, item);
-    int needed_tags = 0;
-    int i;
-
-    if (options_get_bool("ReadTags") && (!item->tags || !item->tags->title))
-    {
-      needed_tags |= TAGS_COMMENTS;
-    }
-    if (!strcasecmp(options_get_symb("ShowTime"), "yes") &&
-        (!item->tags || item->tags->time == -1))
-    {
-      needed_tags |= TAGS_TIME;
-    }
-
-    if (needed_tags)
-    {
-      send_tags_request(item->file, needed_tags);
-    }
-
-    if (options_get_bool("ReadTags"))
-    {
-      make_tags_title(playlist, item_num);
-    }
-    else
-    {
-      make_file_title(playlist, item_num,
-                      options_get_bool("HideFileExtension"));
-    }
-
-    /* Update queue position if this file is already queued. */
-    if ((i = plist_find_fname(queue, item->file)) != -1)
-    {
-      playlist->items[item_num].queue_pos = plist_get_position(queue, i);
-    }
-
-    iface_add_to_plist(playlist, item_num);
-  }
-}
-
 /* Handle EV_QUEUE_ADD. */
 static void event_queue_add(const struct plist_item *item)
 {
@@ -860,37 +816,6 @@ static void clear_queue()
   interface_message("The queue was cleared.");
 }
 
-/* Remove an item from the playlist. */
-static void event_plist_del(char *file)
-{
-  int item = plist_find_fname(playlist, file);
-
-  if (item != -1)
-  {
-    char *file;
-    int have_all_times;
-    int playlist_total_time;
-
-    file = plist_get_file(playlist, item);
-    plist_delete(playlist, item);
-
-    iface_del_plist_item(file);
-    playlist_total_time = plist_total_time(playlist, &have_all_times);
-    iface_plist_set_total_time(playlist_total_time, have_all_times);
-    free(file);
-
-    if (plist_count(playlist) == 0)
-    {
-      clear_playlist();
-    }
-  }
-  else
-  {
-    logit("Engine requested deleting an item not present on the"
-          " playlist.");
-  }
-}
-
 /* Handle EV_QUEUE_DEL. */
 static void event_queue_del(char *file)
 {
@@ -927,16 +852,6 @@ static void swap_playlist_items(const char *file1, const char *file2)
   plist_swap_files(playlist, file1, file2);
   iface_swap_plist_items(file1, file2);
   playlist_dirty = true;
-}
-
-/* Move an item in the playlist. */
-static void event_plist_move(const struct move_ev_data *d)
-{
-  assert(d != NULL);
-  assert(d->from != NULL);
-  assert(d->to != NULL);
-
-  swap_playlist_items(d->from, d->to);
 }
 
 /* Handle EV_QUEUE_MOVE. */
