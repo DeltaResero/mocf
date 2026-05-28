@@ -382,6 +382,12 @@ static void precache_wait(struct precache *precache)
 static void precache_reset(struct precache *precache)
 {
   assert(!precache->running);
+
+  if (precache->ok)
+  {
+    precache->f->close(precache->decoder_data);
+  }
+
   precache->ok = 0;
   if (precache->file)
   {
@@ -653,10 +659,9 @@ static void decode_loop(const struct decoder *f, void *decoder_data,
 
   out_buf_wait(out_buf);
 
-  if (precache.ok && (stopped || !options_get_bool("AutoNext")))
+  if (stopped || !options_get_bool("AutoNext"))
   {
     precache_wait(&precache);
-    precache.f->close(precache.decoder_data);
     precache_reset(&precache);
   }
 }
@@ -742,7 +747,6 @@ static void play_file(const char *file, const struct decoder *f,
   if (precache.ok && strcmp(precache.file, file))
   {
     logit("The precached file is not the file we want.");
-    precache.f->close(precache.decoder_data);
     precache_reset(&precache);
   }
 
@@ -756,6 +760,10 @@ static void play_file(const char *file, const struct decoder *f,
 
     sound_params = precache.sound_params;
     decoder_data = precache.decoder_data;
+
+    /* We now own decoder_data; prevent precache_reset() from closing it. */
+    precache.ok = 0;
+
     set_info_channels(sound_params.channels);
     set_info_rate(sound_params.rate / 1000);
 
