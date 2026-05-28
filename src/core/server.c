@@ -381,7 +381,7 @@ static void add_event_all(const int event, const void *data)
  * server_init — open audio, load tags cache, signal ready
  * ----------------------------------------------------------------------- */
 
-void server_init(struct engine_event_queue *eq, int debugging)
+void server_init(struct engine_event_queue *eq)
 {
   logit("Starting MOC Engine");
 

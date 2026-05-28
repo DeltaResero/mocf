@@ -94,13 +94,12 @@ static void check_moc_dir()
 
 struct server_thread_args {
   struct engine_event_queue *eq;
-  int debug;
 };
 
 static void *server_thread_func(void *arg)
 {
   struct server_thread_args *args = (struct server_thread_args *)arg;
-  server_init(args->eq, args->debug);
+  server_init(args->eq);
   server_loop();
   free(args);
   return NULL;
@@ -117,7 +116,6 @@ static void start_moc(const struct parameters *params, lists_t_strs *args)
 
   th_args = (struct server_thread_args *)xmalloc(sizeof(*th_args));
   th_args->eq    = eq;
-  th_args->debug = params->debug;
 
   if (params->debug)
   {
