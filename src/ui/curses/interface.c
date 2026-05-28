@@ -851,7 +851,6 @@ static void swap_playlist_items(const char *file1, const char *file2)
 
   plist_swap_files(playlist, file1, file2);
   iface_swap_plist_items(file1, file2);
-  playlist_dirty = true;
 }
 
 /* Handle EV_QUEUE_MOVE. */
@@ -2329,10 +2328,12 @@ static void move_item(const int direction)
 
   swap_playlist_items(file, second_file);
 
-  /* Update the engine's playlist if it currently has ours. */
+  /* Update the engine's playlist if it currently has ours, otherwise
+   * mark it dirty so play_it() will re-send the full playlist next time. */
   if (engine_plist == playlist)
     audio_plist_move(file, second_file);
-  /* playlist_dirty already set by swap_playlist_items */
+  else
+    playlist_dirty = true;
 
   free(second_file);
   free(file);
