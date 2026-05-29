@@ -506,10 +506,10 @@ void server_queue_pop(const char *filename)
 
 void engine_error(const char *file, const char *msg)
 {
-  struct srv_error_ev *e = (struct srv_error_ev *)xmalloc(sizeof(*e));
-  e->file = xstrdup(file);
-  e->msg  = xstrdup(msg);
-  add_event_all(EV_SRV_ERROR, e);
+  struct srv_error_ev e;
+  e.file = (char *)file;
+  e.msg  = (char *)msg;
+  add_event_all(EV_SRV_ERROR, &e);
 }
 
 void server_error(const char *file, int line, const char *function,

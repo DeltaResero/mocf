@@ -766,7 +766,8 @@ static void event_queue_add(const struct plist_item *item)
 
 static void update_error(struct srv_error_ev *data)
 {
-  error("%s", data->msg);
+  if (data->msg)
+    interface_error(data->msg);
   if (data->file && data->file[0])
     iface_mark_file_error(data->file);
 }
