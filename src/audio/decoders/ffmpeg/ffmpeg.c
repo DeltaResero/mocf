@@ -1457,6 +1457,7 @@ static void ffmpeg_close(void *prv_data)
     avcodec_close(data->enc);
     av_freep(&data->enc);
 #endif
+    av_dict_free(&data->opts);
     avformat_close_input(&data->ic);
     free_remain_buf(data);
   }
