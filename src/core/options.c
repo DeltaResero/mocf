@@ -908,11 +908,6 @@ void options_init()
   add_int("ModPlug_LoopCount", 0, CHECK_RANGE(1), -1, INT_MAX);
   add_int("ModPlug_MaxFileSize", 32 * 1024 * 1024, CHECK_RANGE(1), 1, INT_MAX);
 
-  add_int("TiMidity_Rate", 48000, CHECK_RANGE(1), 8000, 48000);
-  add_int("TiMidity_Bits", 16, CHECK_DISCRETE(2), 8, 16);
-  add_int("TiMidity_Channels", 2, CHECK_DISCRETE(2), 1, 2);
-  add_int("TiMidity_Volume", 100, CHECK_RANGE(1), 0, 800);
-  add_str("TiMidity_Config", NULL, CHECK_NONE);
 
   add_int("SidPlayFP_DefaultSongLength", 180, CHECK_RANGE(1), 0, INT_MAX);
   add_int("SidPlayFP_MinimumSongLength", 0, CHECK_RANGE(1), 0, INT_MAX);

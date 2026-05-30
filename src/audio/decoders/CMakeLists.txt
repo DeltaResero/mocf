@@ -269,21 +269,6 @@ if(WITH_SPEEX)
   endif()
 endif()
 
-# Timidity decoder
-if(WITH_TIMIDITY)
-  pkg_check_modules(TIMIDITY libtimidity>=0.1.0)
-  if(TIMIDITY_FOUND)
-    add_decoder_plugin(
-      timidity
-      SOURCES
-      timidity/timidity.c
-      LIBRARIES
-      ${TIMIDITY_LIBRARIES}
-      INCLUDE_DIRS
-      ${TIMIDITY_INCLUDE_DIRS})
-  endif()
-endif()
-
 # SIDPlayFP decoder (replaces old libsidplay2 + ReSID decoder)
 # Requires: libsidplayfp >= 2.0 (Arch: libsidplayfp)
 # CMake option: -DWITH_SIDPLAYFP=ON  (replaces -DWITH_SIDPLAY2=ON)

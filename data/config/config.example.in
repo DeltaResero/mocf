@@ -563,19 +563,6 @@
 #
 #ModPlug_MaxFileSize = 33554432
 
-# Self-describing TiMidity audio characteristic options.
-#TiMidity_Rate = 48000              # Between 8000 and 48000
-#TiMidity_Bits = 16                 # 8 or 16
-#TiMidity_Channels = 2              # 1 or 2
-#TiMidity_Volume = 100              # 0 to 800
-
-# You can setup a TiMidity-Config-File here.
-# Leave it unset to use library defaults (/etc/timidity.cfg mostly).
-# Setting it to 'yes' also uses the library defaults.
-# Set it to 'no' if you don't have any configuration file.
-# Otherwise set it to the name of a specific file.
-#TiMidity_Config =
-
 # Self-describing SidPlayFP audio characteristic options.
 #SidPlayFP_DefaultSongLength = 180   # If not in database (in seconds)
 #SidPlayFP_MinimumSongLength = 0     # Play at least n (in seconds)

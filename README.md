@@ -28,7 +28,7 @@ built, saved, and exported as m3u files.
 
 Supported formats include MP3, Ogg Vorbis, FLAC, Musepack, Speex, Opus, WAVE,
 and formats handled by FFmpeg/LibAV (e.g., WMA, AAC, MP4). Additional
-support includes AIFF, AU, SID, wavpack, MIDI, and modplug.
+support includes AIFF, AU, SID, wavpack, and modplug.
 
 ## Building and Installation
 
@@ -44,7 +44,7 @@ This project uses the **CMake** build system.
     libsamplerate, libmagic, BerkeleyDB.
 *   **Decoder Libraries:** libmad, libmpg123, libfaad2, libvorbis, opusfile,
     libflac, libmpcdec, libwavpack, libsndfile, libmodplug, ffmpeg/libav,
-    libspeex, libtimidity, libsidplayfp.
+    libspeex, libsidplayfp.
 
 ### Quick Start
 
@@ -93,7 +93,6 @@ You can configure the build by passing `-DOPTION=ON/OFF` to cmake.
 | `WITH_MODPLUG` | Enable libmodplug support | `ON` |
 | `WITH_FFMPEG` | Enable ffmpeg/libav support | `ON` |
 | `WITH_SPEEX` | Enable Speex support | `ON` |
-| `WITH_TIMIDITY` | Enable libtimidity support | `ON` |
 | `WITH_SIDPLAYFP` | Enable libsidplayfp support | `ON` |
 
 ### Installation Directories

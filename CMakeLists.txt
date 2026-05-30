@@ -69,7 +69,6 @@ option(WITH_SNDFILE "Enable libsndfile support" ON)
 option(WITH_MODPLUG "Enable libmodplug support" ON)
 option(WITH_FFMPEG "Enable ffmpeg/libav support" ON)
 option(WITH_SPEEX "Enable Speex support" ON)
-option(WITH_TIMIDITY "Enable libtimidity support" ON)
 option(WITH_SIDPLAYFP "Enable libsidplayfp support" ON)
 
 # Dependencies
