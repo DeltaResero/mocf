@@ -35,7 +35,7 @@ extern "C" {
 #include <sidplayfp/SidConfig.h>
 #include <sidplayfp/SidInfo.h>
 #include <sidplayfp/SidTuneInfo.h>
-#include <sidplayfp/builders/residfp.h>
+#include <sidplayfp/builders/resid.h>
 #include <sidplayfp/SidDatabase.h>
 
 // Option keys — updated from old sidplay2 keys
@@ -53,7 +53,7 @@ struct sidplayfp_data
 {
     SidTune        *tune;
     sidplayfp      *engine;
-    ReSIDfpBuilder *builder;
+    ReSIDBuilder   *builder;
 
     int   length_ms;        // total playback length in milliseconds
     int  *sublengths_ms;    // per-song lengths in milliseconds
