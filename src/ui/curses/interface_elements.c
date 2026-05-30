@@ -4768,10 +4768,10 @@ void iface_update_queue_position_last(const struct plist *queue,
   iface_refresh_screen();
 }
 
-/* Mark a file as failed in all visible menus.  Called when the server reports
- * a fatal playback error so the user can see at a glance which item failed.
- * Sets the time field to "ERROR" and applies CLR_ERROR to all colour states
- * (normal, selected, marked, marked+selected) for the duration of the
+/* Mark a file as failed in all visible menus.  Called when the audio engine
+ * reports a fatal playback error so the user can see at a glance which item
+ * failed.  Sets the time field to "ERROR" and applies CLR_ERROR to all colour
+ * states (normal, selected, marked, marked+selected) for the duration of the
  * session. */
 void iface_mark_file_error(const char *file)
 {

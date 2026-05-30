@@ -192,6 +192,14 @@ static void ffmpeg_log_cb(void *unused ATTR_UNUSED, int level, const char *fmt,
 
   ffmpeg_log_repeats(msg);
 }
+#else
+/* Release build: suppress FFmpeg log output entirely to prevent it from
+ * writing to stderr and corrupting the ncurses display. */
+static void ffmpeg_log_cb(void *unused ATTR_UNUSED, int level ATTR_UNUSED,
+                          const char *fmt ATTR_UNUSED,
+                          va_list vl ATTR_UNUSED)
+{
+}
 #endif
 
 /* FFmpeg-provided error code to description function wrapper. */
@@ -395,14 +403,12 @@ static bool is_timing_broken(AVFormatContext *ic)
 
 static void ffmpeg_init()
 {
-#ifndef NDEBUG
 #ifdef DEBUG
   av_log_set_level(AV_LOG_INFO);
 #else
   av_log_set_level(AV_LOG_ERROR);
 #endif
   av_log_set_callback(ffmpeg_log_cb);
-#endif
 
 #if HAVE_LIBAV || LIBAVCODEC_VERSION_INT < AV_VERSION_INT(58, 10, 100)
   avcodec_register_all();
@@ -1451,6 +1457,7 @@ static void ffmpeg_close(void *prv_data)
     avcodec_close(data->enc);
     av_freep(&data->enc);
 #endif
+    av_dict_free(&data->opts);
     avformat_close_input(&data->ic);
     free_remain_buf(data);
   }

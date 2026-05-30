@@ -824,7 +824,7 @@ void options_init()
   add_bool("NonUTFXterm", false);
   add_bool("Precache", true);
   add_bool("SavePlaylist", true);
-  add_bool("SyncPlaylist", true);
+
   add_bool("SavePlaylistTags", false);
   add_str("Keymap", NULL, CHECK_NONE);
   add_bool("ASCIILines", false);
@@ -876,7 +876,6 @@ void options_init()
   add_list("Layout3", NULL, CHECK_FUNCTION);
 
   add_bool("FollowPlayedFile", true);
-  add_bool("CanStartInPlaylist", true);
 
   add_bool("UseCursorSelection", false);
   add_bool("SetXtermTitle", true);
@@ -925,8 +924,8 @@ void options_init()
 
   add_bool("AAC_HEAACUpsampling", true);
 
-  add_path("OnServerStart", NULL, CHECK_NONE);
-  add_path("OnServerStop", NULL, CHECK_NONE);
+  add_path("OnEngineStart", NULL, CHECK_NONE);
+  add_path("OnEngineStop", NULL, CHECK_NONE);
   add_path("OnStop", NULL, CHECK_NONE);
 
   add_bool("QueueNextSongReturn", false);

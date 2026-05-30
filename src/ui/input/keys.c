@@ -47,12 +47,6 @@ struct command
 
 /* Array of commands - each element is a list of keys for this command. */
 static struct command commands[] = {
-    {KEY_CMD_QUIT_CLIENT,
-     "quit_client",
-     "Detach MOC from the server",
-     CON_MENU,
-     {'q', -1},
-     1},
     {KEY_CMD_GO,
      "go",
      "Start playing at this file or go to this directory",
@@ -95,7 +89,7 @@ static struct command commands[] = {
      CON_MENU,
      {KEY_END, -1},
      1},
-    {KEY_CMD_QUIT, "quit", "Quit", CON_MENU, {'Q', -1}, 1},
+    {KEY_CMD_QUIT, "quit", "Quit", CON_MENU, {'q', 'Q', -1}, 2},
     {KEY_CMD_STOP, "stop", "Stop", CON_MENU, {'s', -1}, 1},
     {KEY_CMD_NEXT, "next", "Play next file", CON_MENU, {'n', -1}, 1},
     {KEY_CMD_PREVIOUS,

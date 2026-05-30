@@ -30,11 +30,6 @@
    (((x) & 0x00FF0000) >> 8) | (((x) & 0xFF000000) >> 24))
 #endif
 
-#ifndef SUN_LEN
-#define SUN_LEN(p)                                                             \
-  ((sizeof *(p)) - sizeof((p)->sun_path) + strlen((p)->sun_path))
-#endif
-
 /* Maximum path length, we don't consider exceptions like mounted NFS */
 #ifndef PATH_MAX
 #if defined(_POSIX_PATH_MAX)

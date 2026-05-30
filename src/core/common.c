@@ -29,18 +29,12 @@
 #include <pthread.h>
 #include <signal.h>
 #include <errno.h>
-#ifdef HAVE_SYSLOG
-#include <syslog.h>
-#endif
-
 #include "core/common.h"
 #include "core/server.h"
 #include "ui/curses/interface.h"
 #include "ui/curses/interface_elements.h"
 #include "core/log.h"
 #include "core/options.h"
-
-static int im_server = 0; /* Am I the server? */
 
 void internal_error(const char *file, int line, const char *function,
                     const char *format, ...)
@@ -53,22 +47,14 @@ void internal_error(const char *file, int line, const char *function,
   msg = format_msg_va(format, va);
   va_end(va);
 
-  if (im_server)
-  {
-    server_error(file, line, function, msg);
-  }
-  else
-  {
-    interface_error(msg);
-  }
+  server_error(file, line, function, msg);
 
   free(msg);
 
   errno = saved_errno;
 }
 
-/* End program with a message. Use when an error occurs and we can't recover.
- * If we're the server, then also log the message to the system log. */
+/* End program with a message. Use when an error occurs and we can't recover. */
 void internal_fatal(const char *file LOGIT_ONLY, int line LOGIT_ONLY,
                     const char *function LOGIT_ONLY, const char *format, ...)
 {
@@ -86,13 +72,6 @@ void internal_fatal(const char *file LOGIT_ONLY, int line LOGIT_ONLY,
   va_end(va);
 
   log_close();
-
-#ifdef HAVE_SYSLOG
-  if (im_server)
-  {
-    syslog(LOG_USER | LOG_ERR, "%s", msg);
-  }
-#endif
 
   free(msg);
 
@@ -197,12 +176,6 @@ char *xstrerror(int errnum)
 {
   char *result;
 
-  /* The client is not threaded. */
-  if (!im_server)
-  {
-    return xstrdup(strerror(errnum));
-  }
-
   LOCK(xstrerror_mtx);
 
   result = xstrdup(strerror(errnum));
@@ -254,8 +227,6 @@ void xsignal(int signum, void (*func)(int))
     fatal("sigaction() failed: %s", xstrerror(errno));
   }
 }
-
-void set_me_server() { im_server = 1; }
 
 char *str_repl(char *target, const char *oldstr, const char *newstr)
 {
@@ -483,11 +454,6 @@ void common_cleanup()
 {
 #if !HAVE_DECL_STRERROR_R
   int rc;
-
-  if (im_server)
-  {
-    return;
-  }
 
   rc = pthread_mutex_destroy(&xstrerror_mtx);
   if (rc != 0)

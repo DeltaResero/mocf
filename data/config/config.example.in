@@ -58,10 +58,6 @@
 # afterwards (which gives the choice of whether the configured values are
 # replaced or added to).
 
-# Remember that the client and server are separate processes and the
-# server will retain the configuration values formed from the environment
-# within which it was originally started.
-
 # Show file titles (title, author, album) instead of file names?
 #ReadTags = yes
 
@@ -74,16 +70,16 @@
 #MusicDir =
 
 # Start in the music directory by default?  If set to 'no', start
-# in the directory being viewed when the was client last active or,
-# as a last resort, the directory in which the client is being started.
+# in the directory being viewed when mocf last exited, or, as a last resort,
+# the directory from which mocf is being started.
 # A single directory on the command line takes precedence.
 #StartInMusicDir = no
 
 # The number of lines which are retained in an in-memory circular logging
 # buffer.  A value of zero indicates that lines will be written directly
 # to the log file, otherwise the latest CircularLogSize lines are retained
-# in memory and not written to the log file until the MOCF client or server
-# are shutdown.  If the client or server terminates abnormally then the
+# in memory and not written to the log file until mocf exits.  If mocf
+# terminates abnormally then the
 # log lines are lost.
 #
 # This option is intended to help identify problems which occur infrequently
@@ -167,7 +163,7 @@
 
 # Save software mixer state?
 # If enabled, a file 'softmixer' will be created in '~/.mocf/' storing the
-# mixersetting set when the server is shut down.
+# mixersetting set when the player is shut down.
 # Note that there is a "hidden" 'Amplification' setting in that file.
 # Amplification (0-200) is used to scale the mixer setting (0-100).  This
 # results in a higher signal amplitude but may also produce clipping.
@@ -175,7 +171,7 @@
 
 # Save equalizer state?
 # If enabled, a file 'equalizer' will be created in '~/.mocf/' storing the
-# equalizer settings when the server is shut down.
+# equalizer settings when the player is shut down.
 # Note that there is a "hidden" 'Mixin' setting in that file.
 # Mixin (0.0-1.0) is used to determine how much of the original signal is
 # used after equalizing.  0 means to only use the equalized sound, while 1
@@ -230,7 +226,7 @@
 #
 #XTermTheme =
 
-# MOCF directory (where pid file, socket and state files are stored).
+# MOCF directory (config, playlist, cache, and other state files).
 # You can use ~ at the beginning.
 #MOCDir = ~/.mocf
 
@@ -262,10 +258,6 @@
 
 # Remember the playlist after exit?
 #SavePlaylist = yes
-
-# When using more than one client (interface) at a time, do they share
-# the playlist?
-#SyncPlaylist = yes
 
 # Should MOCF load and save tags in playlist files? Setting it to "no"
 # disables the use of Extended M3U tags. It will also speed up MOCF shutdown.
@@ -470,13 +462,6 @@
 # played file is visible?
 #FollowPlayedFile = yes
 
-# What to do if the interface was started and the server is already playing
-# something from the playlist?  If CanStartInPlaylist is set to 'yes', the
-# interface will switch to the playlist.  When set to 'no' it will start
-# from the last directory.
-#CanStartInPlaylist = yes
-
-
 # Display the cursor in the line with the selected file.  Some braille
 # readers (the Handy Tech modular series ZMU 737, for example) use the
 # cursor to focus and can make use of it to present the file line even
@@ -619,11 +604,10 @@
 #
 #OnStop =
 
-# Run the OnServerStart or OnServerStop commands (full path, no arguments)
-# when MOCF server is started or terminated respectively.  The server will
-# not wait for the commands to complete before continuing.
-#OnServerStart =
-#OnServerStop =
+# Run OnEngineStart or OnEngineStop (full path, no arguments) when the audio
+# engine starts or stops.  MOCF does not wait for the commands to finish.
+#OnEngineStart =
+#OnEngineStop =
 
 # This option determines which song to play after finishing all the songs
 # in the queue.  Setting this to 'yes' causes MOCF to play the song which

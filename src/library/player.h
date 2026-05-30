@@ -27,7 +27,6 @@ extern "C"
   void player_jump_to(const int n);
   void player_reset();
   void player_init();
-  struct file_tags *player_get_curr_tags();
   void player_pause();
   void player_unpause();
 

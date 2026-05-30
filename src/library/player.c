@@ -382,6 +382,12 @@ static void precache_wait(struct precache *precache)
 static void precache_reset(struct precache *precache)
 {
   assert(!precache->running);
+
+  if (precache->ok)
+  {
+    precache->f->close(precache->decoder_data);
+  }
+
   precache->ok = 0;
   if (precache->file)
   {
@@ -653,10 +659,9 @@ static void decode_loop(const struct decoder *f, void *decoder_data,
 
   out_buf_wait(out_buf);
 
-  if (precache.ok && (stopped || !options_get_bool("AutoNext")))
+  if (stopped || !options_get_bool("AutoNext"))
   {
     precache_wait(&precache);
-    precache.f->close(precache.decoder_data);
     precache_reset(&precache);
   }
 }
@@ -742,7 +747,6 @@ static void play_file(const char *file, const struct decoder *f,
   if (precache.ok && strcmp(precache.file, file))
   {
     logit("The precached file is not the file we want.");
-    precache.f->close(precache.decoder_data);
     precache_reset(&precache);
   }
 
@@ -756,6 +760,10 @@ static void play_file(const char *file, const struct decoder *f,
 
     sound_params = precache.sound_params;
     decoder_data = precache.decoder_data;
+
+    /* We now own decoder_data; prevent precache_reset() from closing it. */
+    precache.ok = 0;
+
     set_info_channels(sound_params.channels);
     set_info_rate(sound_params.rate / 1000);
 
@@ -815,10 +823,7 @@ static void play_file(const char *file, const struct decoder *f,
     {
       f->close(decoder_data);
       status_msg("");
-      /* Prefix with \x01<file>\x01 so the UI can identify which file
-       * failed without a protocol change.  The client strips this prefix
-       * before displaying the message. */
-      error("\x01%s\x01%s", file, err.err);
+      engine_error(file, err.err);
       decoder_error_clear(&err);
       logit("Can't open file, exiting");
       return;
@@ -964,22 +969,6 @@ void player_unpause()
   LOCK(request_cond_mtx);
   pthread_cond_signal(&request_cond);
   UNLOCK(request_cond_mtx);
-}
-
-/* Return tags for the currently played file or NULL if there are no tags.
- * Tags are duplicated. */
-struct file_tags *player_get_curr_tags()
-{
-  struct file_tags *tags = NULL;
-
-  LOCK(curr_tags_mtx);
-  if (curr_tags)
-  {
-    tags = tags_dup(curr_tags);
-  }
-  UNLOCK(curr_tags_mtx);
-
-  return tags;
 }
 
 // EOF

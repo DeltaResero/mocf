@@ -16,12 +16,6 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <sys/socket.h>
-#include <sys/select.h>
-#ifdef HAVE_GETRLIMIT
-#include <sys/resource.h>
-#endif
-#include <sys/un.h>
 #include <time.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -31,6 +25,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <pthread.h>
+#include <fcntl.h>
 #include <assert.h>
 
 #define DEBUG
@@ -48,36 +43,163 @@
 #include "audio/processing/softmixer.h"
 #include "audio/processing/equalizer.h"
 
-#define SERVER_LOG "mocf_server_log"
-#define PID_FILE "pid"
+/* -----------------------------------------------------------------------
+ * Engine event queue — thread-safe linked-list + pipe wakeup
+ * ----------------------------------------------------------------------- */
 
-struct client
+struct engine_event_queue
 {
-  int socket;             /* -1 if inactive */
-  int wants_plist_events; /* requested playlist events? */
-  struct event_queue events;
-  pthread_mutex_t events_mtx;
-  int requests_plist; /* is the client waiting for the playlist? */
-  int can_send_plist; /* can this client send a playlist? */
-  int lock;           /* is this client locking us? */
-  int serial;         /* used for generating unique serial numbers */
+  struct event_queue q;
+  pthread_mutex_t    mtx;
+  int                pipe_fd[2]; /* [0] = read (UI), [1] = write (engine) */
 };
 
-static struct client clients[CLIENTS_MAX];
+struct engine_event_queue *engine_event_queue_new(void)
+{
+  struct engine_event_queue *eq =
+      (struct engine_event_queue *)xmalloc(sizeof(*eq));
+  event_queue_init(&eq->q);
+  pthread_mutex_init(&eq->mtx, NULL);
 
-/* Thread ID of the server thread. */
+  if (pipe(eq->pipe_fd) < 0)
+    fatal("pipe() failed for engine event queue: %s", xstrerror(errno));
+
+  /* Make the write end non-blocking so audio callbacks never block. */
+  int flags = fcntl(eq->pipe_fd[1], F_GETFL);
+  if (flags == -1 || fcntl(eq->pipe_fd[1], F_SETFL, flags | O_NONBLOCK) == -1)
+    fatal("fcntl() on event pipe failed: %s", xstrerror(errno));
+
+  /* Make the read end non-blocking so drain loops never block. */
+  flags = fcntl(eq->pipe_fd[0], F_GETFL);
+  if (flags == -1 || fcntl(eq->pipe_fd[0], F_SETFL, flags | O_NONBLOCK) == -1)
+    fatal("fcntl() on event pipe failed: %s", xstrerror(errno));
+
+  return eq;
+}
+
+void engine_event_queue_free(struct engine_event_queue *eq)
+{
+  if (!eq) return;
+  LOCK(eq->mtx);
+  event_queue_free(&eq->q);
+  UNLOCK(eq->mtx);
+  pthread_mutex_destroy(&eq->mtx);
+  close(eq->pipe_fd[0]);
+  close(eq->pipe_fd[1]);
+  free(eq);
+}
+
+int engine_event_queue_fd(const struct engine_event_queue *eq)
+{
+  return eq->pipe_fd[0];
+}
+
+/* Push an event onto the queue and wake the UI thread. */
+static void eq_push(struct engine_event_queue *eq, int type, void *data)
+{
+  char w = 1;
+  LOCK(eq->mtx);
+  event_push(&eq->q, type, data);
+  UNLOCK(eq->mtx);
+  /* Best-effort wakeup; non-blocking pipe so this never stalls. */
+  if (write(eq->pipe_fd[1], &w, 1) < 0 && errno != EAGAIN)
+    logit("Can't write to engine event pipe: %s", xstrerror(errno));
+}
+
+/* Drain all pending events + consume wakeup bytes.  Non-blocking. */
+void engine_event_queue_flush(struct engine_event_queue *eq,
+                              struct event_queue *dest)
+{
+  char buf[64];
+  /* Consume any wakeup bytes (non-blocking, so returns when pipe is empty). */
+  while (read(eq->pipe_fd[0], buf, sizeof(buf)) > 0)
+    ;
+
+  /* Splice the shared queue onto the tail of dest. */
+  LOCK(eq->mtx);
+  if (!event_queue_empty(&eq->q))
+  {
+    if (event_queue_empty(dest))
+    {
+      *dest = eq->q;
+    }
+    else
+    {
+      dest->tail->next = eq->q.head;
+      dest->tail       = eq->q.tail;
+    }
+    event_queue_init(&eq->q);
+  }
+  UNLOCK(eq->mtx);
+}
+
+/* Blocking variant: wait until at least one event arrives, then drain. */
+void engine_event_queue_wait_flush(struct engine_event_queue *eq,
+                                   struct event_queue *dest)
+{
+  /* First drain without blocking in case there is already something. */
+  engine_event_queue_flush(eq, dest);
+  if (!event_queue_empty(dest))
+    return;
+
+  /* Nothing yet — block on the read end of the pipe. */
+  fd_set fds;
+  FD_ZERO(&fds);
+  FD_SET(eq->pipe_fd[0], &fds);
+
+  /* select() restores the O_NONBLOCK flag so reading will still work. */
+  int fd_blocking = eq->pipe_fd[0];
+  /* Temporarily make the read end blocking just for select. */
+  (void)select(fd_blocking + 1, &fds, NULL, NULL, NULL);
+
+  engine_event_queue_flush(eq, dest);
+}
+
+/* -----------------------------------------------------------------------
+ * Engine lifecycle — ready condvar + quit condvar
+ * ----------------------------------------------------------------------- */
+
+static pthread_mutex_t ready_mtx  = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  ready_cond = PTHREAD_COND_INITIALIZER;
+static int             engine_ready_flag = 0;
+
+static pthread_mutex_t quit_mtx  = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  quit_cond = PTHREAD_COND_INITIALIZER;
+static volatile int    server_quit = 0;
+
+void engine_signal_ready(void)
+{
+  pthread_mutex_lock(&ready_mtx);
+  engine_ready_flag = 1;
+  pthread_cond_signal(&ready_cond);
+  pthread_mutex_unlock(&ready_mtx);
+}
+
+void engine_wait_ready(void)
+{
+  pthread_mutex_lock(&ready_mtx);
+  while (!engine_ready_flag)
+    pthread_cond_wait(&ready_cond, &ready_mtx);
+  pthread_mutex_unlock(&ready_mtx);
+}
+
+void engine_quit(void)
+{
+  pthread_mutex_lock(&quit_mtx);
+  server_quit = 1;
+  pthread_cond_signal(&quit_cond);
+  pthread_mutex_unlock(&quit_mtx);
+}
+
+/* -----------------------------------------------------------------------
+ * Global engine event queue pointer (set by server_init, used by callbacks)
+ * ----------------------------------------------------------------------- */
+static struct engine_event_queue *g_eq = NULL;
+
+/* Thread ID of the engine thread (used in signal handling) */
 static pthread_t server_tid;
 
-/* Pipe used to wake up the server from select() from another thread. */
-static int wake_up_pipe[2];
-
-/* Socket used to accept incoming client connections. */
-static int server_sock = -1;
-
-/* Set to 1 when a signal arrived causing the program to exit. */
-static volatile int server_quit = 0;
-
-/* Information about currently played file */
+/* Information about currently played file. */
 static struct
 {
   int avg_bitrate;
@@ -90,40 +212,9 @@ static struct tags_cache *tags_cache;
 
 extern char **environ;
 
-static void write_pid_file()
-{
-  char *fname = create_file_name(PID_FILE);
-  FILE *file;
-
-  if ((file = fopen(fname, "w")) == NULL)
-  {
-    fatal("Can't open pid file for writing: %s", xstrerror(errno));
-  }
-  fprintf(file, "%d\n", getpid());
-  fclose(file);
-}
-
-/* Check if there is a pid file and if it is valid, return the pid, else 0 */
-static pid_t check_pid_file()
-{
-  FILE *file;
-  pid_t pid;
-  char *fname = create_file_name(PID_FILE);
-
-  /* Read the pid file */
-  if ((file = fopen(fname, "r")) == NULL)
-  {
-    return 0;
-  }
-  if (fscanf(file, "%d", &pid) != 1)
-  {
-    fclose(file);
-    return 0;
-  }
-  fclose(file);
-
-  return pid;
-}
+/* -----------------------------------------------------------------------
+ * Signal handlers
+ * ----------------------------------------------------------------------- */
 
 static void sig_chld(int sig LOGIT_ONLY)
 {
@@ -145,172 +236,29 @@ static void sig_exit(int sig)
   log_signal(sig);
   server_quit = 1;
 
-  // FIXME (JCF): pthread_*() are not async-signal-safe and
-  //              should not be used within signal handlers.
+  /* pthread_*() is not async-signal-safe, but we only call it when the
+   * signal is received in a thread other than the server thread. */
   if (!pthread_equal(server_tid, pthread_self()))
   {
     pthread_kill(server_tid, sig);
   }
 }
 
-static void clients_init()
-{
-  int i;
-
-  for (i = 0; i < CLIENTS_MAX; i++)
-  {
-    clients[i].socket = -1;
-    pthread_mutex_init(&clients[i].events_mtx, NULL);
-  }
-}
-
-static void clients_cleanup()
-{
-  int i, rc;
-
-  for (i = 0; i < CLIENTS_MAX; i++)
-  {
-    clients[i].socket = -1;
-    rc = pthread_mutex_destroy(&clients[i].events_mtx);
-    if (rc != 0)
-    {
-      log_errno("Can't destroy events mutex", rc);
-    }
-  }
-}
-
-/* Add a client to the list, return 1 if ok, 0 on error (max clients exceeded)
- */
-static int add_client(int sock)
-{
-  int i;
-
-  for (i = 0; i < CLIENTS_MAX; i++)
-  {
-    if (clients[i].socket == -1)
-    {
-      clients[i].wants_plist_events = 0;
-      LOCK(clients[i].events_mtx);
-      event_queue_free(&clients[i].events);
-      event_queue_init(&clients[i].events);
-      UNLOCK(clients[i].events_mtx);
-      clients[i].socket = sock;
-      clients[i].requests_plist = 0;
-      clients[i].can_send_plist = 0;
-      clients[i].lock = 0;
-      tags_cache_clear_queue(tags_cache, i);
-      return 1;
-    }
-  }
-
-  return 0;
-}
-
-/* Return index of a client that has a lock acquired. Return -1 if there is no
- * lock. */
-static int locking_client()
-{
-  int i;
-
-  for (i = 0; i < CLIENTS_MAX; i++)
-  {
-    if (clients[i].socket != -1 && clients[i].lock)
-    {
-      return i;
-    }
-  }
-  return -1;
-}
-
-/* Acquire a lock for this client. Return 0 on error. */
-static int client_lock(struct client *cli)
-{
-  if (cli->lock)
-  {
-    logit("Client wants deadlock");
-    return 0;
-  }
-
-  assert(locking_client() == -1);
-
-  cli->lock = 1;
-  logit("Lock acquired for client with fd %d", cli->socket);
-  return 1;
-}
-
-/* Return != 0 if this client holds a lock. */
-static int is_locking(const struct client *cli) { return cli->lock; }
-
-/* Release the lock hold by the client. Return 0 on error. */
-static int client_unlock(struct client *cli)
-{
-  if (!cli->lock)
-  {
-    logit("Client wants to unlock when there is no lock");
-    return 0;
-  }
-
-  cli->lock = 0;
-  logit("Lock released by client with fd %d", cli->socket);
-  return 1;
-}
-
-/* Return the client index from the clients table. */
-static int client_index(const struct client *cli)
-{
-  int i;
-
-  for (i = 0; i < CLIENTS_MAX; i++)
-  {
-    if (clients[i].socket == cli->socket)
-    {
-      return i;
-    }
-  }
-  return -1;
-}
-
-static void del_client(struct client *cli)
-{
-  cli->socket = -1;
-  LOCK(cli->events_mtx);
-  event_queue_free(&cli->events);
-  tags_cache_clear_queue(tags_cache, client_index(cli));
-  UNLOCK(cli->events_mtx);
-}
-
-/* Check if the process with given PID exists. Return != 0 if so. */
-static int valid_pid(const pid_t pid) { return kill(pid, 0) == 0 ? 1 : 0; }
-
-static void wake_up_server()
-{
-  int w = 1;
-
-  debug("Waking up the server");
-
-  if (write(wake_up_pipe[1], &w, sizeof(w)) < 0)
-  {
-    log_errno("Can't wake up the server: (write() failed)", errno);
-  }
-}
+/* -----------------------------------------------------------------------
+ * Helpers
+ * ----------------------------------------------------------------------- */
 
 static void redirect_output(FILE *stream)
 {
   FILE *rc;
 
   if (stream == stdin)
-  {
     rc = freopen("/dev/null", "r", stream);
-  }
   else
-  {
     rc = freopen("/dev/null", "w", stream);
-  }
 
   if (!rc)
-  {
     fatal("Can't open /dev/null: %s", xstrerror(errno));
-  }
 }
 
 static void log_process_stack_size()
@@ -318,12 +266,9 @@ static void log_process_stack_size()
 #if !defined(NDEBUG) && defined(HAVE_GETRLIMIT)
   int rc;
   struct rlimit limits;
-
   rc = getrlimit(RLIMIT_STACK, &limits);
   if (rc == 0)
-  {
     logit("Process's stack size: %u", (unsigned int)limits.rlim_cur);
-  }
 #endif
 }
 
@@ -333,24 +278,15 @@ static void log_pthread_stack_size()
   int rc;
   size_t stack_size;
   pthread_attr_t attr;
-
   rc = pthread_attr_init(&attr);
-  if (rc)
-  {
-    return;
-  }
-
+  if (rc) return;
   rc = pthread_attr_getstacksize(&attr, &stack_size);
   if (rc == 0)
-  {
     logit("PThread's stack size: %u", (unsigned int)stack_size);
-  }
-
   pthread_attr_destroy(&attr);
 #endif
 }
 
-/* Handle running external command on requested event. */
 static void run_extern_cmd(const char *event)
 {
   char *command;
@@ -382,178 +318,13 @@ static void run_extern_cmd(const char *event)
   }
 }
 
-/* Initialize the server - return fd of the listening socket or -1 on error */
-void server_init(int debugging, int foreground)
-{
-  struct sockaddr_un sock_name;
-  pid_t pid;
-
-  logit("Starting MOC Server");
-
-  assert(server_sock == -1);
-
-  pid = check_pid_file();
-  if (pid && valid_pid(pid))
-  {
-    fprintf(stderr,
-            "\nIt seems that the server is already running"
-            " with pid %d.\n",
-            pid);
-    fprintf(stderr,
-            "If it is not true, remove the pid file (%s)"
-            " and try again.\n",
-            create_file_name(PID_FILE));
-    fatal("Exiting!");
-  }
-
-  if (foreground)
-  {
-    log_init_stream(stdout, "stdout");
-  }
-  else
-  {
-    FILE *logfp;
-
-    logfp = NULL;
-    if (debugging)
-    {
-      logfp = fopen(SERVER_LOG, "a");
-      if (!logfp)
-      {
-        fatal("Can't open server log file: %s", xstrerror(errno));
-      }
-    }
-    log_init_stream(logfp, SERVER_LOG);
-  }
-
-  if (pipe(wake_up_pipe) < 0)
-  {
-    fatal("pipe() failed: %s", xstrerror(errno));
-  }
-
-  unlink(socket_name());
-
-  /* Create a socket.
-   * For reasons why AF_UNIX is the correct constant to use in both
-   * cases, see the commentary the SVN log for commit r9999. */
-  server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (server_sock == -1)
-  {
-    fatal("Can't create socket: %s", xstrerror(errno));
-  }
-  sock_name.sun_family = AF_UNIX;
-  snprintf(sock_name.sun_path, sizeof(sock_name.sun_path), "%s", socket_name());
-
-  /* Bind to socket */
-  if (bind(server_sock, (struct sockaddr *)&sock_name, SUN_LEN(&sock_name)) ==
-      -1)
-  {
-    fatal("Can't bind() to the socket: %s", xstrerror(errno));
-  }
-
-  if (listen(server_sock, 1) == -1)
-  {
-    fatal("listen() failed: %s", xstrerror(errno));
-  }
-
-  /* Log stack sizes so stack overflows can be debugged. */
-  log_process_stack_size();
-  log_pthread_stack_size();
-
-  clients_init();
-  audio_initialize();
-  tags_cache = tags_cache_new(options_get_int("TagsCacheSize"));
-  tags_cache_load(tags_cache, create_file_name("cache"));
-
-  server_tid = pthread_self();
-  xsignal(SIGTERM, sig_exit);
-  xsignal(SIGINT, foreground ? sig_exit : SIG_IGN);
-  xsignal(SIGHUP, SIG_IGN);
-  xsignal(SIGQUIT, sig_exit);
-  xsignal(SIGPIPE, SIG_IGN);
-  xsignal(SIGCHLD, sig_chld);
-
-  write_pid_file();
-
-  if (!foreground)
-  {
-    setsid();
-    redirect_output(stdin);
-    redirect_output(stdout);
-    redirect_output(stderr);
-  }
-
-  logit("Running OnServerStart");
-  run_extern_cmd("OnServerStart");
-
-  return;
-}
-
-/* Send EV_DATA and the integer value. Return 0 on error. */
-static int send_data_int(const struct client *cli, const int data)
-{
-  assert(cli->socket != -1);
-
-  if (!send_int(cli->socket, EV_DATA) || !send_int(cli->socket, data))
-  {
-    return 0;
-  }
-
-  return 1;
-}
-
-/* Send EV_DATA and the boolean value. Return 0 on error. */
-static int send_data_bool(const struct client *cli, const bool data)
-{
-  assert(cli->socket != -1);
-
-  if (!send_int(cli->socket, EV_DATA) || !send_int(cli->socket, data ? 1 : 0))
-  {
-    return 0;
-  }
-
-  return 1;
-}
-
-/* Send EV_DATA and the string value. Return 0 on error. */
-static int send_data_str(const struct client *cli, const char *str)
-{
-  if (!send_int(cli->socket, EV_DATA) || !send_str(cli->socket, str))
-  {
-    return 0;
-  }
-  return 1;
-}
-
-/* Add event to the client's queue */
-static void add_event(struct client *cli, const int event, void *data)
-{
-  LOCK(cli->events_mtx);
-  event_push(&cli->events, event, data);
-  UNLOCK(cli->events_mtx);
-}
-
-/* Return true iff 'event' is a playlist event. */
-static inline bool is_plist_event(const int event)
-{
-  bool result = false;
-
-  switch (event)
-  {
-    case EV_PLIST_ADD:
-    case EV_PLIST_DEL:
-    case EV_PLIST_MOVE:
-    case EV_PLIST_CLEAR:
-      result = true;
-  }
-
-  return result;
-}
+/* -----------------------------------------------------------------------
+ * add_event_all — push an event to the UI event queue with data copy
+ * ----------------------------------------------------------------------- */
 
 static void add_event_all(const int event, const void *data)
 {
-  int i;
-  int added = 0;
+  void *data_copy = NULL;
 
   if (event == EV_STATE)
   {
@@ -567,1397 +338,118 @@ static void add_event_all(const int event, const void *data)
     }
   }
 
-  for (i = 0; i < CLIENTS_MAX; i++)
+  if (data)
   {
-    void *data_copy = NULL;
-
-    if (clients[i].socket == -1)
+    if (event == EV_QUEUE_ADD)
     {
-      continue;
+      data_copy = plist_new_item();
+      plist_item_copy(data_copy, data);
     }
-
-    if (!clients[i].wants_plist_events && is_plist_event(event))
+    else if (event == EV_QUEUE_DEL || event == EV_STATUS_MSG)
     {
-      continue;
+      data_copy = xstrdup(data);
     }
-
-    if (data)
+    else if (event == EV_SRV_ERROR)
     {
-      if (event == EV_PLIST_ADD || event == EV_QUEUE_ADD)
-      {
-        data_copy = plist_new_item();
-        plist_item_copy(data_copy, data);
-      }
-      else if (event == EV_PLIST_DEL || event == EV_QUEUE_DEL ||
-               event == EV_STATUS_MSG || event == EV_SRV_ERROR)
-      {
-        data_copy = xstrdup(data);
-      }
-      else if (event == EV_PLIST_MOVE || event == EV_QUEUE_MOVE)
-      {
-        data_copy = move_ev_data_dup((struct move_ev_data *)data);
-      }
-      else if (event == EV_FILE_TAGS)
-      {
-        data_copy = tag_ev_data_dup((struct tag_ev_response *)data);
-      }
-      else
-      {
-        logit("Unhandled data!");
-      }
+      const struct srv_error_ev *src = (const struct srv_error_ev *)data;
+      struct srv_error_ev *e = (struct srv_error_ev *)xmalloc(sizeof(*e));
+      e->file = xstrdup(src->file);
+      e->msg  = xstrdup(src->msg);
+      data_copy = e;
     }
-
-    add_event(&clients[i], event, data_copy);
-    added++;
+    else if (event == EV_QUEUE_MOVE)
+    {
+      data_copy = move_ev_data_dup((struct move_ev_data *)data);
+    }
+    else if (event == EV_FILE_TAGS)
+    {
+      data_copy = tag_ev_data_dup((struct tag_ev_response *)data);
+    }
+    else
+    {
+      logit("Unhandled data!");
+    }
   }
 
-  if (added)
-  {
-    wake_up_server();
-  }
-  else
-  {
-    debug("No events have been added because there are no clients");
-  }
+  if (g_eq)
+    eq_push(g_eq, event, data_copy);
+  else if (data_copy)
+    free_event_data(event, data_copy);
 }
 
-/* Send events from the queue. Return 0 on error. */
-static int flush_events(struct client *cli)
+/* -----------------------------------------------------------------------
+ * server_init — open audio, load tags cache, signal ready
+ * ----------------------------------------------------------------------- */
+
+void server_init(struct engine_event_queue *eq)
 {
-  enum noblock_io_status st = NB_IO_OK;
+  logit("Starting MOC Engine");
 
-  LOCK(cli->events_mtx);
-  while (!event_queue_empty(&cli->events) &&
-         (st = event_send_noblock(cli->socket, &cli->events)) == NB_IO_OK)
-    ;
-  UNLOCK(cli->events_mtx);
+  g_eq = eq;
 
-  return st != NB_IO_ERR ? 1 : 0;
+  log_process_stack_size();
+  log_pthread_stack_size();
+
+  audio_initialize();
+  tags_cache = tags_cache_new(options_get_int("TagsCacheSize"));
+  tags_cache_load(tags_cache, create_file_name("cache"));
+
+  server_tid = pthread_self();
+  xsignal(SIGTERM, sig_exit);
+  xsignal(SIGINT, SIG_IGN);
+  xsignal(SIGHUP, SIG_IGN);
+  xsignal(SIGQUIT, sig_exit);
+  xsignal(SIGPIPE, SIG_IGN);
+  xsignal(SIGCHLD, sig_chld);
+
+  logit("Running OnEngineStart");
+  run_extern_cmd("OnEngineStart");
+
+  /* Signal the main thread that we are ready to accept commands. */
+  engine_signal_ready();
 }
 
-/* Send events to clients whose sockets are ready to write. */
-static void send_events(fd_set *fds)
-{
-  int i;
+/* -----------------------------------------------------------------------
+ * server_loop — wait for quit, then shut down
+ * ----------------------------------------------------------------------- */
 
-  for (i = 0; i < CLIENTS_MAX; i++)
-  {
-    if (clients[i].socket != -1 && FD_ISSET(clients[i].socket, fds))
-    {
-      debug("Flushing events for client %d", i);
-      if (!flush_events(&clients[i]))
-      {
-        close(clients[i].socket);
-        del_client(&clients[i]);
-      }
-    }
-  }
-}
-
-/* End playing and cleanup. */
-static void server_shutdown()
+static void server_shutdown(void)
 {
-  logit("Server exiting...");
+  logit("Engine exiting...");
   audio_exit();
   tags_cache_free(tags_cache);
   tags_cache = NULL;
-  logit("Running OnServerStop");
-  run_extern_cmd("OnServerStop");
-  unlink(socket_name());
-  unlink(create_file_name(PID_FILE));
-  close(wake_up_pipe[0]);
-  close(wake_up_pipe[1]);
-  logit("Server exited");
+  logit("Running OnEngineStop");
+  run_extern_cmd("OnEngineStop");
+  logit("Engine exited");
   log_close();
 }
 
-/* Send EV_BUSY message and close the connection. */
-static void busy(int sock)
+void server_loop(void)
 {
-  logit("Closing connection due to maximum number of clients reached");
-  send_int(sock, EV_BUSY);
-  close(sock);
-}
-
-/* Handle CMD_LIST_ADD, return 1 if ok or 0 on error. */
-static int req_list_add(struct client *cli)
-{
-  char *file;
-
-  file = get_str(cli->socket);
-  if (!file)
-  {
-    return 0;
-  }
-
-  logit("Adding '%s' to the list", file);
-
-  audio_plist_add(file);
-  free(file);
-
-  return 1;
-}
-
-/* Handle CMD_QUEUE_ADD, return 1 if ok or 0 on error. */
-static int req_queue_add(const struct client *cli)
-{
-  char *file;
-  struct plist_item *item;
-
-  file = get_str(cli->socket);
-  if (!file)
-  {
-    return 0;
-  }
-
-  logit("Adding '%s' to the queue", file);
-
-  audio_queue_add(file);
-
-  /* Wrap the filename in struct plist_item.
-   * We don't need tags, because the player gets them
-   * when playing the file. This may change if there is
-   * support for viewing/reordering the queue and here
-   * is the place to read the tags and fill them into
-   * the item. */
-
-  item = plist_new_item();
-  item->file = xstrdup(file);
-  item->type = file_type(file);
-  item->mtime = get_mtime(file);
-
-  add_event_all(EV_QUEUE_ADD, item);
-
-  plist_free_item_fields(item);
-  free(item);
-  free(file);
-
-  return 1;
-}
-
-/* Handle CMD_PLAY, return 1 if ok or 0 on error. */
-static int req_play(struct client *cli)
-{
-  char *file;
-
-  if (!(file = get_str(cli->socket)))
-  {
-    return 0;
-  }
-
-  logit("Playing %s", *file ? file : "first element on the list");
-  audio_play(file);
-  free(file);
-
-  return 1;
-}
-
-/* Handle CMD_SEEK, return 1 if ok or 0 on error */
-static int req_seek(struct client *cli)
-{
-  int sec;
-
-  if (!get_int(cli->socket, &sec))
-  {
-    return 0;
-  }
-
-  logit("Seeking %ds", sec);
-  audio_seek(sec);
-
-  return 1;
-}
-
-/* Handle CMD_JUMP_TO, return 1 if ok or 0 on error */
-static int req_jump_to(struct client *cli)
-{
-  int sec;
-
-  if (!get_int(cli->socket, &sec))
-  {
-    return 0;
-  }
-
-  if (sec < 0)
-  {
-    sec = -sec; /* percentage */
-    assert(sec >= 0 && sec <= 100);
-
-    char *file = audio_get_sname();
-    if (!file || !*file)
-    {
-      free(file);
-      return 0;
-    }
-
-    struct file_tags *tags;
-    tags = tags_cache_get_immediate(tags_cache, file, TAGS_TIME);
-    assert(tags && tags->filled & TAGS_TIME);
-
-    sec = (tags->time * sec) / 100;
-    tags_free(tags);
-    free(file);
-  }
-
-  logit("Jumping to %ds", sec);
-  audio_jump_to(sec);
-
-  return 1;
-}
-
-/* Report an error logging it and sending a message to the client. */
-void server_error(const char *file, int line, const char *function,
-                  const char *msg)
-{
-  internal_logit(file, line, function, "ERROR: %s", msg);
-  add_event_all(EV_SRV_ERROR, msg);
-}
-
-/* Send the song name to the client. Return 0 on error. */
-static int send_sname(struct client *cli)
-{
-  int status = 1;
-  char *sname = audio_get_sname();
-
-  if (!send_data_str(cli, sname ? sname : ""))
-  {
-    status = 0;
-  }
-  free(sname);
-
-  return status;
-}
-
-/* Return 0 if an option is valid when getting/setting with the client. */
-static int valid_sync_option(const char *name)
-{
-  return !strcasecmp(name, "ShowStreamErrors") || !strcasecmp(name, "Repeat") ||
-         !strcasecmp(name, "Shuffle") || !strcasecmp(name, "AutoNext");
-}
-
-/* Send requested option value to the client. Return 1 if OK. */
-static int send_option(struct client *cli)
-{
-  char *name;
-
-  if (!(name = get_str(cli->socket)))
-  {
-    return 0;
-  }
-
-  /* We can send only a few options, others make no sense here. */
-  if (!valid_sync_option(name))
-  {
-    logit("Client wanted to get invalid option '%s'", name);
-    free(name);
-    return 0;
-  }
-
-  /* All supported options are boolean type. */
-  if (!send_data_bool(cli, options_get_bool(name)))
-  {
-    free(name);
-    return 0;
-  }
-
-  free(name);
-  return 1;
-}
-
-/* Get and set an option from the client. Return 1 on error. */
-static int get_set_option(struct client *cli)
-{
-  char *name;
-  int val;
-
-  if (!(name = get_str(cli->socket)))
-  {
-    return 0;
-  }
-  if (!valid_sync_option(name))
-  {
-    logit("Client requested setting invalid option '%s'", name);
-    return 0;
-  }
-  if (!get_int(cli->socket, &val))
-  {
-    free(name);
-    return 0;
-  }
-
-  options_set_bool(name, val ? true : false);
-  free(name);
-
-  add_event_all(EV_OPTIONS, NULL);
-
-  return 1;
-}
-
-/* Set the mixer to the value provided by the client. Return 0 on error. */
-static int set_mixer(struct client *cli)
-{
-  int val;
-
-  if (!get_int(cli->socket, &val))
-  {
-    return 0;
-  }
-
-  audio_set_mixer(val);
-  return 1;
-}
-
-/* Delete an item from the playlist. Return 0 on error. */
-static int delete_item(struct client *cli)
-{
-  char *file;
-
-  if (!(file = get_str(cli->socket)))
-  {
-    return 0;
-  }
-
-  debug("Request for deleting %s", file);
-
-  audio_plist_delete(file);
-  free(file);
-  return 1;
-}
-
-static int req_queue_del(const struct client *cli)
-{
-  char *file;
-
-  if (!(file = get_str(cli->socket)))
-  {
-    return 0;
-  }
-
-  debug("Deleting '%s' from queue", file);
-
-  audio_queue_delete(file);
-  add_event_all(EV_QUEUE_DEL, file);
-  free(file);
-
-  return 1;
-}
-
-/* Return the index of the first client able to send the playlist or -1 if
- * there isn't any. */
-static int find_sending_plist()
-{
-  int i;
-
-  for (i = 0; i < CLIENTS_MAX; i++)
-  {
-    if (clients[i].socket != -1 && clients[i].can_send_plist)
-    {
-      return i;
-    }
-  }
-  return -1;
-}
-
-/* Handle CMD_GET_PLIST. Return 0 on error. */
-static int get_client_plist(struct client *cli)
-{
-  int first;
-
-  debug("Client with fd %d requests the playlist", cli->socket);
-
-  /* Find the first connected client, and ask it to send the playlist.
-   * Here, send 1 if there is a client with the playlist, or 0 if there
-   * isn't. */
-
-  cli->requests_plist = 1;
-
-  first = find_sending_plist();
-  if (first == -1)
-  {
-    debug("No clients with the playlist");
-    cli->requests_plist = 0;
-    if (!send_data_int(cli, 0))
-    {
-      return 0;
-    }
-    return 1;
-  }
-
-  if (!send_data_int(cli, 1))
-  {
-    return 0;
-  }
-
-  if (!send_int(clients[first].socket, EV_SEND_PLIST))
-  {
-    return 0;
-  }
-
-  return 1;
-}
-
-/* Find the client requesting the playlist. */
-static int find_cli_requesting_plist()
-{
-  int i;
-
-  for (i = 0; i < CLIENTS_MAX; i++)
-  {
-    if (clients[i].requests_plist)
-    {
-      return i;
-    }
-  }
-  return -1;
-}
-
-/* Handle CMD_SEND_PLIST. Some client requested to get the playlist, so we asked
- * another client to send it (EV_SEND_PLIST). */
-static int req_send_plist(struct client *cli)
-{
-  int requesting = find_cli_requesting_plist();
-  int send_fd;
-  struct plist_item *item;
-  int serial;
-
-  debug("Client with fd %d wants to send its playlists", cli->socket);
-
-  if (requesting == -1)
-  {
-    logit("No clients are requesting the playlist");
-    send_fd = -1;
-  }
-  else
-  {
-    send_fd = clients[requesting].socket;
-    if (!send_int(send_fd, EV_DATA))
-    {
-      logit("Error while sending response; disconnecting the client");
-      close(send_fd);
-      del_client(&clients[requesting]);
-      send_fd = -1;
-    }
-  }
-
-  if (!get_int(cli->socket, &serial))
-  {
-    logit("Error while getting serial");
-    return 0;
-  }
-
-  if (send_fd != -1 && !send_int(send_fd, serial))
-  {
-    error("Error while sending serial; disconnecting the client");
-    close(send_fd);
-    del_client(&clients[requesting]);
-    send_fd = -1;
-  }
-
-  /* Even if no clients are requesting the playlist, we must read it,
-   * because there is no way to say that we don't need it. */
-  while ((item = recv_item(cli->socket)) && item->file[0])
-  {
-    if (send_fd != -1 && !send_item(send_fd, item))
-    {
-      logit("Error while sending item; disconnecting the client");
-      close(send_fd);
-      del_client(&clients[requesting]);
-      send_fd = -1;
-    }
-    plist_free_item_fields(item);
-    free(item);
-  }
-
-  if (item)
-  {
-    plist_free_item_fields(item);
-    free(item);
-    logit("Playlist sent");
-  }
-  else
-  {
-    logit("Error while receiving item");
-  }
-
-  if (send_fd != -1 && !send_item(send_fd, NULL))
-  {
-    logit("Error while sending end of playlist mark; "
-          "disconnecting the client");
-    close(send_fd);
-    del_client(&clients[requesting]);
-    return 0;
-  }
-
-  if (requesting != -1)
-  {
-    clients[requesting].requests_plist = 0;
-  }
-
-  return item ? 1 : 0;
-}
-
-/* Client requested we send the queue so we get it from audio.c and
- * send it to the client. */
-static int req_send_queue(struct client *cli)
-{
-  int i;
-  struct plist *queue;
-
-  logit("Client with fd %d wants queue... sending it", cli->socket);
-
-  if (!send_int(cli->socket, EV_DATA))
-  {
-    logit("Error while sending response; disconnecting the client");
-    close(cli->socket);
-    del_client(cli);
-    return 0;
-  }
-
-  queue = audio_queue_get_contents();
-
-  for (i = 0; i < queue->num; i++)
-  {
-    if (!plist_deleted(queue, i))
-    {
-      if (!send_item(cli->socket, &queue->items[i]))
-      {
-        logit("Error sending queue; disconnecting the client");
-        close(cli->socket);
-        del_client(cli);
-        free(queue);
-        return 0;
-      }
-    }
-  }
-
-  plist_free(queue);
-  free(queue);
-
-  if (!send_item(cli->socket, NULL))
-  {
-    logit("Error while sending end of playlist mark; "
-          "disconnecting the client");
-    close(cli->socket);
-    del_client(cli);
-    return 0;
-  }
-
-  logit("Queue sent");
-  return 1;
-}
-
-/* Handle command that synchronises the playlists between interfaces
- * (except forwarding the whole list). Return 0 on error. */
-static int plist_sync_cmd(struct client *cli, const int cmd)
-{
-  if (cmd == CMD_CLI_PLIST_ADD)
-  {
-    struct plist_item *item;
-
-    debug("Sending EV_PLIST_ADD");
-
-    if (!(item = recv_item(cli->socket)))
-    {
-      logit("Error while receiving item");
-      return 0;
-    }
-
-    add_event_all(EV_PLIST_ADD, item);
-    plist_free_item_fields(item);
-    free(item);
-  }
-  else if (cmd == CMD_CLI_PLIST_DEL)
-  {
-    char *file;
-
-    debug("Sending EV_PLIST_DEL");
-
-    if (!(file = get_str(cli->socket)))
-    {
-      logit("Error while receiving file");
-      return 0;
-    }
-
-    add_event_all(EV_PLIST_DEL, file);
-    free(file);
-  }
-  else if (cmd == CMD_CLI_PLIST_MOVE)
-  {
-    struct move_ev_data m;
-
-    if (!(m.from = get_str(cli->socket)) || !(m.to = get_str(cli->socket)))
-    {
-      logit("Error while receiving file");
-      return 0;
-    }
-
-    add_event_all(EV_PLIST_MOVE, &m);
-
-    free(m.from);
-    free(m.to);
-  }
-  else
-  { /* it can be only CMD_CLI_PLIST_CLEAR */
-    debug("Sending EV_PLIST_CLEAR");
-    add_event_all(EV_PLIST_CLEAR, NULL);
-  }
-
-  return 1;
-}
-
-/* Handle CMD_PLIST_GET_SERIAL. Return 0 on error. */
-static int req_plist_get_serial(struct client *cli)
-{
-  if (!send_data_int(cli, audio_plist_get_serial()))
-  {
-    return 0;
-  }
-  return 1;
-}
-
-/* Handle CMD_PLIST_SET_SERIAL. Return 0 on error. */
-static int req_plist_set_serial(struct client *cli)
-{
-  int serial;
-
-  if (!get_int(cli->socket, &serial))
-  {
-    return 0;
-  }
-
-  if (serial < 0)
-  {
-    logit("Client wants to set bad serial number");
-    return 0;
-  }
-
-  debug("Setting the playlist serial number to %d", serial);
-  audio_plist_set_serial(serial);
-
-  return 1;
-}
-
-/* Generate a unique playlist serial number. */
-static int gen_serial(const struct client *cli)
-{
-  static int seed = 0;
-  int serial;
-
-  /* Each client must always get a different serial number, so we use
-   * also the client index to generate it. It must also not be used by
-   * our playlist to not confuse clients.
-   * There can be 256 different serial number per client, but it's
-   * enough since clients use only two playlists. */
-
-  do
-  {
-    serial = (seed << 8) | client_index(cli);
-    seed = (seed + 1) & 0xFF;
-  } while (serial == audio_plist_get_serial());
-
-  debug("Generated serial %d for client with fd %d", serial, cli->socket);
-
-  return serial;
-}
-
-/* Send the unique number to the client. Return 0 on error. */
-static int send_serial(struct client *cli)
-{
-  if (!send_data_int(cli, gen_serial(cli)))
-  {
-    logit("Error when sending serial");
-    return 0;
-  }
-  return 1;
-}
-
-/* Send tags to the client. Return 0 on error. */
-static int req_get_tags(struct client *cli)
-{
-  struct file_tags *tags;
-  int res = 1;
-
-  debug("Sending tags to client with fd %d...", cli->socket);
-
-  if (!send_int(cli->socket, EV_DATA))
-  {
-    logit("Error when sending EV_DATA");
-    return 0;
-  }
-
-  tags = audio_get_curr_tags();
-  if (!send_tags(cli->socket, tags))
-  {
-    logit("Error when sending tags");
-    res = 0;
-  }
-
-  if (tags)
-  {
-    tags_free(tags);
-  }
-
-  return res;
-}
-
-/* Handle CMD_GET_MIXER_CHANNEL_NAME. Return 0 on error. */
-int req_get_mixer_channel_name(struct client *cli)
-{
-  int status = 1;
-  char *name = audio_get_mixer_channel_name();
-
-  if (!send_data_str(cli, name ? name : ""))
-  {
-    status = 0;
-  }
-  free(name);
-
-  return status;
-}
-
-/* Handle CMD_TOGGLE_MIXER_CHANNEL. */
-void req_toggle_mixer_channel()
-{
-  audio_toggle_mixer_channel();
-  add_event_all(EV_MIXER_CHANGE, NULL);
-}
-
-/* Handle CMD_TOGGLE_SOFTMIXER. */
-void req_toggle_softmixer()
-{
-  softmixer_set_active(!softmixer_is_active());
-  add_event_all(EV_MIXER_CHANGE, NULL);
-}
-
-void update_eq_name()
-{
-  char buffer[27];
-
-  char *n = equalizer_current_eqname();
-
-  int l = strlen(n);
-
-  /* Status message can only take strings up to 25 chars
-   * (Without terminating zero).
-   * The message header has 11 chars (EQ set to...).
-   */
-  if (l > 14)
-  {
-    n[14] = 0;
-    n[13] = '.';
-    n[12] = '.';
-    n[11] = '.';
-  }
-
-  sprintf(buffer, "EQ set to: %s", n);
-
-  logit("%s", buffer);
-
-  free(n);
-
-  status_msg(buffer);
-}
-
-void req_toggle_equalizer()
-{
-  equalizer_set_active(!equalizer_is_active());
-
-  update_eq_name();
-}
-
-void req_equalizer_refresh()
-{
-  equalizer_refresh();
-
-  status_msg("Equalizer refreshed");
-
-  logit("Equalizer refreshed");
-}
-
-void req_equalizer_prev()
-{
-  equalizer_prev();
-
-  update_eq_name();
-}
-
-void req_equalizer_next()
-{
-  equalizer_next();
-
-  update_eq_name();
-}
-
-void req_toggle_make_mono()
-{
-  char buffer[128];
-
-  softmixer_set_mono(!softmixer_is_mono());
-
-  sprintf(buffer, "Mono-Mixing set to: %s", softmixer_is_mono() ? "on" : "off");
-
-  status_msg(buffer);
-}
-
-/* Handle CMD_GET_FILE_TAGS. Return 0 on error. */
-static int get_file_tags(const int cli_id)
-{
-  char *file;
-  int tags_sel;
-
-  if (!(file = get_str(clients[cli_id].socket)))
-  {
-    return 0;
-  }
-  if (!get_int(clients[cli_id].socket, &tags_sel))
-  {
-    free(file);
-    return 0;
-  }
-
-  tags_cache_add_request(tags_cache, file, tags_sel, cli_id);
-  free(file);
-
-  return 1;
-}
-
-static int abort_tags_requests(const int cli_id)
-{
-  char *file;
-
-  if (!(file = get_str(clients[cli_id].socket)))
-  {
-    return 0;
-  }
-
-  tags_cache_clear_up_to(tags_cache, file, cli_id);
-  free(file);
-
-  return 1;
-}
-
-/* Handle CMD_LIST_MOVE. Return 0 on error. */
-static int req_list_move(struct client *cli)
-{
-  char *from;
-  char *to;
-
-  if (!(from = get_str(cli->socket)))
-  {
-    return 0;
-  }
-  if (!(to = get_str(cli->socket)))
-  {
-    free(from);
-    return 0;
-  }
-
-  audio_plist_move(from, to);
-
-  free(from);
-  free(to);
-
-  return 1;
-}
-
-/* Handle CMD_QUEUE_MOVE. Return 0 on error. */
-static int req_queue_move(const struct client *cli)
-{
-  struct move_ev_data m;
-
-  if (!(m.from = get_str(cli->socket)))
-  {
-    return 0;
-  }
-  if (!(m.to = get_str(cli->socket)))
-  {
-    free(m.from);
-    return 0;
-  }
-
-  audio_queue_move(m.from, m.to);
-
-  logit("Swapping %s with %s in the queue", m.from, m.to);
-
-  /* Broadcast the event to clients */
-  add_event_all(EV_QUEUE_MOVE, &m);
-
-  free(m.from);
-  free(m.to);
-
-  return 1;
-}
-
-/* Receive a command from the client and execute it. */
-static void handle_command(const int client_id)
-{
-  int cmd;
-  int err = 0;
-  struct client *cli = &clients[client_id];
-
-  if (!get_int(cli->socket, &cmd))
-  {
-    logit("Failed to get command from the client");
-    close(cli->socket);
-    del_client(cli);
-    return;
-  }
-
-  switch (cmd)
-  {
-    case CMD_QUIT:
-      logit("Exit request from the client");
-      close(cli->socket);
-      del_client(cli);
-      server_quit = 1;
-      break;
-    case CMD_LIST_CLEAR:
-      logit("Clearing the list");
-      audio_plist_clear();
-      break;
-    case CMD_LIST_ADD:
-      if (!req_list_add(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_PLAY:
-      if (!req_play(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_DISCONNECT:
-      logit("Client disconnected");
-      close(cli->socket);
-      del_client(cli);
-      break;
-    case CMD_PAUSE:
-      audio_pause();
-      break;
-    case CMD_UNPAUSE:
-      audio_unpause();
-      break;
-    case CMD_STOP:
-      audio_stop();
-      break;
-    case CMD_GET_CTIME:
-      if (!send_data_int(cli, MAX(0, audio_get_time())))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_SEEK:
-      if (!req_seek(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_JUMP_TO:
-      if (!req_jump_to(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_GET_SNAME:
-      if (!send_sname(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_GET_STATE:
-      if (!send_data_int(cli, audio_get_state()))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_GET_BITRATE:
-      if (!send_data_int(cli, sound_info.bitrate))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_GET_AVG_BITRATE:
-      if (!send_data_int(cli, sound_info.avg_bitrate))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_GET_RATE:
-      if (!send_data_int(cli, sound_info.rate))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_GET_CHANNELS:
-      if (!send_data_int(cli, sound_info.channels))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_NEXT:
-      audio_next();
-      break;
-    case CMD_PREV:
-      audio_prev();
-      break;
-    case CMD_PING:
-      if (!send_int(cli->socket, EV_PONG))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_GET_OPTION:
-      if (!send_option(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_SET_OPTION:
-      if (!get_set_option(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_GET_MIXER:
-      if (!send_data_int(cli, audio_get_mixer()))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_SET_MIXER:
-      if (!set_mixer(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_DELETE:
-      if (!delete_item(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_SEND_PLIST_EVENTS:
-      cli->wants_plist_events = 1;
-      logit("Request for events");
-      break;
-    case CMD_GET_PLIST:
-      if (!get_client_plist(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_SEND_PLIST:
-      if (!req_send_plist(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_CAN_SEND_PLIST:
-      cli->can_send_plist = 1;
-      break;
-    case CMD_CLI_PLIST_ADD:
-    case CMD_CLI_PLIST_DEL:
-    case CMD_CLI_PLIST_CLEAR:
-    case CMD_CLI_PLIST_MOVE:
-      if (!plist_sync_cmd(cli, cmd))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_LOCK:
-      if (!client_lock(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_UNLOCK:
-      if (!client_unlock(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_GET_SERIAL:
-      if (!send_serial(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_PLIST_GET_SERIAL:
-      if (!req_plist_get_serial(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_PLIST_SET_SERIAL:
-      if (!req_plist_set_serial(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_GET_TAGS:
-      if (!req_get_tags(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_TOGGLE_MIXER_CHANNEL:
-      req_toggle_mixer_channel();
-      break;
-    case CMD_TOGGLE_SOFTMIXER:
-      req_toggle_softmixer();
-      break;
-    case CMD_GET_MIXER_CHANNEL_NAME:
-      if (!req_get_mixer_channel_name(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_GET_FILE_TAGS:
-      if (!get_file_tags(client_id))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_ABORT_TAGS_REQUESTS:
-      if (!abort_tags_requests(client_id))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_LIST_MOVE:
-      if (!req_list_move(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_TOGGLE_EQUALIZER:
-      req_toggle_equalizer();
-      break;
-    case CMD_EQUALIZER_REFRESH:
-      req_equalizer_refresh();
-      break;
-    case CMD_EQUALIZER_PREV:
-      req_equalizer_prev();
-      break;
-    case CMD_EQUALIZER_NEXT:
-      req_equalizer_next();
-      break;
-    case CMD_TOGGLE_MAKE_MONO:
-      req_toggle_make_mono();
-      break;
-    case CMD_QUEUE_ADD:
-      if (!req_queue_add(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_QUEUE_DEL:
-      if (!req_queue_del(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_QUEUE_CLEAR:
-      logit("Clearing the queue");
-      audio_queue_clear();
-      add_event_all(EV_QUEUE_CLEAR, NULL);
-      break;
-    case CMD_QUEUE_MOVE:
-      if (!req_queue_move(cli))
-      {
-        err = 1;
-      }
-      break;
-    case CMD_GET_QUEUE:
-      if (!req_send_queue(cli))
-      {
-        err = 1;
-      }
-      break;
-    default:
-      logit("Bad command (0x%x) from the client", cmd);
-      err = 1;
-  }
-
-  if (err)
-  {
-    logit("Closing client connection due to error");
-    close(cli->socket);
-    del_client(cli);
-  }
-}
-
-/* Add clients file descriptors to fds. */
-static void add_clients_fds(fd_set *read, fd_set *write)
-{
-  int i;
-
-  for (i = 0; i < CLIENTS_MAX; i++)
-  {
-    if (clients[i].socket != -1)
-    {
-      if (locking_client() == -1 || is_locking(&clients[i]))
-      {
-        FD_SET(clients[i].socket, read);
-      }
-
-      LOCK(clients[i].events_mtx);
-      if (!event_queue_empty(&clients[i].events))
-      {
-        FD_SET(clients[i].socket, write);
-      }
-      UNLOCK(clients[i].events_mtx);
-    }
-  }
-}
-
-/* Return the maximum fd from clients and the argument. */
-static int max_fd(int max)
-{
-  int i;
-
-  if (wake_up_pipe[0] > max)
-  {
-    max = wake_up_pipe[0];
-  }
-
-  for (i = 0; i < CLIENTS_MAX; i++)
-  {
-    if (clients[i].socket > max)
-    {
-      max = clients[i].socket;
-    }
-  }
-  return max;
-}
-
-/* Handle clients whose fds are ready to read. */
-static void handle_clients(fd_set *fds)
-{
-  int i;
-
-  for (i = 0; i < CLIENTS_MAX; i++)
-  {
-    if (clients[i].socket != -1 && FD_ISSET(clients[i].socket, fds))
-    {
-      if (locking_client() == -1 || is_locking(&clients[i]))
-      {
-        handle_command(i);
-      }
-      else
-      {
-        debug("Not getting a command from client with"
-              " fd %d because of lock",
-              clients[i].socket);
-      }
-    }
-  }
-}
-
-/* Close all client connections sending EV_EXIT. */
-static void close_clients()
-{
-  int i;
-
-  for (i = 0; i < CLIENTS_MAX; i++)
-  {
-    if (clients[i].socket != -1)
-    {
-      send_int(clients[i].socket, EV_EXIT);
-      close(clients[i].socket);
-      del_client(&clients[i]);
-    }
-  }
-}
-
-/* Handle incoming connections */
-void server_loop()
-{
-  struct sockaddr_un client_name;
-  socklen_t name_len = sizeof(client_name);
-
-  logit("MOC server started, pid: %d", getpid());
-
-  assert(server_sock != -1);
+  logit("MOC engine started, pid: %d", getpid());
 
   log_circular_start();
 
-  do
+  pthread_mutex_lock(&quit_mtx);
+  while (!server_quit)
   {
-    int res;
-    fd_set fds_write, fds_read;
-
-    FD_ZERO(&fds_read);
-    FD_ZERO(&fds_write);
-    FD_SET(server_sock, &fds_read);
-    FD_SET(wake_up_pipe[0], &fds_read);
-    add_clients_fds(&fds_read, &fds_write);
-
-    res = 0;
-    if (!server_quit)
-    {
-      res = select(max_fd(server_sock) + 1, &fds_read, &fds_write, NULL, NULL);
-    }
-
-    if (res == -1 && errno != EINTR && !server_quit)
-    {
-      fatal("select() failed: %s", xstrerror(errno));
-    }
-
-    if (!server_quit && res >= 0)
-    {
-      if (FD_ISSET(server_sock, &fds_read))
-      {
-        int client_sock;
-
-        debug("accept()ing connection...");
-        client_sock =
-            accept(server_sock, (struct sockaddr *)&client_name, &name_len);
-
-        if (client_sock == -1)
-        {
-          fatal("accept() failed: %s", xstrerror(errno));
-        }
-        logit("Incoming connection");
-        if (!add_client(client_sock))
-        {
-          busy(client_sock);
-        }
-      }
-
-      if (FD_ISSET(wake_up_pipe[0], &fds_read))
-      {
-        int w;
-
-        logit("Got 'wake up'");
-
-        if (read(wake_up_pipe[0], &w, sizeof(w)) < 0)
-        {
-          fatal("Can't read wake up signal: %s", xstrerror(errno));
-        }
-      }
-
-      send_events(&fds_write);
-      handle_clients(&fds_read);
-    }
-
-    if (server_quit)
-    {
-      logit("Exiting...");
-    }
-
-  } while (!server_quit);
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += 1;
+    pthread_cond_timedwait(&quit_cond, &quit_mtx, &ts);
+  }
+  pthread_mutex_unlock(&quit_mtx);
 
   log_circular_log();
   log_circular_stop();
 
-  close_clients();
-  clients_cleanup();
-  close(server_sock);
-  server_sock = -1;
   server_shutdown();
 }
+
+/* -----------------------------------------------------------------------
+ * Engine→UI notification callbacks (called from player/tags threads)
+ * ----------------------------------------------------------------------- */
 
 void set_info_bitrate(const int bitrate)
 {
@@ -1983,48 +475,236 @@ void set_info_avg_bitrate(const int avg_bitrate)
   add_event_all(EV_AVG_BITRATE, NULL);
 }
 
-/* Notify the client about change of the player state. */
-void state_change() { add_event_all(EV_STATE, NULL); }
-
-void ctime_change() { add_event_all(EV_CTIME, NULL); }
-
-void tags_change() { add_event_all(EV_TAGS, NULL); }
+void state_change(void)  { add_event_all(EV_STATE, NULL); }
+void ctime_change(void)  { add_event_all(EV_CTIME, NULL); }
+void tags_change(void)   { add_event_all(EV_TAGS, NULL); }
 
 void status_msg(const char *msg) { add_event_all(EV_STATUS_MSG, msg); }
 
-void tags_response(const int client_id, const char *file,
-                   const struct file_tags *tags)
+void tags_response(const char *file, const struct file_tags *tags)
 {
   assert(file != NULL);
   assert(tags != NULL);
-  assert(LIMIT(client_id, CLIENTS_MAX));
 
-  if (clients[client_id].socket != -1)
-  {
-    struct tag_ev_response *data =
-        (struct tag_ev_response *)xmalloc(sizeof(struct tag_ev_response));
+  if (!g_eq) return;
 
-    data->file = xstrdup(file);
-    data->tags = tags_dup(tags);
-
-    add_event(&clients[client_id], EV_FILE_TAGS, data);
-    wake_up_server();
-  }
+  struct tag_ev_response *data =
+      (struct tag_ev_response *)xmalloc(sizeof(struct tag_ev_response));
+  data->file = xstrdup(file);
+  data->tags = tags_dup(tags);
+  eq_push(g_eq, EV_FILE_TAGS, data);
 }
 
-void ev_audio_start() { add_event_all(EV_AUDIO_START, NULL); }
+void ev_audio_start(void) { add_event_all(EV_AUDIO_START, NULL); }
+void ev_audio_stop(void)  { add_event_all(EV_AUDIO_STOP, NULL); }
 
-void ev_audio_stop() { add_event_all(EV_AUDIO_STOP, NULL); }
-
-/* Announce to clients that first file from the queue is being played
- * and therefore needs to be removed from it */
-/* XXX: this function is called from player thread and add_event_all
- *      imho doesn't properly lock all shared variables -- possible
- *      race condition??? */
 void server_queue_pop(const char *filename)
 {
   debug("Queue pop -- broadcasting EV_QUEUE_DEL");
   add_event_all(EV_QUEUE_DEL, filename);
+}
+
+void engine_error(const char *file, const char *msg)
+{
+  struct srv_error_ev e;
+  e.file = (char *)file;
+  e.msg  = (char *)msg;
+  add_event_all(EV_SRV_ERROR, &e);
+}
+
+void server_error(const char *file, int line, const char *function,
+                  const char *msg)
+{
+  internal_logit(file, line, function, "ERROR: %s", msg);
+  engine_error("", msg);
+}
+
+/* -----------------------------------------------------------------------
+ * Sound-info getters (UI thread reads these after receiving EV_BITRATE etc.)
+ * ----------------------------------------------------------------------- */
+
+int engine_get_bitrate(void)     { return sound_info.bitrate; }
+int engine_get_avg_bitrate(void) { return sound_info.avg_bitrate; }
+int engine_get_rate(void)        { return sound_info.rate; }
+int engine_get_channels(void)    { return sound_info.channels; }
+
+/* -----------------------------------------------------------------------
+ * Option sync
+ * ----------------------------------------------------------------------- */
+
+static int valid_sync_option(const char *name)
+{
+  return !strcasecmp(name, "ShowStreamErrors") ||
+         !strcasecmp(name, "Repeat")           ||
+         !strcasecmp(name, "Shuffle")           ||
+         !strcasecmp(name, "AutoNext");
+}
+
+void engine_set_option(const char *name, bool val)
+{
+  if (!valid_sync_option(name))
+  {
+    logit("Ignoring request to set invalid option '%s'", name);
+    return;
+  }
+  options_set_bool(name, val);
+  add_event_all(EV_OPTIONS, NULL);
+}
+
+/* -----------------------------------------------------------------------
+ * Tags requests
+ * ----------------------------------------------------------------------- */
+
+void engine_request_file_tags(const char *file, int tags_sel)
+{
+  tags_cache_add_request(tags_cache, file, tags_sel);
+}
+
+void engine_abort_tags_requests(const char *file)
+{
+  tags_cache_clear_up_to(tags_cache, file);
+}
+
+/* -----------------------------------------------------------------------
+ * Queue operations
+ * ----------------------------------------------------------------------- */
+
+void engine_queue_add(const char *file)
+{
+  struct plist_item *item;
+
+  logit("Adding '%s' to the queue", file);
+  audio_queue_add(file);
+
+  item = plist_new_item();
+  item->file  = xstrdup(file);
+  item->type  = file_type(file);
+  item->mtime = get_mtime(file);
+
+  add_event_all(EV_QUEUE_ADD, item);
+
+  plist_free_item_fields(item);
+  free(item);
+}
+
+void engine_queue_del(const char *file)
+{
+  debug("Deleting '%s' from queue", file);
+  audio_queue_delete(file);
+  add_event_all(EV_QUEUE_DEL, file);
+}
+
+void engine_queue_clear(void)
+{
+  logit("Clearing the queue");
+  audio_queue_clear();
+  add_event_all(EV_QUEUE_CLEAR, NULL);
+}
+
+struct plist *engine_get_queue(void)
+{
+  return audio_queue_get_contents();
+}
+
+/* -----------------------------------------------------------------------
+ * Compound commands
+ * ----------------------------------------------------------------------- */
+
+void engine_jump_to(int sec)
+{
+  if (sec < 0)
+  {
+    int percent = -sec;
+    assert(percent >= 0 && percent <= 100);
+
+    char *file = audio_get_sname();
+    if (!file || !*file)
+    {
+      free(file);
+      return;
+    }
+
+    struct file_tags *tags;
+    tags = tags_cache_get_immediate(tags_cache, file, TAGS_TIME);
+    if (!tags || !(tags->filled & TAGS_TIME))
+    {
+      tags_free(tags);
+      free(file);
+      return;
+    }
+
+    sec = (tags->time * percent) / 100;
+    tags_free(tags);
+    free(file);
+  }
+
+  logit("Jumping to %ds", sec);
+  audio_jump_to(sec);
+}
+
+void engine_toggle_mixer_channel(void)
+{
+  audio_toggle_mixer_channel();
+  add_event_all(EV_MIXER_CHANGE, NULL);
+}
+
+void engine_toggle_softmixer(void)
+{
+  softmixer_set_active(!softmixer_is_active());
+  add_event_all(EV_MIXER_CHANGE, NULL);
+}
+
+static void update_eq_name(void)
+{
+  char buffer[27];
+  char *n = equalizer_current_eqname();
+  int l   = strlen(n);
+
+  if (l > 14)
+  {
+    n[14] = 0;
+    n[13] = '.';
+    n[12] = '.';
+    n[11] = '.';
+  }
+
+  sprintf(buffer, "EQ set to: %s", n);
+  logit("%s", buffer);
+  free(n);
+  status_msg(buffer);
+}
+
+void engine_toggle_equalizer(void)
+{
+  equalizer_set_active(!equalizer_is_active());
+  update_eq_name();
+}
+
+void engine_equalizer_refresh(void)
+{
+  equalizer_refresh();
+  status_msg("Equalizer refreshed");
+  logit("Equalizer refreshed");
+}
+
+void engine_equalizer_prev(void)
+{
+  equalizer_prev();
+  update_eq_name();
+}
+
+void engine_equalizer_next(void)
+{
+  equalizer_next();
+  update_eq_name();
+}
+
+void engine_toggle_make_mono(void)
+{
+  char buffer[128];
+  softmixer_set_mono(!softmixer_is_mono());
+  sprintf(buffer, "Mono-Mixing set to: %s", softmixer_is_mono() ? "on" : "off");
+  status_msg(buffer);
 }
 
 // EOF

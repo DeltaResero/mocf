@@ -92,19 +92,19 @@ static int song_length_ms(SidTune &tune)
 // Engine / builder construction
 // ---------------------------------------------------------------------------
 
-// Create and sanity-check an ReSIDfpBuilder.  Returns NULL on failure.
-static ReSIDfpBuilder *make_builder(unsigned int n_chips)
+// Create and sanity-check an ReSIDBuilder.  Returns NULL on failure.
+static ReSIDBuilder *make_builder(unsigned int n_chips)
 {
-    ReSIDfpBuilder *b = new ReSIDfpBuilder("ReSIDfp");
+    ReSIDBuilder *b = new ReSIDBuilder("ReSID");
     if (!b->getStatus()) {
-        logit("sidplayfp: ReSIDfpBuilder construction failed");
+        logit("sidplayfp: ReSIDBuilder construction failed");
         delete b;
         return NULL;
     }
 
     b->create(n_chips);
     if (!b->getStatus()) {
-        logit("sidplayfp: ReSIDfpBuilder::create(%u) failed: %s",
+        logit("sidplayfp: ReSIDBuilder::create(%u) failed: %s",
               n_chips, b->error());
         delete b;
         return NULL;
@@ -114,7 +114,7 @@ static ReSIDfpBuilder *make_builder(unsigned int n_chips)
 }
 
 // Create and configure a sidplayfp engine.  Returns NULL on failure.
-static sidplayfp *make_engine(ReSIDfpBuilder *builder, int frequency)
+static sidplayfp *make_engine(ReSIDBuilder *builder, int frequency)
 {
     sidplayfp *engine = new sidplayfp();
 
@@ -226,7 +226,7 @@ extern "C" void *sidplayfp_open(const char *file)
     s->builder = make_builder(n_chips);
     if (!s->builder) {
         decoder_error(&s->error, ERROR_FATAL, 0,
-                      "sidplayfp: cannot create ReSIDfp builder");
+                      "sidplayfp: cannot create ReSID builder");
         return s;
     }
 

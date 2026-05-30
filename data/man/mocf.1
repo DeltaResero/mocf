@@ -43,17 +43,8 @@ configuration file options exception).
 .LP
 .TP
 \fB\-D\fP, \fB\-\-debug\fP
-Run MOCF in debug mode.  The client and server log a lot of information
-to debug files.  Don't use this; the server log is large.  This is only
-available if MOCF was compiled without \fB\-\-disable\-debug\fP.
-.LP
-.TP
-\fB\-S\fP, \fB\-\-server\fP
-Run only the server and exit.
-.LP
-.TP
-\fB\-F\fP, \fB\-\-foreground\fP
-Implies \fB\-S\fP.  Run the server in foreground and log everything to stdout.
+Run MOCF in debug mode.  Extra logging is written to debug files.  This is
+only available if MOCF was compiled without \fB\-\-disable\-debug\fP.
 .LP
 .TP
 \fB\-R\fP \fINAME\fP[\fB:\fP...], \
@@ -67,63 +58,6 @@ the configuration file.
 \fB\-m\fP, \fB\-\-music\-dir\fP
 Start in \fBMusicDir\fP (set in the configuration file).  This can be also
 set in the configuration file as \fBStartInMusicDir\fP.
-.LP
-.TP
-\fB\-q\fP, \fB\-\-enqueue\fP
-Add files given after command line options to the queue.  Don't start the
-interface.
-.LP
-.TP
-\fB\-a\fP, \fB\-\-append\fP
-Append files, directories (recursively) and playlists given after command
-line options to the playlist.  Don't start the interface.
-.LP
-.TP
-\fB\-c\fP, \fB\-\-clear\fP
-Clear the playlist.
-.LP
-.TP
-\fB\-p\fP, \fB\-\-play\fP
-Start playing from the first item on the playlist.
-.LP
-.TP
-\fB\-l\fP, \fB\-\-playit\fP
-Play files given on the command line without modifying the clients'
-playlists.
-.LP
-.TP
-\fB\-f\fP, \fB\-\-next\fP
-Request playing the next song from the server's playlist.
-.LP
-.TP
-\fB\-r\fP, \fB\-\-previous\fP
-Request playing the previous song from the server's playlist.
-.LP
-.TP
-\fB\-s\fP, \fB\-\-stop\fP
-Request the server to stop playing.
-.LP
-.TP
-\fB\-x\fP, \fB\-\-exit\fP
-Bring down the server.
-.LP
-.TP
-\fB\-P\fP, \fB\-\-pause\fP
-Request the server to pause playing.
-.LP
-.TP
-\fB\-U\fP, \fB\-\-unpause\fP
-Request the server to resume playing when paused.
-.LP
-.TP
-\fB\-G\fP, \fB\-\-toggle\-pause\fP
-Toggle between play and pause.
-.LP
-.TP
-\fB\-k\fP [\fB+\fP|\fB\-\fP]\fIN\fP, \
-\fB\-\-seek \fP[\fB+\fP|\fB\-\fP]\fIN\fP
-Seek forward (positive) or backward (negative) by \fIN\fP seconds in the
-file currently being played.
 .LP
 .TP
 \fB\-T\fP \fITHEME\fP, \fB\-\-theme\fP \fITHEME\fP
@@ -172,52 +106,8 @@ the configuration file from that directory to be used.  This can also be
 specified in the configuration file using the \fBMOCDir\fP option.
 .LP
 .TP
-\fB\-y\fP, \fB\-\-sync\fP
-This copy of the interface will synchronize its playlist with other clients.
-This option is called \fBSyncPlaylist\fP in the configuration file.
-.LP
-.TP
-\fB\-n\fP, \fB\-\-nosync\fP
-This copy of the interface will not synchronize its playlist with other
-clients (see above).
-.LP
-.TP
 \fB\-A\fP, \fB\-\-ascii\fP
 Use ASCII characters to draw lines.  (This helps on some terminals.)
-.LP
-.TP
-\fB\-i\fP, \fB\-\-info\fP
-Print the information about the file currently being played.
-.LP
-.TP
-\fB\-Q\fP \fIFORMAT_STRING\fP, \fB\-\-format\fP \fIFORMAT_STRING\fP
-Print information about the file currently being played using a format
-string.  Replace string sequences with the actual information:
-.IP
-.RS 16
-.EX
-\fB%state\fP     State
-\fB%file\fP      File
-\fB%title\fP     Title
-\fB%artist\fP    Artist
-\fB%song\fP      SongTitle
-\fB%album\fP     Album
-\fB%tt\fP        TotalTime
-\fB%tl\fP        TimeLeft
-\fB%ts\fP        TotalSec
-\fB%ct\fP        CurrentTime
-\fB%cs\fP        CurrentSec
-\fB%b\fP         Bitrate
-\fB%r\fP         Rate
-.EE
-.RE
-.IP
-It is also possible to use variables from the \fBFormatString\fP
-configuration file option.
-.LP
-.TP
-\fB\-e\fP, \fB\-\-recursively\fP
-Alias of \fB\-a\fP for backward compatibility.
 .LP
 .TP
 \fB\-h\fP, \fB\-\-help\fP
@@ -234,42 +124,6 @@ Print the program version and exit.
 .TP
 \fB\-\-echo-args\fP
 Print the POPT-interpreted command line arguments and exit.
-.LP
-.TP
-\fB\-v\fP [\fB+\fP|\fB\-\fP]\fIN\fP, \
-\fB\-\-volume\fP [\fB+\fP|\fB\-\fP]\fIN\fP
-Adjust the mixer volume.  You can set (\fB\-v 50\fP) or adjust
-(\fB\-v +10\fP, \fB\-v \-10\fP).
-.LP
-.TP
-\fB\-t\fP \fIOPTION\fP[\fB,\fP...], \fB\-\-toggle\fP \fIOPTION\fP[\fB,\fP...]
-.TQ
-\fB\-o\fP \fIOPTION\fP[\fB,\fP...], \fB\-\-on\fP \fIOPTION\fP[\fB,\fP...]
-.TQ
-\fB\-u\fP \fIOPTION\fP[\fB,\fP...], \fB\-\-off\fP \fIOPTION\fP[\fB,\fP...]
-Followed by a list of identifiers, these will control MOCF's playlist
-options.  Valid identifiers are \fBshuffle\fP, \fBrepeat\fP and \fBautonext\fP.
-They can be shortened to '\fBs\fP', '\fBr\fP' and '\fBn\fP' respectively.
-Both the identifiers and short forms are case insensitive.
-.LP
-.RS
-.EX
-Example: \fB\-t shuffle,R,n\fP
-.EE
-         would toggle shuffle, repeat and autonext all at once.
-.RE
-.LP
-.TP
-\fB\-j\fP \fIN\fP{\fBs\fP|\fB%\fP}, \fB\-\-jump\fP \fIN\fP{\fBs\fP|\fB%\fP}
-Jump to some position in the current file.  \fIN\fP is the number of seconds
-(when followed by an '\fBs\fP') or the percent of total file time (when
-followed by a '\fB%\fP').
-.LP
-.RS
-.EX
-Examples: \fB\-j 10s\fP, \fB\-j 50%\fP
-.EE
-.RE
 .LP
 .SH USING POPT ALIASES
 MOCF uses the POPT library to process its command line.  This allows
@@ -435,7 +289,7 @@ terminals.  MOCF uses the configuration file options \fBXTerms\fP and
 .SH FILES
 .TP
 .B ~/.mocf
-MOCF directory for the configuration file, socket, the pid file and other data.
+MOCF directory for the configuration file, playlist, cache, and other data.
 .LP
 .TP
 .B ~/.mocf/config
@@ -468,16 +322,9 @@ Default directories for the theme files.
 Default directories for the audio decoder plugins.
 .LP
 .TP
-.B mocf_client_log
-.TQ
-.B mocf_server_log
-Client and server log files.  These files are created in the directory in
-which the client and server are started.  (Also see the \fB\-D\fP option.)
-.LP
-.SH BUGS
-Command line options that affect the server behaviour (like
-\fB\-\-sound\-driver\fP) are ignored if the server is already running at
-the time of executing \fBmocf\fP.  The user is not warned about this.
+.B mocf.log
+Debug log file (when \fB\-D\fP is used), created in the directory from which
+\fBmocf\fP was started.
 .LP
 .SH HOMEPAGE
 http://moc.daper.net/

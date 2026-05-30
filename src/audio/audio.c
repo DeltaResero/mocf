@@ -1714,36 +1714,11 @@ void audio_state_started_playing()
   state_change();
 }
 
-int audio_plist_get_serial()
-{
-  int serial;
-
-  LOCK(plist_mtx);
-  serial = plist_get_serial(&playlist);
-  UNLOCK(plist_mtx);
-
-  return serial;
-}
-
-void audio_plist_set_serial(const int serial)
-{
-  LOCK(plist_mtx);
-  plist_set_serial(&playlist, serial);
-  UNLOCK(plist_mtx);
-}
-
 /* Swap 2 files on the playlist. */
 void audio_plist_move(const char *file1, const char *file2)
 {
   LOCK(plist_mtx);
   plist_swap_files(&playlist, file1, file2);
-  UNLOCK(plist_mtx);
-}
-
-void audio_queue_move(const char *file1, const char *file2)
-{
-  LOCK(plist_mtx);
-  plist_swap_files(&queue, file1, file2);
   UNLOCK(plist_mtx);
 }
 
@@ -1762,7 +1737,6 @@ struct plist *audio_queue_get_contents()
   return ret;
 }
 
-struct file_tags *audio_get_curr_tags() { return player_get_curr_tags(); }
 
 char *audio_get_mixer_channel_name()
 {

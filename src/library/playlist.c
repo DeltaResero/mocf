@@ -204,7 +204,6 @@ void plist_init(struct plist *plist)
   plist->not_deleted = 0;
   plist->items =
       (struct plist_item *)xmalloc(sizeof(struct plist_item) * INIT_SIZE);
-  plist->serial = -1;
   plist->search_tree = rb_tree_new(rb_compare, rb_fname_compare, plist);
   plist->total_time = 0;
   plist->items_with_time = 0;
@@ -946,13 +945,6 @@ void plist_swap_first_fname(struct plist *plist, const char *fname)
     rb_insert(plist->search_tree, (void *)(intptr_t)i);
   }
 }
-
-void plist_set_serial(struct plist *plist, const int serial)
-{
-  plist->serial = serial;
-}
-
-int plist_get_serial(const struct plist *plist) { return plist->serial; }
 
 /* Return the index of the last non-deleted item from the playlist.
  * Return -1 if there are no items. */

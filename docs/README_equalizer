@@ -148,8 +148,9 @@ When designing presets, just save the preset and select it in MOCF.  After
 each change press the refresh key (default 'e').  This will re-create the
 equalizer reflecting your changes.
 
-If your preset is not found, have a look at the output of MOC's server
-thread.  Parsing errors are emitted there.
+If your preset is not found, have a look at the application log (mocf.log
+in your ~/.mocf/ directory when started with --debug).  Parsing errors are
+emitted there.
 
 *  3dB is commonly used for bandwidth.  -3dB equals about 70.7% of
    original amplification.
