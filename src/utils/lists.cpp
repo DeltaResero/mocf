@@ -1,4 +1,4 @@
-// src/utils/lists.c
+// src/utils/lists.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -18,28 +18,27 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
+#include <vector>
+#include <algorithm>
 
 #include "core/common.h"
 #include "utils/lists.h"
 
 struct lists_strs
 {
-  int size;     /* Number of strings on the list */
-  int capacity; /* Number of allocated strings */
-  char **strs;
+  std::vector<char*> strs;
 };
 
 /* Allocate a new list of strings and return its address. */
 lists_t_strs *lists_strs_new(int reserve)
 {
-  lists_t_strs *result;
-
   assert(reserve >= 0);
 
-  result = (lists_t_strs *)xmalloc(sizeof(lists_t_strs));
-  result->size = 0;
-  result->capacity = (reserve ? reserve : 64);
-  result->strs = (char **)xcalloc(sizeof(char *), result->capacity);
+  lists_t_strs *result = new lists_t_strs();
+  if (reserve > 0)
+  {
+    result->strs.reserve(reserve);
+  }
 
   return result;
 }
@@ -47,15 +46,13 @@ lists_t_strs *lists_strs_new(int reserve)
 /* Clear a list to an empty state. */
 void lists_strs_clear(lists_t_strs *list)
 {
-  int ix;
-
   assert(list);
 
-  for (ix = 0; ix < list->size; ix += 1)
+  for (char *s : list->strs)
   {
-    free((void *)list->strs[ix]);
+    free(s);
   }
-  list->size = 0;
+  list->strs.clear();
 }
 
 /* Free all storage associated with a list of strings. */
@@ -64,8 +61,7 @@ void lists_strs_free(lists_t_strs *list)
   assert(list);
 
   lists_strs_clear(list);
-  free(list->strs);
-  free(list);
+  delete list;
 }
 
 /* Return the number of strings in a list. */
@@ -73,7 +69,7 @@ int lists_strs_size(const lists_t_strs *list)
 {
   assert(list);
 
-  return list->size;
+  return static_cast<int>(list->strs.size());
 }
 
 /* Return the total number of strings which could be held without growing. */
@@ -81,7 +77,7 @@ int lists_strs_capacity(const lists_t_strs *list)
 {
   assert(list);
 
-  return list->capacity;
+  return static_cast<int>(list->strs.capacity());
 }
 
 /* Return true iff the list has no members. */
@@ -89,14 +85,14 @@ bool lists_strs_empty(const lists_t_strs *list)
 {
   assert(list);
 
-  return list->size == 0 ? true : false;
+  return list->strs.empty();
 }
 
 /* Given an index, return the string at that position in a list. */
 char *lists_strs_at(const lists_t_strs *list, int index)
 {
   assert(list);
-  assert(LIMIT(index, list->size));
+  assert(index >= 0 && index < static_cast<int>(list->strs.size()));
 
   return list->strs[index];
 }
@@ -107,24 +103,15 @@ void lists_strs_sort(lists_t_strs *list, lists_t_compare *compare)
   assert(list);
   assert(compare);
 
-  qsort(list->strs, list->size, sizeof(char *), compare);
+  qsort(list->strs.data(), list->strs.size(), sizeof(char *), compare);
 }
 
 /* Reverse the order of entries in a list. */
 void lists_strs_reverse(lists_t_strs *list)
 {
-  int ix, iy;
-
   assert(list);
 
-  for (ix = 0, iy = list->size - 1; ix < iy; ix += 1, iy -= 1)
-  {
-    char *str;
-
-    str = list->strs[ix];
-    list->strs[ix] = list->strs[iy];
-    list->strs[iy] = str;
-  }
+  std::reverse(list->strs.begin(), list->strs.end());
 }
 
 /* Take a string and push it onto the end of a list
@@ -134,44 +121,33 @@ void lists_strs_push(lists_t_strs *list, char *s)
   assert(list);
   assert(s);
 
-  if (list->size == list->capacity)
-  {
-    list->capacity *= 2;
-    list->strs = (char **)xrealloc(list->strs, list->capacity * sizeof(char *));
-  }
-
-  list->strs[list->size] = s;
-  list->size += 1;
+  list->strs.push_back(s);
 }
 
 /* Remove the last string on the list and return it, or NULL if the list
  * is empty. */
 char *lists_strs_pop(lists_t_strs *list)
 {
-  char *result;
-
   assert(list);
 
-  result = NULL;
-  if (list->size > 0)
+  if (list->strs.empty())
   {
-    list->size -= 1;
-    result = list->strs[list->size];
+    return NULL;
   }
 
+  char *result = list->strs.back();
+  list->strs.pop_back();
   return result;
 }
 
 /* Replace the nominated string with a new one and return the old one. */
 char *lists_strs_swap(lists_t_strs *list, int index, char *s)
 {
-  char *result;
-
   assert(list);
-  assert(LIMIT(index, list->size));
+  assert(index >= 0 && index < static_cast<int>(list->strs.size()));
   assert(s);
 
-  result = list->strs[index];
+  char *result = list->strs[index];
   list->strs[index] = s;
 
   return result;
@@ -180,23 +156,19 @@ char *lists_strs_swap(lists_t_strs *list, int index, char *s)
 /* Copy a string and append it to the end of a list. */
 void lists_strs_append(lists_t_strs *list, const char *s)
 {
-  char *str;
-
   assert(list);
   assert(s);
 
-  str = xstrdup(s);
+  char *str = xstrdup(s);
   lists_strs_push(list, str);
 }
 
 /* Remove a string from the end of the list and free it. */
 void lists_strs_remove(lists_t_strs *list)
 {
-  char *str;
-
   assert(list);
 
-  str = lists_strs_pop(list);
+  char *str = lists_strs_pop(list);
   if (str)
   {
     free(str);
@@ -207,12 +179,10 @@ void lists_strs_remove(lists_t_strs *list)
  * and free the old one. */
 void lists_strs_replace(lists_t_strs *list, int index, char *s)
 {
-  char *str;
-
   assert(list);
-  assert(LIMIT(index, list->size));
+  assert(index >= 0 && index < static_cast<int>(list->strs.size()));
 
-  str = xstrdup(s);
+  char *str = xstrdup(s);
   str = lists_strs_swap(list, index, str);
   free(str);
 }
@@ -247,14 +217,10 @@ int lists_strs_split(lists_t_strs *list, const char *s, const char *delim)
  * Returns the number of tokens appended. */
 int lists_strs_tokenise(lists_t_strs *list, const char *s)
 {
-  int result;
-
   assert(list);
   assert(s);
 
-  result = lists_strs_split(list, s, " \t");
-
-  return result;
+  return lists_strs_split(list, s, " \t");
 }
 
 /* Return the concatenation of all the strings in a list using the
@@ -283,7 +249,7 @@ char *lists_strs_fmt(const lists_t_strs *list, const char *fmt)
     }
     len += ix * (strlen(fmt) - 2);
 
-    ptr = result = xmalloc(len + 1);
+    ptr = result = (char *)xmalloc(len + 1);
     for (ix = 0; ix < lists_strs_size(list); ix += 1)
     {
       rc = snprintf(ptr, len + 1, "%.*s%s%s",
@@ -306,13 +272,9 @@ char *lists_strs_fmt(const lists_t_strs *list, const char *fmt)
  * if the list is empty. */
 char *lists_strs_cat(const lists_t_strs *list)
 {
-  char *result;
-
   assert(list);
 
-  result = lists_strs_fmt(list, "%s");
-
-  return result;
+  return lists_strs_fmt(list, "%s");
 }
 
 /* Return a "snapshot" of the given string list.  The returned memory is a
