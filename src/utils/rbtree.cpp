@@ -1,4 +1,4 @@
-// src/utils/rbtree.c
+// src/utils/rbtree.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -34,6 +34,8 @@ struct rb_node
   struct rb_node *parent;
   enum rb_color color;
   const void *data;
+
+  rb_node() : left(nullptr), right(nullptr), parent(nullptr), color(RB_BLACK), data(nullptr) {}
 };
 
 struct rb_tree
@@ -48,10 +50,13 @@ struct rb_tree
 
   /* pointer to additional data passed to compare functions */
   const void *adata;
+
+  rb_tree(rb_t_compare *c_fn, rb_t_compare_key *ck_fn, const void *ad)
+      : root(nullptr), cmp_fn(c_fn), cmp_key_fn(ck_fn), adata(ad) {}
 };
 
 /* item used as a null value */
-static struct rb_node rb_null = {NULL, NULL, NULL, RB_BLACK, NULL};
+static struct rb_node rb_null;
 
 static void rb_left_rotate(struct rb_node **root, struct rb_node *x)
 {
@@ -267,7 +272,7 @@ void rb_insert(struct rb_tree *t, void *data)
 
   x = t->root;
   y = &rb_null;
-  z = (struct rb_node *)xmalloc(sizeof(struct rb_node));
+  z = new rb_node();
 
   z->data = data;
 
@@ -457,24 +462,18 @@ void rb_delete(struct rb_tree *t, const void *key)
       rb_delete_fixup(&t->root, x, parent);
     }
 
-    free(y);
+    delete y;
   }
 }
 
 struct rb_tree *rb_tree_new(rb_t_compare *cmp_fn, rb_t_compare_key *cmp_key_fn,
                             const void *adata)
 {
-  struct rb_tree *t;
-
   assert(cmp_fn != NULL);
   assert(cmp_key_fn != NULL);
 
-  t = xmalloc(sizeof(*t));
-
+  struct rb_tree *t = new rb_tree(cmp_fn, cmp_key_fn, adata);
   t->root = &rb_null;
-  t->cmp_fn = cmp_fn;
-  t->cmp_key_fn = cmp_key_fn;
-  t->adata = adata;
 
   return t;
 }
@@ -485,7 +484,7 @@ static void rb_destroy(struct rb_node *n)
   {
     rb_destroy(n->right);
     rb_destroy(n->left);
-    free(n);
+    delete n;
   }
 }
 
@@ -498,7 +497,7 @@ void rb_tree_clear(struct rb_tree *t)
   {
     rb_destroy(t->root->left);
     rb_destroy(t->root->right);
-    free(t->root);
+    delete t->root;
     t->root = &rb_null;
   }
 }
@@ -509,7 +508,7 @@ void rb_tree_free(struct rb_tree *t)
   assert(t->root != NULL);
 
   rb_tree_clear(t);
-  free(t);
+  delete t;
 }
 
 // EOF
