@@ -1,4 +1,4 @@
-// src/core/options.c
+// src/core/options.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,16 +13,16 @@
 #include "config.h"
 #endif
 
-#include <assert.h>
-#include <string.h>
-#include <strings.h>
-#include <ctype.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include <cassert>
+#include <cctype>
+#include <cerrno>
+#include <climits>
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <string>
 #include <unistd.h>
-#include <limits.h>
-#include <stdarg.h>
 #include <sys/types.h>
 #include <regex.h>
 
@@ -294,7 +294,7 @@ static int check_function(int opt, ...)
 
   if (preg == NULL)
   {
-    preg = (regex_t *)xmalloc(sizeof(regex_t));
+    preg = new regex_t;
     rc = regcomp(preg, regex, REG_EXTENDED | REG_ICASE | REG_NOSUB);
     assert(rc == 0);
   }
@@ -415,15 +415,13 @@ static void add_path(const char *name, const char *value,
 
   if (value && value[0] == '~')
   {
-    char *path = xmalloc(PATH_MAX);
-    int rc = snprintf(path, PATH_MAX, "%s/%s", get_home(),
-                      (value[1] == '/') ? value + 2 : value + 1);
-    if (rc >= PATH_MAX)
+    std::string path = std::string(get_home()) + "/" +
+                       ((value[1] == '/') ? value + 2 : value + 1);
+    if (path.size() >= PATH_MAX)
     {
       fatal("Path too long!");
     }
-    options[pos].value.str = xstrdup(path);
-    free(path);
+    options[pos].value.str = xstrdup(path.c_str());
   }
   else
   {
@@ -614,15 +612,13 @@ void options_set_path(const char *name, const char *value)
 
   if (value[0] == '~')
   {
-    char *path = xmalloc(PATH_MAX);
-    int rc = snprintf(path, PATH_MAX, "%s/%s", get_home(),
-                      (value[1] == '/') ? value + 2 : value + 1);
-    if (rc >= PATH_MAX)
+    std::string path = std::string(get_home()) + "/" +
+                       ((value[1] == '/') ? value + 2 : value + 1);
+    if (path.size() >= PATH_MAX)
     {
       fatal("Path too long!");
     }
-    options[opt].value.str = xstrdup(path);
-    free(path);
+    options[opt].value.str = xstrdup(path.c_str());
   }
   else
   {

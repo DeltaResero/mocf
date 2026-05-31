@@ -1,4 +1,4 @@
-// src/core/main.c
+// src/core/main.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,21 +13,22 @@
 #include "config.h"
 #endif
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <ctype.h>
-#include <sys/types.h>
+#include <cassert>
+#include <cctype>
+#include <cerrno>
+#include <csignal>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <locale.h>
+#include <string>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <sys/utsname.h>
 #include <unistd.h>
-#include <signal.h>
-#include <errno.h>
-#include <time.h>
-#include <locale.h>
-#include <assert.h>
 #include <popt.h>
 
 #include "core/common.h"
@@ -98,11 +99,11 @@ struct server_thread_args {
 
 static void *server_thread_func(void *arg)
 {
-  struct server_thread_args *args = (struct server_thread_args *)arg;
+  auto *args = static_cast<server_thread_args *>(arg);
   server_init(args->eq);
   server_loop();
-  free(args);
-  return NULL;
+  delete args;
+  return nullptr;
 }
 
 /* Run client and server in the same process. */
@@ -114,7 +115,7 @@ static void start_moc(const struct parameters *params, lists_t_strs *args)
 
   eq = engine_event_queue_new();
 
-  th_args = (struct server_thread_args *)xmalloc(sizeof(*th_args));
+  th_args = new server_thread_args;
   th_args->eq    = eq;
 
   if (params->debug)
@@ -403,19 +404,15 @@ static void read_mocf_poptrc(poptContext ctx, const char *env_poptrc)
 /* Check that the ~/.popt file is secure. */
 static void check_popt_secure()
 {
-  int len;
-  const char *home, dot_popt[] = ".popt";
-  char *home_popt;
+  const char *home;
+  const char dot_popt[] = ".popt";
 
   home = get_home();
-  len = strlen(home) + strlen(dot_popt) + 2;
-  home_popt = xcalloc(len, sizeof(char));
-  snprintf(home_popt, len, "%s/%s", home, dot_popt);
-  if (!is_secure(home_popt))
+  std::string home_popt = std::string(home) + "/" + dot_popt;
+  if (!is_secure(home_popt.c_str()))
   {
-    fatal("POPT config file is not secure: %s", home_popt);
+    fatal("POPT config file is not secure: %s", home_popt.c_str());
   }
-  free(home_popt);
 }
 
 /* Read the default POPT configuration file. */
@@ -530,7 +527,7 @@ struct poptOption *clone_popt_options(struct poptOption *opts)
   for (tally = 1; !is_tableend(&opts[tally - 1]); tally += 1)
     ;
 
-  result = xcalloc(tally, sizeof(struct poptOption));
+  result = new poptOption[tally]();
 
   for (ix = 0; ix < tally; ix += 1)
   {
@@ -602,7 +599,7 @@ void free_popt_clone(struct poptOption *opts)
     }
   }
 
-  free(opts);
+  delete[] opts;
 }
 
 /* Return a pointer to the copied POPT option table entry for which the
@@ -671,7 +668,6 @@ static char *render_popt_command_line()
 
   while (1)
   {
-    size_t len;
     char *str;
     const char *arg;
     struct poptOption *opt;
@@ -699,39 +695,17 @@ static char *render_popt_command_line()
 
     if (opt->longName)
     {
-      len = strlen(opt->longName) + 3;
-      if (arg)
-      {
-        len += strlen(arg) + 3;
-      }
-      str = xmalloc(len);
-
-      if (arg)
-      {
-        snprintf(str, len, "--%s='%s'", opt->longName, arg);
-      }
-      else
-      {
-        snprintf(str, len, "--%s", opt->longName);
-      }
+      std::string s = arg
+                      ? std::string("--") + opt->longName + "='" + arg + "'"
+                      : std::string("--") + opt->longName;
+      str = xstrdup(s.c_str());
     }
     else
     {
-      len = 3;
-      if (arg)
-      {
-        len += strlen(arg) + 3;
-      }
-      str = xmalloc(len);
-
-      if (arg)
-      {
-        snprintf(str, len, "-%c '%s'", opt->shortName, arg);
-      }
-      else
-      {
-        snprintf(str, len, "-%c", opt->shortName);
-      }
+      std::string s = arg
+                      ? std::string("-") + opt->shortName + " '" + arg + "'"
+                      : std::string(1, '-') + opt->shortName;
+      str = xstrdup(s.c_str());
     }
 
     lists_strs_push(cmdline, str);
@@ -989,20 +963,17 @@ static void log_environment_variables()
 static void log_command_line()
 {
 #ifndef NDEBUG
-  lists_t_strs *cmdline;
-  char *str;
-
-  cmdline = lists_strs_new(mocf_argc);
+  lists_t_strs *cmdline = lists_strs_new(mocf_argc);
   if (lists_strs_load(cmdline, mocf_argv) > 0)
   {
-    str = lists_strs_fmt(cmdline, "%s ");
+    char *str = lists_strs_fmt(cmdline, "%s ");
+    logit("%s", str);
+    free(str);
   }
   else
   {
-    str = xstrdup("No command line available");
+    logit("No command line available");
   }
-  logit("%s", str);
-  free(str);
   lists_strs_free(cmdline);
 #endif
 }

@@ -1,4 +1,4 @@
-// src/core/server.c
+// src/core/server.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,20 +13,19 @@
 #include "config.h"
 #endif
 
-#include <stdio.h>
+#include <cassert>
+#include <cerrno>
+#include <csignal>
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <fcntl.h>
+#include <pthread.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <time.h>
-#include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
-#include <strings.h>
-#include <signal.h>
-#include <errno.h>
-#include <stdarg.h>
-#include <pthread.h>
-#include <fcntl.h>
-#include <assert.h>
 
 #define DEBUG
 
@@ -56,8 +55,7 @@ struct engine_event_queue
 
 struct engine_event_queue *engine_event_queue_new(void)
 {
-  struct engine_event_queue *eq =
-      (struct engine_event_queue *)xmalloc(sizeof(*eq));
+  auto *eq = new engine_event_queue;
   event_queue_init(&eq->q);
   pthread_mutex_init(&eq->mtx, NULL);
 
@@ -86,7 +84,7 @@ void engine_event_queue_free(struct engine_event_queue *eq)
   pthread_mutex_destroy(&eq->mtx);
   close(eq->pipe_fd[0]);
   close(eq->pipe_fd[1]);
-  free(eq);
+  delete eq;
 }
 
 int engine_event_queue_fd(const struct engine_event_queue *eq)
@@ -352,7 +350,7 @@ static void add_event_all(const int event, const void *data)
     else if (event == EV_SRV_ERROR)
     {
       const struct srv_error_ev *src = (const struct srv_error_ev *)data;
-      struct srv_error_ev *e = (struct srv_error_ev *)xmalloc(sizeof(*e));
+      auto *e = new srv_error_ev;
       e->file = xstrdup(src->file);
       e->msg  = xstrdup(src->msg);
       data_copy = e;
@@ -488,8 +486,7 @@ void tags_response(const char *file, const struct file_tags *tags)
 
   if (!g_eq) return;
 
-  struct tag_ev_response *data =
-      (struct tag_ev_response *)xmalloc(sizeof(struct tag_ev_response));
+  auto *data = new tag_ev_response;
   data->file = xstrdup(file);
   data->tags = tags_dup(tags);
   eq_push(g_eq, EV_FILE_TAGS, data);
