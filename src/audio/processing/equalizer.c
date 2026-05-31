@@ -549,7 +549,7 @@ void equalizer_refresh()
 
   while (de)
   {
-    sprintf(buf, "eqsets/%s", de->d_name);
+    snprintf(buf, sizeof(buf), "eqsets/%s", de->d_name);
 
     char *filename = xstrdup(create_file_name(buf));
 

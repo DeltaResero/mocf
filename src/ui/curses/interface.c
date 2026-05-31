@@ -2026,7 +2026,7 @@ static void entry_key_plist_save(const struct iface_key *k)
       {
         char *tmp = (char *)xmalloc((strlen(text) + 5) * sizeof(char));
 
-        sprintf(tmp, "%s.m3u", text);
+        snprintf(tmp, strlen(text) + 5, "%s.m3u", text);
         free(text);
         text = tmp;
       }
@@ -2654,7 +2654,7 @@ static void go_to_fast_dir(const int num)
 
   assert(RANGE(1, num, 10));
 
-  sprintf(option_name, "FastDir%d", num);
+  snprintf(option_name, sizeof(option_name), "FastDir%d", num);
 
   if (options_get_str(option_name))
   {

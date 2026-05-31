@@ -77,7 +77,7 @@ static void draw_item(const struct menu *menu, const struct menu_item *mi,
   /* Compute the length of the queue position if nonzero */
   if (mi->queue_pos)
   {
-    sprintf(buf, "%d", mi->queue_pos);
+    snprintf(buf, sizeof(buf), "%d", mi->queue_pos);
     queue_pos_len = strlen(buf) + 2;
     title_space -= queue_pos_len;
   }

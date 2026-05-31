@@ -668,7 +668,7 @@ static void update_eq_name(void)
     n[11] = '.';
   }
 
-  sprintf(buffer, "EQ set to: %s", n);
+  snprintf(buffer, sizeof(buffer), "EQ set to: %s", n);
   logit("%s", buffer);
   free(n);
   status_msg(buffer);
@@ -703,7 +703,7 @@ void engine_toggle_make_mono(void)
 {
   char buffer[128];
   softmixer_set_mono(!softmixer_is_mono());
-  sprintf(buffer, "Mono-Mixing set to: %s", softmixer_is_mono() ? "on" : "off");
+  snprintf(buffer, sizeof(buffer), "Mono-Mixing set to: %s", softmixer_is_mono() ? "on" : "off");
   status_msg(buffer);
 }
 

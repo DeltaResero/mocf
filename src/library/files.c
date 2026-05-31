@@ -655,7 +655,7 @@ static char *add_dir_file(const char *base, const char *name)
   base_is_root = !strcmp(base, "/") ? 1 : 0;
   path = (char *)xmalloc(sizeof(char) * (strlen(base) + strlen(name) + 2));
 
-  sprintf(path, "%s/%s", base_is_root ? "" : base, name);
+  snprintf(path, strlen(base) + strlen(name) + 2, "%s/%s", base_is_root ? "" : base, name);
 
   return path;
 }

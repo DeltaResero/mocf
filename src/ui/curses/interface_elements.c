@@ -1305,7 +1305,7 @@ static void side_menu_draw_frame(const struct side_menu *m)
 
       tail = xstrtail(m->title, m->width - 7);
       title = (char *)xmalloc(strlen(tail) + 4);
-      sprintf(title, "...%s", tail);
+      snprintf(title, strlen(tail) + 4, "...%s", tail);
       free(tail);
     }
     else
@@ -4611,7 +4611,7 @@ void iface_toggle_layout()
     curr_layout = 1;
   }
 
-  sprintf(layout_option, "Layout%d", curr_layout);
+  snprintf(layout_option, sizeof(layout_option), "Layout%d", curr_layout);
   layout_fmt = options_get_list(layout_option);
   if (lists_strs_empty(layout_fmt))
   {

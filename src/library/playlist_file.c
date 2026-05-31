@@ -361,7 +361,7 @@ static int plist_load_pls(struct plist *plist, const char *fname,
     char *pls_file, *pls_title, *pls_length;
     char key[32], path[2 * PATH_MAX];
 
-    sprintf(key, "File%ld", i);
+    snprintf(key, sizeof(key), "File%ld", i);
     pls_file = read_ini_value(file, "playlist", key);
     if (!pls_file)
     {
@@ -369,10 +369,10 @@ static int plist_load_pls(struct plist *plist, const char *fname,
       goto err;
     }
 
-    sprintf(key, "Title%ld", i);
+    snprintf(key, sizeof(key), "Title%ld", i);
     pls_title = read_ini_value(file, "playlist", key);
 
-    sprintf(key, "Length%ld", i);
+    snprintf(key, sizeof(key), "Length%ld", i);
     pls_length = read_ini_value(file, "playlist", key);
 
     if (pls_length)

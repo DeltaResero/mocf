@@ -676,7 +676,7 @@ static void log_md5_sum(const char *file, struct sound_params sound_params,
 
   for (ix = 0; ix < MD5_DIGEST_SIZE; ix += 1)
   {
-    sprintf(&md5sum[ix * 2], "%02x", md5[ix]);
+    snprintf(&md5sum[ix * 2], 3, "%02x", md5[ix]);
   }
   md5sum[MD5_DIGEST_SIZE * 2] = 0x00;
 

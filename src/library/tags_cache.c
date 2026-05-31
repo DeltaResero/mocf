@@ -1139,7 +1139,7 @@ static int cache_version_matches(const char *cache_dir)
   int compare_result = 0;
 
   fname = (char *)xmalloc(strlen(cache_dir) + sizeof(MOC_VERSION_TAG) + 1);
-  sprintf(fname, "%s/%s", cache_dir, MOC_VERSION_TAG);
+  snprintf(fname, strlen(cache_dir) + sizeof(MOC_VERSION_TAG) + 1, "%s/%s", cache_dir, MOC_VERSION_TAG);
 
   f = fopen(fname, "r");
   if (!f)
@@ -1201,7 +1201,7 @@ static void write_cache_version(const char *cache_dir)
   int rc;
 
   fname = (char *)xmalloc(strlen(cache_dir) + sizeof(MOC_VERSION_TAG) + 1);
-  sprintf(fname, "%s/%s", cache_dir, MOC_VERSION_TAG);
+  snprintf(fname, strlen(cache_dir) + sizeof(MOC_VERSION_TAG) + 1, "%s/%s", cache_dir, MOC_VERSION_TAG);
 
   f = fopen(fname, "w");
   if (!f)

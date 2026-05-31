@@ -941,7 +941,7 @@ static void make_help()
       len += strlen(unassigned);
     }
     help[i] = xcalloc(sizeof(char), len);
-    sprintf(help[i], "%-*s%s", HELP_INDENT, get_command_keys(i),
+    snprintf(help[i], len, "%-*s%s", HELP_INDENT, get_command_keys(i),
             commands[i].help);
     if (commands[i].keys[0] == -1)
     {
