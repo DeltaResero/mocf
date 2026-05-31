@@ -323,11 +323,11 @@ static void parse_comment(const char *str, struct file_tags *tags)
   }
   else if (!strncasecmp(str, "tracknumber=", strlen("tracknumber=")))
   {
-    tags->track = atoi(str + strlen("tracknumber="));
+    tags->track = (int)strtol(str + strlen("tracknumber="), NULL, 10);
   }
   else if (!strncasecmp(str, "track=", strlen("track=")))
   {
-    tags->track = atoi(str + strlen("track="));
+    tags->track = (int)strtol(str + strlen("track="), NULL, 10);
   }
 }
 

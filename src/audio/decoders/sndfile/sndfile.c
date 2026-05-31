@@ -266,7 +266,7 @@ static void sndfile_info(const char *file_name, struct file_tags *info,
     }
     if ((res = sf_get_string(data->sndfile, SF_STR_TRACKNUMBER)))
     {
-      info->track = atoi(res);
+      info->track = (int)strtol(res, NULL, 10);
     }
   }
 

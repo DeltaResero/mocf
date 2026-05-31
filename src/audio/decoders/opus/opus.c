@@ -70,12 +70,12 @@ static void get_comment_tags(OggOpusFile *of, struct file_tags *info)
     else if (!strncasecmp(comments->user_comments[i],
                           "tracknumber=", strlen("tracknumber=")))
     {
-      info->track = atoi(comments->user_comments[i] + strlen("tracknumber="));
+      info->track = (int)strtol(comments->user_comments[i] + strlen("tracknumber="), NULL, 10);
     }
     else if (!strncasecmp(comments->user_comments[i],
                           "track=", strlen("track=")))
     {
-      info->track = atoi(comments->user_comments[i] + strlen("track="));
+      info->track = (int)strtol(comments->user_comments[i] + strlen("track="), NULL, 10);
     }
   }
 }

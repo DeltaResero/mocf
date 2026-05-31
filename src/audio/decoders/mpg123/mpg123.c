@@ -127,9 +127,10 @@ static void get_tags(mpg123_handle *mf, struct file_tags *info)
 
             num = xmalloc((j + 1) * sizeof(char));
             memcpy(num, v2->text[i].text.p, j);
-            if (atoi(num) > 0)
+            long track_num = strtol(num, NULL, 10);
+            if (track_num > 0)
             {
-              info->track = atoi(num);
+              info->track = (int)track_num;
             }
             debug("TG: track v2 %d.", info->track);
             free(num);

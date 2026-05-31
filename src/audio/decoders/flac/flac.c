@@ -383,7 +383,7 @@ static void fill_tag(FLAC__StreamMetadata_VorbisComment_Entry *comm,
   }
   else if (!strcasecmp(name, "tracknumber") || !strcasecmp(name, "track"))
   {
-    tags->track = atoi(value);
+    tags->track = (int)strtol(value, NULL, 10);
     free(value);
   }
   else

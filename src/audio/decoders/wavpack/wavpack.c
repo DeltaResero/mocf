@@ -192,7 +192,7 @@ static void wav_info(const char *file_name, struct file_tags *info,
     {
       tag = (char *)xmalloc(++tag_len);
       WavpackGetTagItem(wpc, "track", tag, tag_len);
-      info->track = atoi(tag);
+      info->track = (int)strtol(tag, NULL, 10);
       free(tag);
     }
 

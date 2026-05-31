@@ -501,7 +501,7 @@ static void ffmpeg_info(const char *file_name, struct file_tags *info,
   entry = av_dict_get(md, "track", NULL, 0);
   if (entry && entry->value && entry->value[0])
   {
-    info->track = atoi(entry->value);
+    info->track = (int)strtol(entry->value, NULL, 10);
   }
   entry = av_dict_get(md, "title", NULL, 0);
   if (entry && entry->value && entry->value[0])
