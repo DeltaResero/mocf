@@ -19,6 +19,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <limits.h>
+#include <string>
 
 #include "core/compat.h"
 
@@ -152,7 +153,7 @@ extern "C"
                       const char *format, ...) ATTR_NORETURN ATTR_PRINTF(4, 5);
   char *str_repl(char *target, const char *oldstr, const char *newstr);
   char *trim(const char *src, size_t len);
-  char *format_msg(const char *format, ...);
+  char *format_msg(const char *format, ...) ATTR_PRINTF(1, 2);
   char *format_msg_va(const char *format, va_list va);
   bool is_valid_symbol(const char *candidate);
   char *create_file_name(const char *file);

@@ -1,4 +1,4 @@
-// src/core/compat.c
+// src/core/compat.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -16,8 +16,8 @@
 /* Various functions which some systems lack. */
 
 #ifndef HAVE_STRCASESTR
-#include <string.h>
-#include <ctype.h>
+#include <cstring>
+#include <cctype>
 
 /* Case insensitive version of strstr(). */
 char *strcasestr(const char *haystack, const char *needle)

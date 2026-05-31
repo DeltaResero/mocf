@@ -1,4 +1,4 @@
-// src/core/log.c
+// src/core/log.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,14 +13,14 @@
 #include "config.h"
 #endif
 
-#include <stdio.h>
-#include <stdarg.h>
-#include <stdint.h>
-#include <assert.h>
+#include <cstdio>
+#include <cstdarg>
+#include <cstdint>
+#include <cassert>
 #include <pthread.h>
-#include <time.h>
-#include <errno.h>
-#include <signal.h>
+#include <ctime>
+#include <cerrno>
+#include <csignal>
 
 #include "core/common.h"
 #include "utils/lists.h"

@@ -1,4 +1,4 @@
-// src/core/protocol.c
+// src/core/protocol.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -17,9 +17,9 @@
 #include "config.h"
 #endif
 
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
+#include <cstdlib>
+#include <cstring>
+#include <cassert>
 
 #include "core/common.h"
 #include "core/log.h"
@@ -42,8 +42,8 @@ void event_push(struct event_queue *q, const int event, void *data)
 {
   assert(q != NULL);
 
-  struct event *e = (struct event *)xmalloc(sizeof(struct event));
-  e->next = NULL;
+  struct event *e = new struct event;
+  e->next = nullptr;
   e->type = event;
   e->data = data;
 
@@ -73,8 +73,8 @@ void event_pop(struct event_queue *q)
   e = q->head;
   q->head = e->next;
   if (q->tail == e)
-    q->tail = NULL;
-  free(e);
+    q->tail = nullptr;
+  delete e;
 }
 
 struct event *event_get_first(struct event_queue *q)
@@ -98,7 +98,7 @@ void free_event_data(const int type, void *data)
   if (type == EV_QUEUE_ADD)
   {
     plist_free_item_fields((struct plist_item *)data);
-    free(data);
+    delete static_cast<struct plist_item *>(data);
   }
   else if (type == EV_FILE_TAGS)
   {
@@ -109,7 +109,7 @@ void free_event_data(const int type, void *data)
     struct srv_error_ev *e = (struct srv_error_ev *)data;
     free(e->file);
     free(e->msg);
-    free(e);
+    delete e;
   }
   else if (type == EV_STATUS_MSG || type == EV_QUEUE_DEL)
   {
@@ -156,10 +156,9 @@ struct tag_ev_response *tag_ev_data_dup(const struct tag_ev_response *d)
   assert(d != NULL);
   assert(d->file != NULL);
 
-  struct tag_ev_response *n =
-      (struct tag_ev_response *)xmalloc(sizeof(struct tag_ev_response));
+  struct tag_ev_response *n = new tag_ev_response;
   n->file = xstrdup(d->file);
-  n->tags = d->tags ? tags_dup(d->tags) : NULL;
+  n->tags = d->tags ? tags_dup(d->tags) : nullptr;
   return n;
 }
 
@@ -172,7 +171,7 @@ void free_move_ev_data(struct move_ev_data *m)
   assert(m != NULL);
   free(m->from);
   free(m->to);
-  free(m);
+  delete m;
 }
 
 struct move_ev_data *move_ev_data_dup(const struct move_ev_data *m)
@@ -181,8 +180,7 @@ struct move_ev_data *move_ev_data_dup(const struct move_ev_data *m)
   assert(m->from != NULL);
   assert(m->to != NULL);
 
-  struct move_ev_data *n =
-      (struct move_ev_data *)xmalloc(sizeof(struct move_ev_data));
+  struct move_ev_data *n = new move_ev_data;
   n->from = xstrdup(m->from);
   n->to   = xstrdup(m->to);
   return n;

@@ -1,4 +1,4 @@
-// src/core/common.c
+// src/core/common.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -14,21 +14,22 @@
 #undef malloc
 #endif
 
-#include <stdio.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
+#include <cstdio>
+#include <cstdarg>
+#include <cstdlib>
+#include <cstdint>
+#include <cstring>
 #include <strings.h>
-#include <ctype.h>
-#include <assert.h>
+#include <cctype>
+#include <cassert>
 #include <unistd.h>
-#include <time.h>
+#include <ctime>
 #include <sys/types.h>
 #include <pwd.h>
 #include <pthread.h>
-#include <signal.h>
-#include <errno.h>
+#include <csignal>
+#include <cerrno>
+#include <string>
 #include "core/common.h"
 #include "core/server.h"
 #include "ui/curses/interface.h"
@@ -264,7 +265,6 @@ char *str_repl(char *target, const char *oldstr, const char *newstr)
  * any leading and trailing whitespace.  Return NULL if unable.  */
 char *trim(const char *src, size_t len)
 {
-  char *result;
   const char *first, *last;
 
   for (last = &src[len - 1]; last >= src; last -= 1)
@@ -276,7 +276,7 @@ char *trim(const char *src, size_t len)
   }
   if (last < src)
   {
-    return NULL;
+    return nullptr;
   }
 
   for (first = src; first <= last; first += 1)
@@ -288,13 +288,14 @@ char *trim(const char *src, size_t len)
   }
   if (first > last)
   {
-    return NULL;
+    return nullptr;
   }
 
   last += 1;
-  result = xcalloc(last - first + 1, sizeof(char));
-  strncpy(result, first, last - first);
-  result[last - first] = 0x00;
+  size_t result_len = static_cast<size_t>(last - first);
+  char *result = new char[result_len + 1];
+  memcpy(result, first, result_len);
+  result[result_len] = '\0';
 
   return result;
 }
@@ -322,7 +323,7 @@ char *format_msg_va(const char *format, va_list va)
   va_list va_copy;
 
   va_copy(va_copy, va);
-  len = vsnprintf(NULL, 0, format, va_copy) + 1;
+  len = vsnprintf(nullptr, 0, format, va_copy) + 1;
   va_end(va_copy);
   result = xmalloc(len);
   vsnprintf(result, len, format, va);
@@ -418,19 +419,26 @@ void sec_to_min(char *buff, const int seconds)
 /* Determine and return the path of the user's home directory. */
 const char *get_home()
 {
-  static const char *home = NULL;
+  static std::string home_str;
+  static const char *home = nullptr;
   struct passwd *passwd;
 
-  if (home == NULL)
+  if (home == nullptr)
   {
-    home = xstrdup(getenv("HOME"));
-    if (home == NULL)
+    const char *env_home = getenv("HOME");
+    if (env_home)
+    {
+      home_str = env_home;
+      home = home_str.c_str();
+    }
+    else
     {
       errno = 0;
       passwd = getpwuid(geteuid());
       if (passwd)
       {
-        home = xstrdup(passwd->pw_dir);
+        home_str = passwd->pw_dir;
+        home = home_str.c_str();
       }
       else if (errno != 0)
       {
