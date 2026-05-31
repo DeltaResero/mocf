@@ -511,7 +511,7 @@ static struct decoder vorbis_decoder = {DECODER_API_VERSION,
                                         vorbis_get_stream,
                                         vorbis_get_avg_bitrate};
 
-struct decoder *vorbis_plugin_init() { return &vorbis_decoder; }
+extern "C" struct decoder *vorbis_plugin_init() { return &vorbis_decoder; }
 
 /* The have_tremor flag is now detected at compile time in decoder.c via
  * #ifdef HAVE_TREMOR — the vorbis_has_tremor exported symbol is no longer

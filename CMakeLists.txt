@@ -15,7 +15,7 @@ set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
 # Standard settings
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
@@ -23,6 +23,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 add_compile_definitions(_FILE_OFFSET_BITS=64)
 add_compile_definitions(HAVE_CONFIG_H)
 add_compile_definitions(_GNU_SOURCE)
+add_compile_options(-fpermissive)
 
 # Ensure checks use GNU_SOURCE too
 set(CMAKE_REQUIRED_DEFINITIONS "-D_GNU_SOURCE")
@@ -195,7 +196,7 @@ if(WITH_PULSE)
   pkg_check_modules(PULSE libpulse)
   if(PULSE_FOUND)
     set(HAVE_PULSE 1)
-    list(APPEND EXTRA_OBJS src/audio/outputs/pulse.c)
+    list(APPEND EXTRA_OBJS src/audio/outputs/pulse.cpp)
     include_directories(${PULSE_INCLUDE_DIRS})
     list(APPEND EXTRA_LIBS ${PULSE_LIBRARIES})
     list(APPEND SOUND_DRIVERS "PULSE")
@@ -206,7 +207,7 @@ if(WITH_ALSA)
   pkg_check_modules(ALSA alsa>=1.0.11)
   if(ALSA_FOUND)
     set(HAVE_ALSA 1)
-    list(APPEND EXTRA_OBJS src/audio/outputs/alsa.c)
+    list(APPEND EXTRA_OBJS src/audio/outputs/alsa.cpp)
     include_directories(${ALSA_INCLUDE_DIRS})
     list(APPEND EXTRA_LIBS ${ALSA_LIBRARIES})
     list(APPEND SOUND_DRIVERS "ALSA")
@@ -217,7 +218,7 @@ if(WITH_JACK)
   pkg_check_modules(JACK jack>=0.4)
   if(JACK_FOUND)
     set(HAVE_JACK 1)
-    list(APPEND EXTRA_OBJS src/audio/outputs/jack.c)
+    list(APPEND EXTRA_OBJS src/audio/outputs/jack.cpp)
     include_directories(${JACK_INCLUDE_DIRS})
     list(APPEND EXTRA_LIBS ${JACK_LIBRARIES})
     list(APPEND SOUND_DRIVERS "JACK")
@@ -235,7 +236,7 @@ if(WITH_OSS)
   check_include_file(soundcard.h HAVE_SOUNDCARD_H)
   if(HAVE_SYS_SOUNDCARD_H OR HAVE_SOUNDCARD_H)
     set(HAVE_OSS 1)
-    list(APPEND EXTRA_OBJS src/audio/outputs/oss.c)
+    list(APPEND EXTRA_OBJS src/audio/outputs/oss.cpp)
     list(APPEND SOUND_DRIVERS "OSS")
     # Some systems need libossaudio
     check_library_exists(ossaudio _oss_ioctl "" HAVE_OSSAUDIO)
@@ -249,7 +250,7 @@ if(WITH_SNDIO)
   check_include_file(sndio.h HAVE_SNDIO_H)
   if(HAVE_SNDIO_H)
     set(HAVE_SNDIO 1)
-    list(APPEND EXTRA_OBJS src/audio/outputs/sndio_out.c)
+    list(APPEND EXTRA_OBJS src/audio/outputs/sndio_out.cpp)
     list(APPEND SOUND_DRIVERS "SNDIO")
     check_library_exists(sndio sio_open "" HAVE_SNDIO_LIB)
     if(HAVE_SNDIO_LIB)
@@ -259,7 +260,7 @@ if(WITH_SNDIO)
 endif()
 
 if(ENABLE_DEBUG)
-  list(APPEND EXTRA_OBJS src/audio/outputs/null_out.c src/utils/md5.c)
+  list(APPEND EXTRA_OBJS src/audio/outputs/null_out.cpp src/utils/md5.cpp)
 else()
   set(NDEBUG 1)
 endif()
@@ -304,34 +305,34 @@ install(FILES ${THEME_FILES} DESTINATION ${THEMES_DIR})
 
 # Main Executable
 set(MOCF_SOURCES
-    src/core/log.c
-    src/core/protocol.c
-    src/core/server.c
-    src/core/main.c
-    src/core/common.c
-    src/library/playlist.c
-    src/utils/fifo_buf.c
-    src/audio/outputs/out_buf.c
-    src/audio/audio.c
-    src/audio/decoder.c
-    src/ui/curses/interface.c
-    src/ui/curses/interface_elements.c
-    src/ui/curses/menu.c
-    src/library/files.c
-    src/core/options.c
-    src/library/player.c
-    src/library/playlist_file.c
-    src/ui/themes.c
-    src/ui/input/keys.c
-    src/io/io.c
-    src/core/compat.c
-    src/audio/conversion/audio_conversion.c
-    src/utils/rbtree.c
-    src/library/tags_cache.c
-    src/utils/utf8.c
-    src/audio/processing/softmixer.c
-    src/utils/lists.c
-    src/audio/processing/equalizer.c
+    src/core/log.cpp
+    src/core/protocol.cpp
+    src/core/server.cpp
+    src/core/main.cpp
+    src/core/common.cpp
+    src/library/playlist.cpp
+    src/utils/fifo_buf.cpp
+    src/audio/outputs/out_buf.cpp
+    src/audio/audio.cpp
+    src/audio/decoder.cpp
+    src/ui/curses/interface.cpp
+    src/ui/curses/interface_elements.cpp
+    src/ui/curses/menu.cpp
+    src/library/files.cpp
+    src/core/options.cpp
+    src/library/player.cpp
+    src/library/playlist_file.cpp
+    src/ui/themes.cpp
+    src/ui/input/keys.cpp
+    src/io/io.cpp
+    src/core/compat.cpp
+    src/audio/conversion/audio_conversion.cpp
+    src/utils/rbtree.cpp
+    src/library/tags_cache.cpp
+    src/utils/utf8.cpp
+    src/audio/processing/softmixer.cpp
+    src/utils/lists.cpp
+    src/audio/processing/equalizer.cpp
     ${EXTRA_OBJS}
     ${DECODER_OBJECTS})
 

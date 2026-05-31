@@ -932,13 +932,13 @@ static float *resample_sound(struct audio_conversion *conv, const float *buf,
     conv->resample_buf_nsamples = resample_data.input_frames * nchannels;
     if (conv->resample_buf != resample_data.data_in)
     {
-      float *new;
+      float *new_input;
 
-      new = (float *)xmalloc(sizeof(float) * conv->resample_buf_nsamples);
-      memcpy(new, resample_data.data_in,
+      new_input = (float *)xmalloc(sizeof(float) * conv->resample_buf_nsamples);
+      memcpy(new_input, resample_data.data_in,
              sizeof(float) * conv->resample_buf_nsamples);
       free(conv->resample_buf);
-      conv->resample_buf = new;
+      conv->resample_buf = new_input;
     }
   }
   else
@@ -1074,107 +1074,107 @@ static char *ch6_to_stereo(const char *ch6, const size_t size,
 static int8_t *s32_to_s24_3(int32_t *in, const size_t samples)
 {
   size_t i;
-  int8_t *new;
+  int8_t *new_buf;
 
-  new = (int8_t *)xmalloc(samples * 3);
+  new_buf = (int8_t *)xmalloc(samples * 3);
 
   for (i = 0; i < samples; i++)
   {
-    new[3 * i] = (in[i] & 0x0000FF00) >> 8;
-    new[3 * i + 1] = (in[i] & 0x00FF0000) >> 16;
-    new[3 * i + 2] = (in[i] & 0xFF000000) >> 24;
+    new_buf[3 * i] = (in[i] & 0x0000FF00) >> 8;
+    new_buf[3 * i + 1] = (in[i] & 0x00FF0000) >> 16;
+    new_buf[3 * i + 2] = (in[i] & 0xFF000000) >> 24;
   }
-  return new;
+  return new_buf;
 }
 
 static int16_t *s32_to_s16(int32_t *in, const size_t samples)
 {
   size_t i;
-  int16_t *new;
+  int16_t *new_buf;
 
-  new = (int16_t *)xmalloc(samples * 2);
+  new_buf = (int16_t *)xmalloc(samples * 2);
 
   for (i = 0; i < samples; i++)
   {
-    new[i] = in[i] >> 16;
+    new_buf[i] = in[i] >> 16;
   }
 
-  return new;
+  return new_buf;
 }
 
 static uint16_t *u32_to_u16(uint32_t *in, const size_t samples)
 {
   size_t i;
-  uint16_t *new;
+  uint16_t *new_buf;
 
-  new = (uint16_t *)xmalloc(samples * 2);
+  new_buf = (uint16_t *)xmalloc(samples * 2);
 
   for (i = 0; i < samples; i++)
   {
-    new[i] = in[i] >> 16;
+    new_buf[i] = in[i] >> 16;
   }
 
-  return new;
+  return new_buf;
 }
 
 static int32_t *s32_to_s24(int32_t *in, const size_t samples)
 {
   size_t i;
-  int32_t *new;
+  int32_t *new_buf;
 
-  new = (int32_t *)xmalloc(samples * 4);
+  new_buf = (int32_t *)xmalloc(samples * 4);
 
   for (i = 0; i < samples; i++)
   {
-    new[i] = in[i] >> 8;
+    new_buf[i] = in[i] >> 8;
   }
 
-  return new;
+  return new_buf;
 }
 
 static uint32_t *u32_to_u24(uint32_t *in, const size_t samples)
 {
   size_t i;
-  uint32_t *new;
+  uint32_t *new_buf;
 
-  new = (uint32_t *)xmalloc(samples * 4);
+  new_buf = (uint32_t *)xmalloc(samples * 4);
 
   for (i = 0; i < samples; i++)
   {
-    new[i] = in[i] >> 8;
+    new_buf[i] = in[i] >> 8;
   }
 
-  return new;
+  return new_buf;
 }
 
 static int16_t *s24_to_s16(int32_t *in, const size_t samples)
 {
   size_t i;
-  int16_t *new;
+  int16_t *new_buf;
 
-  new = (int16_t *)xmalloc(samples * 2);
+  new_buf = (int16_t *)xmalloc(samples * 2);
 
   for (i = 0; i < samples; i++)
   {
-    new[i] = in[i] >> 8;
+    new_buf[i] = in[i] >> 8;
   }
 
-  return new;
+  return new_buf;
 }
 
 static uint16_t *u24_to_u16(uint32_t *in, const size_t samples)
 {
   size_t i;
-  uint16_t *new;
+  uint16_t *new_buf;
 
-  new = (uint16_t *)xmalloc(samples * 2);
+  new_buf = (uint16_t *)xmalloc(samples * 2);
 
   for (i = 0; i < samples; i++)
   {
-    new[i] = in[i] >> 8;
+    new_buf[i] = in[i] >> 8;
   }
 
-  return new;
+  return new_buf;
 }
 
 /* Do the sound conversion.  buf of length size is the sample buffer to

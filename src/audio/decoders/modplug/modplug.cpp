@@ -290,7 +290,7 @@ static struct decoder modplug_decoder = {DECODER_API_VERSION,
                                          NULL,
                                          NULL};
 
-struct decoder *modplug_plugin_init()
+extern "C" struct decoder *modplug_plugin_init()
 {
   ModPlug_GetSettings(&settings);
   settings.mFlags = 0;

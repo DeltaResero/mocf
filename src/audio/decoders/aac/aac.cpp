@@ -682,6 +682,6 @@ static struct decoder aac_decoder = {DECODER_API_VERSION,
                                      NULL,
                                      aac_get_avg_bitrate};
 
-struct decoder *aac_plugin_init() { return &aac_decoder; }
+extern "C" struct decoder *aac_plugin_init() { return &aac_decoder; }
 
 // EOF

@@ -574,7 +574,7 @@ static char *oss_get_mixer_channel_name()
 
 static int oss_get_rate() { return params.rate; }
 
-void oss_funcs(struct hw_funcs *funcs)
+extern "C" void oss_funcs(struct hw_funcs *funcs)
 {
   funcs->init = oss_init;
   funcs->shutdown = oss_shutdown;

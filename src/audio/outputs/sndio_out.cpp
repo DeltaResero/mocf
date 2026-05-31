@@ -167,7 +167,7 @@ static void sndio_toggle_mixer_channel() { assert(hdl != NULL); }
 
 static char *sndio_get_mixer_channel_name() { return xstrdup("mocf"); }
 
-void sndio_funcs(struct hw_funcs *funcs)
+extern "C" void sndio_funcs(struct hw_funcs *funcs)
 {
   funcs->init = sndio_init;
   funcs->shutdown = sndio_shutdown;

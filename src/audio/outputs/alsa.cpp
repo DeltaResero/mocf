@@ -1212,7 +1212,7 @@ static char *alsa_get_mixer_channel_name()
   return result;
 }
 
-void alsa_funcs(struct hw_funcs *funcs)
+extern "C" void alsa_funcs(struct hw_funcs *funcs)
 {
   funcs->init = alsa_init;
   funcs->shutdown = alsa_shutdown;

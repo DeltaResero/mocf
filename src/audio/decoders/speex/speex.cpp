@@ -746,6 +746,6 @@ static struct decoder spx_decoder = {DECODER_API_VERSION,
                                      spx_get_stream,
                                      NULL};
 
-struct decoder *speex_plugin_init() { return &spx_decoder; }
+extern "C" struct decoder *speex_plugin_init() { return &spx_decoder; }
 
 // EOF

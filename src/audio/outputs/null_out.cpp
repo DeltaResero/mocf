@@ -60,7 +60,7 @@ static void null_toggle_mixer_channel() {}
 
 static char *null_get_mixer_channel_name() { return xstrdup("FakeMixer"); }
 
-void null_funcs(struct hw_funcs *funcs)
+extern "C" void null_funcs(struct hw_funcs *funcs)
 {
   funcs->init = null_init;
   funcs->open = null_open;

@@ -27,6 +27,9 @@
 #include <stdint.h>
 #include <errno.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/mathematics.h>
@@ -34,6 +37,9 @@
 #include <libavutil/channel_layout.h>
 #else
 #include <libavutil/audioconvert.h>
+#endif
+#ifdef __cplusplus
+}
 #endif
 
 /* FFmpeg also likes common names, without that, our common.h and log.h
@@ -1571,6 +1577,6 @@ static struct decoder ffmpeg_decoder = {DECODER_API_VERSION,
                                         ffmpeg_get_iostream,
                                         ffmpeg_get_avg_bitrate};
 
-struct decoder *ffmpeg_plugin_init() { return &ffmpeg_decoder; }
+extern "C" struct decoder *ffmpeg_plugin_init() { return &ffmpeg_decoder; }
 
 // EOF
