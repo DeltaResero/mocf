@@ -703,12 +703,14 @@ static void entry_set_history_up(struct entry *e)
       t = entry_get_text(e);
       entry_history_replace(e->history, e->history_pos, t);
       free(t);
+      t = NULL;
     }
     e->history_pos--;
 
     t = entry_history_get(e->history, e->history_pos);
     entry_set_text(e, t);
     free(t);
+    t = NULL;
   }
 }
 
@@ -726,6 +728,7 @@ static void entry_set_history_down(struct entry *e)
     t = entry_get_text(e);
     entry_history_replace(e->history, e->history_pos, t);
     free(t);
+    t = NULL;
 
     e->history_pos++;
     if (e->history_pos == entry_history_nitems(e->history))
@@ -737,6 +740,7 @@ static void entry_set_history_down(struct entry *e)
       t = entry_history_get(e->history, e->history_pos);
       entry_set_text(e, t);
       free(t);
+      t = NULL;
     }
   }
 }

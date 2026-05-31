@@ -259,14 +259,19 @@ int lists_strs_tokenise(lists_t_strs *list, const char *s)
 
 /* Return the concatenation of all the strings in a list using the
  * given format for each, or NULL if the list is empty. */
-GCC_DIAG_OFF(format-nonliteral)
 char *lists_strs_fmt(const lists_t_strs *list, const char *fmt)
 {
   int len, ix, rc;
   char *result, *ptr;
+  const char *sep, *suffix;
+  int prefix_len;
 
   assert(list);
-  assert(strstr(fmt, "%s"));
+  sep = strstr(fmt, "%s");
+  assert(sep);
+
+  prefix_len = (int)(sep - fmt);
+  suffix = sep + 2;
 
   result = NULL;
   if (!lists_strs_empty(list))
@@ -281,7 +286,10 @@ char *lists_strs_fmt(const lists_t_strs *list, const char *fmt)
     ptr = result = xmalloc(len + 1);
     for (ix = 0; ix < lists_strs_size(list); ix += 1)
     {
-      rc = snprintf(ptr, len + 1, fmt, lists_strs_at(list, ix));
+      rc = snprintf(ptr, len + 1, "%.*s%s%s",
+                    prefix_len, fmt,
+                    lists_strs_at(list, ix),
+                    suffix);
       if (rc > len)
       {
         fatal("Allocated string area was too small!");
@@ -293,7 +301,6 @@ char *lists_strs_fmt(const lists_t_strs *list, const char *fmt)
 
   return result;
 }
-GCC_DIAG_ON(format-nonliteral)
 
 /* Return the concatenation of all the strings in a list, or NULL
  * if the list is empty. */

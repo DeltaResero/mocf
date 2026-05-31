@@ -119,14 +119,18 @@ void *xrealloc(void *ptr, const size_t size)
 
 char *xstrdup(const char *s)
 {
-  char *n;
+  char *n = NULL;
 
-  if (s && (n = strdup(s)) == NULL)
+  if (s)
   {
-    fatal("Can't allocate memory!");
+    n = strdup(s);
+    if (n == NULL)
+    {
+      fatal("Can't allocate memory!");
+    }
   }
 
-  return s ? n : NULL;
+  return n;
 }
 
 /* Sleep for the specified number of 'ticks'. */

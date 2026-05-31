@@ -250,12 +250,14 @@ void log_init_stream(FILE *f LOGIT_ONLY, const char *fn LOGIT_ONLY)
   msg = format_msg("Writing log to: %s", fn);
   locked_logit(__FILE__, __LINE__, __func__, msg);
   free(msg);
+  msg = NULL;
 
   if (log_records_spilt > 0)
   {
     msg = format_msg("%d log records spilt", log_records_spilt);
     locked_logit(__FILE__, __LINE__, __func__, msg);
     free(msg);
+    msg = NULL;
   }
 
   flush_log();
