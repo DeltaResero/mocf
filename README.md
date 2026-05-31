@@ -11,18 +11,18 @@ Native directory handling allows you to simply select a file to begin playback
 for the entire folder. While playlists are not required, complex queues can be
 built, saved, and exported as m3u files.
 
-### Key Features
+## Key Features
 
-*   Single-process player: audio engine runs in-process and exits with the UI
-*   Gapless playback via song precaching
-*   Native PulseAudio backend and modern FFmpeg (> 4.0) support
-*   Support for OSS, ALSA, SNDIO, and JACK output drivers
-*   Inotify support for automatic directory refreshing
-*   Reworked audio formats with support for 32-bit samples and float processing
-*   Simple software mixer and a cache for file tags
-*   Customizable color themes and user-defined keybindings
-*   Stripped non-essential features for a minimal default build
-*   Optimized defaults for software-rendered and terminal environments
+* Single-process player: audio engine runs in-process and exits with the UI
+* Gapless playback via song precaching
+* Native PulseAudio backend and modern FFmpeg (> 4.0) support
+* Support for OSS, ALSA, SNDIO, and JACK output drivers
+* Inotify support for automatic directory refreshing
+* Reworked audio formats with support for 32-bit samples and float processing
+* Simple software mixer and a cache for file tags
+* Customizable color themes and user-defined keybindings
+* Stripped non-essential features for a minimal default build
+* Optimized defaults for software-rendered and terminal environments
 
 ## Supported Formats
 
@@ -36,13 +36,13 @@ This project uses the **CMake** build system.
 
 ### Prerequisites
 
-*   CMake 3.15 or later
-*   C99 and C++17 compatible compilers
-*   POSIX.1-2001 compatible system
-*   **Required Libraries:** libpopt, ncurses, pthreads
-*   **Optional Libraries:** PulseAudio, ALSA, JACK, OSS, SNDIO,
+* CMake 3.15 or later
+* C99 and C++17 compatible compilers
+* POSIX.1-2001 compatible system
+* **Required Libraries:** libpopt, ncurses, pthreads
+* **Optional Libraries:** PulseAudio, ALSA, JACK, OSS, SNDIO,
     libsamplerate, libmagic, BerkeleyDB.
-*   **Decoder Libraries:** libmad, libmpg123, libfaad2, libvorbis, opusfile,
+* **Decoder Libraries:** libmad, libmpg123, libfaad2, libvorbis, opusfile,
     libflac, libmpcdec, libwavpack, libsndfile, libmodplug, ffmpeg/libav,
     libspeex, libsidplayfp.
 
@@ -61,6 +61,7 @@ sudo make install
 You can configure the build by passing `-DOPTION=ON/OFF` to cmake.
 
 #### General Options
+
 | Option | Description | Default |
 |--------|-------------|---------|
 | `ENABLE_DEBUG` | Enable debugging code | `OFF` |
@@ -70,6 +71,7 @@ You can configure the build by passing `-DOPTION=ON/OFF` to cmake.
 | `ENABLE_MAGIC` | Enable MIME magic support | `ON` |
 
 #### Sound Output Options
+
 | Option | Description | Default |
 |--------|-------------|---------|
 | `WITH_PULSE` | Enable PulseAudio support | `ON` (Linux) |
@@ -79,6 +81,7 @@ You can configure the build by passing `-DOPTION=ON/OFF` to cmake.
 | `WITH_SNDIO` | Enable SNDIO support | `ON` (OpenBSD) |
 
 #### Decoder Options
+
 | Option | Description | Default |
 |--------|-------------|---------|
 | `WITH_MP3` | Enable MP3 support (libmad) | `ON` |
