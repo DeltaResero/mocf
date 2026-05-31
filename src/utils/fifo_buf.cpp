@@ -1,4 +1,4 @@
-// src/utils/fifo_buf.c
+// src/utils/fifo_buf.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <assert.h>
 #include <string.h>
+#include <vector>
 
 #include "core/common.h"
 #include "utils/fifo_buf.h"
@@ -26,31 +27,22 @@ struct fifo_buf
   int size;   /* Size of the buffer */
   int pos;    /* Current position */
   int fill;   /* Current fill */
-  char buf[]; /* The buffer content */
+  std::vector<char> buf; /* The buffer content */
+
+  explicit fifo_buf(size_t s) : size(s), pos(0), fill(0), buf(s) {}
 };
 
 /* Initialize and return a new fifo_buf structure of the size requested. */
 struct fifo_buf *fifo_buf_new(const size_t size)
 {
-  struct fifo_buf *b;
-
   assert(size > 0);
-
-  b = xmalloc(offsetof(struct fifo_buf, buf) + size);
-
-  b->size = size;
-  b->pos = 0;
-  b->fill = 0;
-
-  return b;
+  return new struct fifo_buf(size);
 }
 
 /* Destroy the buffer object. */
 void fifo_buf_free(struct fifo_buf *b)
 {
-  assert(b != NULL);
-
-  free(b);
+  delete b;
 }
 
 /* Put data into the buffer. Returns number of bytes actually put. */
@@ -59,7 +51,7 @@ size_t fifo_buf_put(struct fifo_buf *b, const char *data, size_t size)
   size_t written = 0;
 
   assert(b != NULL);
-  assert(b->buf != NULL);
+  assert(!b->buf.empty());
 
   while (b->fill < b->size && written < size)
   {
@@ -82,7 +74,7 @@ size_t fifo_buf_put(struct fifo_buf *b, const char *data, size_t size)
       to_write = size - written;
     }
 
-    memcpy(b->buf + write_from, data + written, to_write);
+    memcpy(b->buf.data() + write_from, data + written, to_write);
     b->fill += to_write;
     written += to_write;
   }
@@ -98,7 +90,7 @@ size_t fifo_buf_peek(struct fifo_buf *b, char *user_buf, size_t user_buf_size)
   ssize_t left, pos;
 
   assert(b != NULL);
-  assert(b->buf != NULL);
+  assert(!b->buf.empty());
 
   left = b->fill;
   pos = b->pos;
@@ -112,7 +104,7 @@ size_t fifo_buf_peek(struct fifo_buf *b, char *user_buf, size_t user_buf_size)
       to_copy = user_buf_size - written;
     }
 
-    memcpy(user_buf + user_buf_pos, b->buf + pos, to_copy);
+    memcpy(user_buf + user_buf_pos, b->buf.data() + pos, to_copy);
     user_buf_pos += to_copy;
     written += to_copy;
 
@@ -132,7 +124,7 @@ size_t fifo_buf_get(struct fifo_buf *b, char *user_buf, size_t user_buf_size)
   size_t user_buf_pos = 0, written = 0;
 
   assert(b != NULL);
-  assert(b->buf != NULL);
+  assert(!b->buf.empty());
 
   while (b->fill && written < user_buf_size)
   {
@@ -143,7 +135,7 @@ size_t fifo_buf_get(struct fifo_buf *b, char *user_buf, size_t user_buf_size)
       to_copy = user_buf_size - written;
     }
 
-    memcpy(user_buf + user_buf_pos, b->buf + b->pos, to_copy);
+    memcpy(user_buf + user_buf_pos, b->buf.data() + b->pos, to_copy);
     user_buf_pos += to_copy;
     written += to_copy;
 
@@ -162,7 +154,7 @@ size_t fifo_buf_get(struct fifo_buf *b, char *user_buf, size_t user_buf_size)
 size_t fifo_buf_get_space(const struct fifo_buf *b)
 {
   assert(b != NULL);
-  assert(b->buf != NULL);
+  assert(!b->buf.empty());
 
   return b->size - b->fill;
 }
