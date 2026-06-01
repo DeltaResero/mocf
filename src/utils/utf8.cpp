@@ -1,4 +1,4 @@
-// src/utils/utf8.c
+// src/utils/utf8.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,8 +13,13 @@
 #include "config.h"
 #endif
 
-#include <stdio.h>
-#include <stdarg.h>
+#include <cassert>
+#include <cerrno>
+#include <cstdarg>
+#include <cstdio>
+#include <cstring>
+#include <cwchar>
+#include <vector>
 
 #ifdef HAVE_ICONV
 #include <iconv.h>
@@ -37,11 +42,6 @@
 #elif defined HAVE_CURSES_H
 #include <curses.h>
 #endif
-
-#include <assert.h>
-#include <string.h>
-#include <errno.h>
-#include <wchar.h>
 
 #include "core/common.h"
 #include "core/log.h"
@@ -231,8 +231,7 @@ static size_t xmbstowcs(wchar_t *dest, const char *src, size_t len,
 int xwaddnstr(WINDOW *win, const char *str, const int n)
 {
   int res, width, inv_char;
-  wchar_t *ucs;
-  char *mstr, *lstr;
+  char *mstr;
   size_t size, num_chars;
 
   assert(n > 0);
@@ -241,9 +240,9 @@ int xwaddnstr(WINDOW *win, const char *str, const int n)
   mstr = iconv_str(iconv_desc, str);
 
   size = xmbstowcs(NULL, mstr, -1, NULL) + 1;
-  ucs = (wchar_t *)xmalloc(sizeof(wchar_t) * size);
-  xmbstowcs(ucs, mstr, size, &inv_char);
-  width = wcswidth(ucs, WIDTH_MAX);
+  std::vector<wchar_t> ucs(size);
+  xmbstowcs(ucs.data(), mstr, size, &inv_char);
+  width = wcswidth(ucs.data(), WIDTH_MAX);
 
   if (width == -1)
   {
@@ -255,7 +254,7 @@ int xwaddnstr(WINDOW *win, const char *str, const int n)
         ucs[clidx] = L'?';
       }
     }
-    width = wcswidth(ucs, WIDTH_MAX);
+    width = wcswidth(ucs.data(), WIDTH_MAX);
     inv_char = 1;
   }
 
@@ -268,22 +267,20 @@ int xwaddnstr(WINDOW *win, const char *str, const int n)
     ucs[size] = L'\0';
   }
 
-  num_chars = wcstombs(NULL, ucs, 0);
-  lstr = (char *)xmalloc(num_chars + 1);
+  num_chars = wcstombs(NULL, ucs.data(), 0);
+  std::vector<char> lstr(num_chars + 1);
 
   if (inv_char)
   {
-    wcstombs(lstr, ucs, num_chars + 1);
+    wcstombs(lstr.data(), ucs.data(), num_chars + 1);
   }
   else
   {
-    snprintf(lstr, num_chars + 1, "%s", mstr);
+    snprintf(lstr.data(), num_chars + 1, "%s", mstr);
   }
 
-  res = waddstr(win, lstr);
+  res = waddstr(win, lstr.data());
 
-  free(ucs);
-  free(lstr);
   free(mstr);
   return res;
 }
@@ -421,17 +418,15 @@ void utf8_cleanup()
 /* Return the number of columns the string occupies when displayed. */
 size_t strwidth(const char *s)
 {
-  wchar_t *ucs;
   size_t size;
   size_t width;
 
   assert(s != NULL);
 
   size = xmbstowcs(NULL, s, -1, NULL) + 1;
-  ucs = (wchar_t *)xmalloc(sizeof(wchar_t) * size);
-  xmbstowcs(ucs, s, size, NULL);
-  width = wcswidth(ucs, WIDTH_MAX);
-  free(ucs);
+  std::vector<wchar_t> ucs(size);
+  xmbstowcs(ucs.data(), s, size, NULL);
+  width = wcswidth(ucs.data(), WIDTH_MAX);
 
   return width;
 }
@@ -440,21 +435,18 @@ size_t strwidth(const char *s)
  * maximum of 'len' characters (in columns occupied on the screen). */
 char *xstrtail(const char *str, const int len)
 {
-  wchar_t *ucs;
-  wchar_t *ucs_tail;
   size_t size;
   int width;
-  char *tail;
 
   assert(str != NULL);
   assert(len > 0);
 
   size = xmbstowcs(NULL, str, -1, NULL) + 1;
-  ucs = (wchar_t *)xmalloc(sizeof(wchar_t) * size);
-  xmbstowcs(ucs, str, size, NULL);
-  ucs_tail = ucs;
+  std::vector<wchar_t> ucs(size);
+  xmbstowcs(ucs.data(), str, size, NULL);
+  wchar_t *ucs_tail = ucs.data();
 
-  width = wcswidth(ucs, WIDTH_MAX);
+  width = wcswidth(ucs.data(), WIDTH_MAX);
   assert(width >= 0);
 
   while (width > len)
@@ -463,12 +455,10 @@ char *xstrtail(const char *str, const int len)
   }
 
   size = wcstombs(NULL, ucs_tail, 0) + 1;
-  tail = (char *)xmalloc(size);
-  wcstombs(tail, ucs_tail, size);
+  std::vector<char> tail_buf(size);
+  wcstombs(tail_buf.data(), ucs_tail, size);
 
-  free(ucs);
-
-  return tail;
+  return xstrdup(tail_buf.data());
 }
 
 // EOF

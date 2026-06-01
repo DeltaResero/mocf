@@ -1,4 +1,4 @@
-// src/utils/md5.c
+// src/utils/md5.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -23,10 +23,11 @@
 #include "utils/md5.h"
 #include "core/common.h"
 
-#include <stddef.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstddef>
+#include <cstdlib>
+#include <cstring>
 #include <sys/types.h>
+#include <vector>
 
 #if USE_UNLOCKED_IO
 #include "unlocked-io.h"
@@ -133,11 +134,7 @@ int md5_stream(FILE *stream, void *resblock)
   struct md5_ctx ctx;
   size_t sum;
 
-  char *buffer = xmalloc(BLOCKSIZE + 72);
-  if (!buffer)
-  {
-    return 1;
-  }
+  std::vector<char> buffer(BLOCKSIZE + 72);
 
   /* Initialize the computation context.  */
   md5_init_ctx(&ctx);
@@ -154,7 +151,7 @@ int md5_stream(FILE *stream, void *resblock)
     /* Read block.  Take care for partial reads.  */
     while (1)
     {
-      n = fread(buffer + sum, 1, BLOCKSIZE - sum, stream);
+      n = fread(buffer.data() + sum, 1, BLOCKSIZE - sum, stream);
 
       sum += n;
 
@@ -170,7 +167,6 @@ int md5_stream(FILE *stream, void *resblock)
            or EWOULDBLOCK.  */
         if (ferror(stream))
         {
-          free(buffer);
           return 1;
         }
         goto process_partial_block;
@@ -188,7 +184,7 @@ int md5_stream(FILE *stream, void *resblock)
     /* Process buffer with BLOCKSIZE bytes.  Note that
        BLOCKSIZE % 64 == 0
      */
-    md5_process_block(buffer, BLOCKSIZE, &ctx);
+    md5_process_block(buffer.data(), BLOCKSIZE, &ctx);
   }
 
 process_partial_block:
@@ -196,12 +192,11 @@ process_partial_block:
   /* Process any remaining bytes.  */
   if (sum > 0)
   {
-    md5_process_bytes(buffer, sum, &ctx);
+    md5_process_bytes(buffer.data(), sum, &ctx);
   }
 
   /* Construct result in desired memory.  */
   md5_finish_ctx(&ctx, resblock);
-  free(buffer);
   return 0;
 }
 
