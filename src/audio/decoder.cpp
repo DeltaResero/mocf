@@ -1,4 +1,4 @@
-// src/audio/decoder.c
+// src/audio/decoder.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,14 +13,13 @@
 #include "config.h"
 #endif
 
-#include <stdio.h>
-#include <stddef.h>
-#include <string.h>
-#include <strings.h>
-#include <ctype.h>
-#include <stdarg.h>
-#include <errno.h>
-#include <assert.h>
+#include <cassert>
+#include <cctype>
+#include <cerrno>
+#include <cstdarg>
+#include <cstddef>
+#include <cstdio>
+#include <cstring>
 
 #include "core/common.h"
 #include "audio/decoder.h"

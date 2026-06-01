@@ -1,4 +1,4 @@
-// src/audio/audio.c
+// src/audio/audio.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -15,12 +15,12 @@
 #include "config.h"
 #endif
 
-#include <stdio.h>
+#include <cassert>
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
 #include <pthread.h>
-#include <string.h>
-#include <strings.h>
-#include <errno.h>
-#include <assert.h>
+#include <vector>
 
 #define DEBUG
 
@@ -1178,53 +1178,28 @@ void audio_hw_unpause()
 
 int audio_send_pcm(const char *buf, const size_t size)
 {
-  char *softmixed = NULL;
-  char *equalized = NULL;
+  std::vector<char> equalized;
+  std::vector<char> softmixed;
 
   if (equalizer_is_active())
   {
-    equalized = xmalloc(size);
-    memcpy(equalized, buf, size);
-
-    equalizer_process_buffer(equalized, size, &driver_sound_params);
-
-    buf = equalized;
+    equalized.assign(buf, buf + size);
+    equalizer_process_buffer(equalized.data(), size, &driver_sound_params);
+    buf = equalized.data();
   }
 
   if (softmixer_is_active() || softmixer_is_mono())
   {
-    if (equalized)
-    {
-      softmixed = equalized;
-    }
-    else
-    {
-      softmixed = xmalloc(size);
-      memcpy(softmixed, buf, size);
-    }
-
-    softmixer_process_buffer(softmixed, size, &driver_sound_params);
-
-    buf = softmixed;
+    softmixed.assign(buf, buf + size);
+    softmixer_process_buffer(softmixed.data(), size, &driver_sound_params);
+    buf = softmixed.data();
   }
 
-  int played;
-
-  played = hw.play(buf, size);
+  int played = hw.play(buf, size);
 
   if (played < 0)
   {
     fatal("Audio output error!");
-  }
-
-  if (softmixed && !equalized)
-  {
-    free(softmixed);
-  }
-
-  if (equalized)
-  {
-    free(equalized);
   }
 
   return played;
@@ -1727,7 +1702,7 @@ void audio_plist_move(const char *file1, const char *file2)
  * It obviously needs to be freed after use. */
 struct plist *audio_queue_get_contents()
 {
-  struct plist *ret = (struct plist *)xmalloc(sizeof(struct plist));
+  struct plist *ret = new plist;
   plist_init(ret);
 
   LOCK(plist_mtx);

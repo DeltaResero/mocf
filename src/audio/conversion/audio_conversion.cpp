@@ -1,4 +1,4 @@
-// src/audio/conversion/audio_conversion.c
+// src/audio/conversion/audio_conversion.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -18,11 +18,10 @@
 #include "config.h"
 #endif
 
-#include <assert.h>
-#include <stdlib.h>
-#include <math.h>
-#include <string.h>
-#include <strings.h>
+#include <cassert>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
 
 #ifdef HAVE_SAMPLERATE
 #include <samplerate.h>
