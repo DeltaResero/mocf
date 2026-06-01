@@ -1,4 +1,4 @@
-// src/audio/outputs/jack.c
+// src/audio/outputs/jack.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -15,14 +15,14 @@
 #include "config.h"
 #endif
 
+#include <cassert>
+#include <cmath>
+#include <cstring>
+#include <cstdio>
 #include <unistd.h>
-#include <stdio.h>
 #include <jack/jack.h>
 #include <jack/types.h>
 #include <jack/ringbuffer.h>
-#include <string.h>
-#include <assert.h>
-#include <math.h>
 
 #define DEBUG
 
@@ -183,7 +183,7 @@ static int moc_jack_init(struct output_driver_caps *caps)
   jack_on_shutdown(client, shutdown_cb, NULL);
 
   /* allocate memory for an array of 2 output ports */
-  output_port = xmalloc(2 * sizeof(jack_port_t *));
+  output_port = new jack_port_t *[2];
   output_port[0] = jack_port_register(
       client, "output0", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
   output_port[1] = jack_port_register(
@@ -355,7 +355,7 @@ static void moc_jack_shutdown()
 {
   jack_port_unregister(client, output_port[0]);
   jack_port_unregister(client, output_port[1]);
-  free(output_port);
+  delete[] output_port;
   jack_client_close(client);
   jack_ringbuffer_free(ringbuffer[0]);
   jack_ringbuffer_free(ringbuffer[1]);

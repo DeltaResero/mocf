@@ -1,4 +1,4 @@
-// src/audio/outputs/oss.c
+// src/audio/outputs/oss.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,16 +13,15 @@
 #include "config.h"
 #endif
 
-#include <stdio.h>
+#include <cassert>
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
+#include <fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <string.h>
-#include <strings.h>
 #include <unistd.h>
-#include <assert.h>
 
 #ifdef HAVE_SYS_SOUNDCARD_H
 #include <sys/soundcard.h>

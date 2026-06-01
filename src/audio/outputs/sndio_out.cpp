@@ -1,4 +1,4 @@
-// src/audio/outputs/sndio_out.c
+// src/audio/outputs/sndio_out.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -18,7 +18,7 @@
 #include <sndio.h>
 #endif
 
-#include <assert.h>
+#include <cassert>
 
 #include "core/common.h"
 #include "audio/audio.h"

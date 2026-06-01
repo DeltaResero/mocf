@@ -1,4 +1,4 @@
-// src/audio/outputs/alsa.c
+// src/audio/outputs/alsa.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -15,14 +15,16 @@
 #include "config.h"
 #endif
 
-#include <stdlib.h>
-#include <inttypes.h>
-#include <alsa/asoundlib.h>
-#include <assert.h>
-#include <string.h>
-#include <errno.h>
+#include <cassert>
+#include <cerrno>
+#include <cinttypes>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <cstdarg>
 #include <unistd.h>
-#include <math.h>
+#include <vector>
+#include <alsa/asoundlib.h>
 #define exp10(x) (exp((x) * log(10)))
 
 #define DEBUG
@@ -362,8 +364,6 @@ static int fill_capabilities(struct output_driver_caps *caps)
 
 static void handle_mixer_events(snd_mixer_t *mixer_handle)
 {
-  struct pollfd *fds = NULL;
-
   assert(mixer_handle);
 
   do
@@ -377,16 +377,16 @@ static void handle_mixer_events(snd_mixer_t *mixer_handle)
       break;
     }
 
-    fds = xcalloc(count, sizeof(struct pollfd));
+    std::vector<struct pollfd> fds(count);
 
-    rc = snd_mixer_poll_descriptors(mixer_handle, fds, count);
+    rc = snd_mixer_poll_descriptors(mixer_handle, fds.data(), count);
     if (rc < 0)
     {
       log_errno("snd_mixer_poll_descriptors() failed", rc);
       break;
     }
 
-    rc = poll(fds, count, 0);
+    rc = poll(fds.data(), count, 0);
     if (rc < 0)
     {
       error_errno("poll() failed", errno);
@@ -406,8 +406,6 @@ static void handle_mixer_events(snd_mixer_t *mixer_handle)
       log_errno("snd_mixer_handle_events() failed", rc);
     }
   } while (0);
-
-  free(fds);
 }
 
 static int alsa_read_mixer_raw(snd_mixer_elem_t *elem, bool raw)

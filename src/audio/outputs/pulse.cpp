@@ -1,4 +1,4 @@
-// src/audio/outputs/pulse.c
+// src/audio/outputs/pulse.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -68,7 +68,7 @@
 
 #define DEBUG
 
-#include <math.h>
+#include <cmath>
 #include <pulse/pulseaudio.h>
 #include "core/common.h"
 #include "core/log.h"
