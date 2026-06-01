@@ -1,4 +1,4 @@
-// src/library/playlist.c
+// src/library/playlist.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -17,10 +17,10 @@
 #include "config.h"
 #endif
 
-#include <stdio.h>
-#include <string.h>
-#include <stdint.h>
-#include <assert.h>
+#include <cassert>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
 
 #define DEBUG
 
@@ -52,7 +52,7 @@ void tags_free(struct file_tags *tags)
     free(tags->album);
   }
 
-  free(tags);
+  delete tags;
 }
 
 void tags_clear(struct file_tags *tags)
@@ -144,16 +144,13 @@ void tags_update(struct file_tags *dst, struct file_tags *src, int move)
 
 struct file_tags *tags_new()
 {
-  struct file_tags *tags;
-
-  tags = (struct file_tags *)xmalloc(sizeof(struct file_tags));
-  tags->title = NULL;
-  tags->artist = NULL;
-  tags->album = NULL;
-  tags->track = -1;
-  tags->time = -1;
-  tags->filled = 0;
-
+  auto *tags    = new file_tags;
+  tags->title   = nullptr;
+  tags->artist  = nullptr;
+  tags->album   = nullptr;
+  tags->track   = -1;
+  tags->time    = -1;
+  tags->filled  = 0;
   return tags;
 }
 
@@ -212,18 +209,15 @@ void plist_init(struct plist *plist)
 /* Create a new playlist item with empty fields. */
 struct plist_item *plist_new_item()
 {
-  struct plist_item *item;
-
-  item = (struct plist_item *)xmalloc(sizeof(struct plist_item));
-  item->file = NULL;
-  item->type = F_OTHER;
-  item->deleted = 0;
-  item->title_file = NULL;
-  item->title_tags = NULL;
-  item->tags = NULL;
-  item->mtime = (time_t)-1;
-  item->queue_pos = 0;
-
+  auto *item      = new plist_item;
+  item->file       = nullptr;
+  item->type       = F_OTHER;
+  item->deleted    = 0;
+  item->title_file = nullptr;
+  item->title_tags = nullptr;
+  item->tags       = nullptr;
+  item->mtime      = (time_t)-1;
+  item->queue_pos  = 0;
   return item;
 }
 
@@ -415,8 +409,7 @@ void plist_sort_fname(struct plist *plist)
     return;
   }
 
-  sorted = (struct plist_item *)xmalloc(plist_count(plist) *
-                                        sizeof(struct plist_item));
+  sorted = new plist_item[plist_count(plist)];
 
   x = rb_min(plist->search_tree);
   assert(!rb_is_null(x));
@@ -443,7 +436,7 @@ void plist_sort_fname(struct plist *plist)
   plist->not_deleted = n;
 
   memcpy(plist->items, sorted, sizeof(struct plist_item) * n);
-  free(sorted);
+  delete[] sorted;
 }
 
 /* Find an item in the list.  Return the index or -1 if not found. */

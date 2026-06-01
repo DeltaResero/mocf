@@ -1,4 +1,4 @@
-// src/library/player.c
+// src/library/player.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,12 +13,12 @@
 #include "config.h"
 #endif
 
-#include <stdio.h>
+#include <cassert>
+#include <cerrno>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <pthread.h>
-#include <string.h>
-#include <stdint.h>
-#include <errno.h>
-#include <assert.h>
 
 #define DEBUG
 
@@ -132,7 +132,7 @@ static void bitrate_list_empty(struct bitrate_list *b)
     {
       struct bitrate_list_node *t = b->head->next;
 
-      free(b->head);
+      delete b->head;
       b->head = t;
     }
 
@@ -167,8 +167,7 @@ static void bitrate_list_add(struct bitrate_list *b, const int time,
   LOCK(b->mtx);
   if (!b->tail)
   {
-    b->head = b->tail =
-        (struct bitrate_list_node *)xmalloc(sizeof(struct bitrate_list_node));
+    b->head = b->tail = new bitrate_list_node;
     b->tail->next = NULL;
     b->tail->time = time;
     b->tail->bitrate = bitrate;
@@ -179,8 +178,7 @@ static void bitrate_list_add(struct bitrate_list *b, const int time,
   {
     assert(b->tail->time < time);
 
-    b->tail->next =
-        (struct bitrate_list_node *)xmalloc(sizeof(struct bitrate_list_node));
+    b->tail->next = new bitrate_list_node;
     b->tail = b->tail->next;
     b->tail->next = NULL;
     b->tail->time = time;
@@ -218,7 +216,7 @@ static int bitrate_list_get(struct bitrate_list *b, const int time)
 
       b->head = o->next;
       debug("Removing old bitrate %d for time %d", o->bitrate, o->time);
-      free(o);
+      delete o;
     }
 
     bitrate = b->head->bitrate /*b->head->time + 1000*/;

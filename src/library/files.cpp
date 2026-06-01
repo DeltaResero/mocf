@@ -1,4 +1,4 @@
-// src/library/files.c
+// src/library/files.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,16 +13,16 @@
 #include "config.h"
 #endif
 
-#include <stdio.h>
-#include <assert.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <string.h>
-#include <strings.h>
-#include <errno.h>
-#include <stdlib.h>
+#include <cassert>
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <dirent.h>
+#include <string>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #ifdef HAVE_LIBMAGIC
 #include <magic.h>
@@ -649,15 +649,9 @@ char *read_line(FILE *file)
 /* Return malloc()ed string in form "base/name". */
 static char *add_dir_file(const char *base, const char *name)
 {
-  char *path;
-  int base_is_root;
-
-  base_is_root = !strcmp(base, "/") ? 1 : 0;
-  path = (char *)xmalloc(sizeof(char) * (strlen(base) + strlen(name) + 2));
-
-  snprintf(path, strlen(base) + strlen(name) + 2, "%s/%s", base_is_root ? "" : base, name);
-
-  return path;
+  bool base_is_root = !strcmp(base, "/");
+  std::string path = std::string(base_is_root ? "" : base) + "/" + name;
+  return xstrdup(path.c_str());
 }
 
 /* Find directories having a prefix of 'pattern'.
@@ -795,7 +789,6 @@ time_t get_mtime(const char *file)
 char *absolute_path(const char *path, const char *cwd)
 {
   char tmp[2 * PATH_MAX];
-  char *result;
 
   assert(path);
   assert(cwd);
@@ -804,19 +797,11 @@ char *absolute_path(const char *path, const char *cwd)
   {
     strncpy(tmp, cwd, sizeof(tmp));
     tmp[sizeof(tmp) - 1] = 0;
-
     resolve_path(tmp, sizeof(tmp), path);
-
-    result = (char *)xmalloc(sizeof(char) * (strlen(tmp) + 1));
-    strcpy(result, tmp);
-  }
-  else
-  {
-    result = (char *)xmalloc(sizeof(char) * (strlen(path) + 1));
-    strcpy(result, path);
+    return xstrdup(tmp);
   }
 
-  return result;
+  return xstrdup(path);
 }
 
 /* Check that a file which may cause other applications to be invoked

@@ -1,4 +1,4 @@
-// src/library/playlist_file.c
+// src/library/playlist_file.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,16 +13,14 @@
 #include "config.h"
 #endif
 
-#include <unistd.h>
+#include <cassert>
+#include <cctype>
+#include <cerrno>
+#include <cstring>
 #include <fcntl.h>
-#include <sys/file.h>
-#include <stdio.h>
-#include <string.h>
-#include <strings.h>
-#include <ctype.h>
-#include <errno.h>
-#include <assert.h>
 #include <libgen.h>
+#include <sys/file.h>
+#include <unistd.h>
 
 #define DEBUG
 
