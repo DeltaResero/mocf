@@ -1,4 +1,4 @@
-// src/library/tags_cache.c
+// src/library/tags_cache.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,17 +13,19 @@
 #include "config.h"
 #endif
 
-#include <pthread.h>
-#include <assert.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <errno.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <time.h>
-#include <unistd.h>
+#include <cassert>
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
 #include <dirent.h>
+#include <optional>
+#include <pthread.h>
+#include <string>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #ifdef HAVE_DB_H
 #ifndef HAVE_U_INT
@@ -154,7 +156,7 @@ static void request_queue_clear(struct request_queue *q)
     q->head = q->head->next;
 
     free(o->file);
-    free(o);
+    delete o;
   }
 
   q->tail = NULL;
@@ -179,7 +181,7 @@ static void request_queue_clear_up_to(struct request_queue *q, const char *file)
     }
 
     free(o->file);
-    free(o);
+    delete o;
   }
 
   if (!q->head)
@@ -195,8 +197,7 @@ static void request_queue_add(struct request_queue *q, const char *file,
 
   if (!q->head)
   {
-    q->head =
-        (struct request_queue_node *)xmalloc(sizeof(struct request_queue_node));
+    q->head = new request_queue_node;
     q->tail = q->head;
   }
   else
@@ -204,8 +205,7 @@ static void request_queue_add(struct request_queue *q, const char *file,
     assert(q->tail != NULL);
     assert(q->tail->next == NULL);
 
-    q->tail->next =
-        (struct request_queue_node *)xmalloc(sizeof(struct request_queue_node));
+    q->tail->next = new request_queue_node;
     q->tail = q->tail->next;
   }
 
@@ -239,7 +239,7 @@ static char *request_queue_pop(struct request_queue *q, int *tags_sel)
   q->head = n->next;
   file = n->file;
   *tags_sel = n->tags_sel;
-  free(n);
+  delete n;
 
   if (q->tail == n)
   {
@@ -487,7 +487,7 @@ static void tags_cache_gc(struct tags_cache *c)
   DBT key;
   DBT serialized_cache_rec;
   int ret;
-  char *last_referenced = NULL;
+  std::optional<std::string> last_referenced;
   time_t last_referenced_atime = time(NULL) + 1;
   int nitems = 0;
 
@@ -519,14 +519,8 @@ static void tags_cache_gc(struct tags_cache *c)
         rec.atime < last_referenced_atime)
     {
       last_referenced_atime = rec.atime;
-
-      if (last_referenced)
-      {
-        free(last_referenced);
-      }
-      last_referenced = (char *)xmalloc(key.size + 1);
-      memcpy(last_referenced, key.data, key.size);
-      last_referenced[key.size] = '\0';
+      last_referenced = std::string(static_cast<const char *>(key.data),
+                                    key.size);
     }
 
     // TODO: remove objects with serialization error.
@@ -554,9 +548,8 @@ static void tags_cache_gc(struct tags_cache *c)
   {
     if (nitems >= c->max_items)
     {
-      tags_cache_remove_rec(c, last_referenced);
+      tags_cache_remove_rec(c, last_referenced->c_str());
     }
-    free(last_referenced);
   }
   else
   {
@@ -789,10 +782,10 @@ static void *reader_thread(void *cache_ptr)
 
 struct tags_cache *tags_cache_new(size_t max_size)
 {
-  int i, rc;
+  int rc;
   struct tags_cache *result;
 
-  result = (struct tags_cache *)xmalloc(sizeof(struct tags_cache));
+  result = new tags_cache;
 
 #ifdef HAVE_DB_H
   result->db_env = NULL;
@@ -826,7 +819,7 @@ struct tags_cache *tags_cache_new(size_t max_size)
 
 void tags_cache_free(struct tags_cache *c)
 {
-  int i, rc;
+  int rc;
 
   assert(c != NULL);
 
@@ -881,7 +874,7 @@ void tags_cache_free(struct tags_cache *c)
     log_errno("Can't destroy request_cond", rc);
   }
 
-  free(c);
+  delete c;
 }
 
 #ifdef HAVE_DB_H
@@ -1038,64 +1031,54 @@ static int purge_directory(const char *dir_path)
   while ((d = readdir(dir)))
   {
     struct stat st;
-    char *fpath;
-    int len;
 
     if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
     {
       continue;
     }
 
-    len = strlen(dir_path) + strlen(d->d_name) + 2;
-    fpath = (char *)xmalloc(len);
-    snprintf(fpath, len, "%s/%s", dir_path, d->d_name);
+    std::string fpath = std::string(dir_path) + "/" + d->d_name;
 
-    if (stat(fpath, &st) < 0)
+    if (stat(fpath.c_str(), &st) < 0)
     {
       char *err = xstrerror(errno);
-      logit("Can't stat %s: %s", fpath, err);
+      logit("Can't stat %s: %s", fpath.c_str(), err);
       free(err);
-      free(fpath);
       closedir(dir);
       return 0;
     }
 
     if (S_ISDIR(st.st_mode))
     {
-      if (!purge_directory(fpath))
+      if (!purge_directory(fpath.c_str()))
       {
-        free(fpath);
         closedir(dir);
         return 0;
       }
 
-      logit("Removing directory %s...", fpath);
-      if (rmdir(fpath) < 0)
+      logit("Removing directory %s...", fpath.c_str());
+      if (rmdir(fpath.c_str()) < 0)
       {
         char *err = xstrerror(errno);
-        logit("Can't remove %s: %s", fpath, err);
+        logit("Can't remove %s: %s", fpath.c_str(), err);
         free(err);
-        free(fpath);
         closedir(dir);
         return 0;
       }
     }
     else
     {
-      logit("Removing file %s...", fpath);
+      logit("Removing file %s...", fpath.c_str());
 
-      if (unlink(fpath) < 0)
+      if (unlink(fpath.c_str()) < 0)
       {
         char *err = xstrerror(errno);
-        logit("Can't remove %s: %s", fpath, err);
+        logit("Can't remove %s: %s", fpath.c_str(), err);
         free(err);
-        free(fpath);
         closedir(dir);
         return 0;
       }
     }
-
-    free(fpath);
   }
 
   closedir(dir);
@@ -1132,20 +1115,18 @@ static const char *create_version_tag(char *buf)
 #ifdef HAVE_DB_H
 static int cache_version_matches(const char *cache_dir)
 {
-  char *fname = NULL;
   char disk_version_tag[VERSION_TAG_MAX];
   ssize_t rres;
   FILE *f;
   int compare_result = 0;
 
-  fname = (char *)xmalloc(strlen(cache_dir) + sizeof(MOC_VERSION_TAG) + 1);
-  snprintf(fname, strlen(cache_dir) + sizeof(MOC_VERSION_TAG) + 1, "%s/%s", cache_dir, MOC_VERSION_TAG);
+  std::string fname =
+      std::string(cache_dir) + "/" + MOC_VERSION_TAG;
 
-  f = fopen(fname, "r");
+  f = fopen(fname.c_str(), "r");
   if (!f)
   {
     logit("No %s in cache directory", MOC_VERSION_TAG);
-    free(fname);
     return 0;
   }
 
@@ -1186,7 +1167,6 @@ static int cache_version_matches(const char *cache_dir)
   }
 
   fclose(f);
-  free(fname);
 
   return compare_result;
 }
@@ -1196,18 +1176,15 @@ static int cache_version_matches(const char *cache_dir)
 static void write_cache_version(const char *cache_dir)
 {
   char cur_version_tag[VERSION_TAG_MAX];
-  char *fname = NULL;
   FILE *f;
   int rc;
 
-  fname = (char *)xmalloc(strlen(cache_dir) + sizeof(MOC_VERSION_TAG) + 1);
-  snprintf(fname, strlen(cache_dir) + sizeof(MOC_VERSION_TAG) + 1, "%s/%s", cache_dir, MOC_VERSION_TAG);
+  std::string fname = std::string(cache_dir) + "/" + MOC_VERSION_TAG;
 
-  f = fopen(fname, "w");
+  f = fopen(fname.c_str(), "w");
   if (!f)
   {
     log_errno("Error opening cache", errno);
-    free(fname);
     return;
   }
 
@@ -1218,7 +1195,6 @@ static void write_cache_version(const char *cache_dir)
     logit("Error writing cache version tag: %d", rc);
   }
 
-  free(fname);
   fclose(f);
 }
 #endif
