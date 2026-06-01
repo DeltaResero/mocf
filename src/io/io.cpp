@@ -1,4 +1,4 @@
-// src/io/io.c
+// src/io/io.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -15,17 +15,16 @@
 #include "config.h"
 #endif
 
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
+#include <cassert>
+#include <cerrno>
+#include <cinttypes>
+#include <cstdlib>
+#include <cstring>
 #include <fcntl.h>
-#include <errno.h>
-#include <string.h>
-#include <strings.h>
-#include <assert.h>
 #include <pthread.h>
-#include <inttypes.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #ifdef HAVE_MMAP
 #include <sys/mman.h>
@@ -386,7 +385,7 @@ void io_close(struct io_stream *s)
   {
     free(s->strerror);
   }
-  free(s);
+  delete s;
 
   logit("done");
 }
@@ -549,7 +548,7 @@ struct io_stream *io_open(const char *file, const int buffered)
 
   assert(file != NULL);
 
-  s = xmalloc(sizeof(struct io_stream));
+  s = new io_stream;
   s->errno_val = 0;
   s->read_error = 0;
   s->strerror = NULL;

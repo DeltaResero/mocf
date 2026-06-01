@@ -1,4 +1,4 @@
-// src/audio/outputs/out_buf.c
+// src/audio/outputs/out_buf.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -16,11 +16,11 @@
 #include "config.h"
 #endif
 
-#include <assert.h>
-#include <math.h>
+#include <cassert>
+#include <cerrno>
+#include <cmath>
+#include <cstring>
 #include <pthread.h>
-#include <string.h>
-#include <errno.h>
 
 #ifdef OUT_TEST
 #include <unistd.h>
@@ -267,7 +267,7 @@ struct out_buf *out_buf_new(int size)
 
   assert(size > 0);
 
-  buf = xmalloc(sizeof(struct out_buf));
+  buf = new out_buf;
 
   buf->buf = fifo_buf_new(size);
   buf->exit = 0;
@@ -336,7 +336,7 @@ void out_buf_free(struct out_buf *buf)
     log_errno("Destroying buffer ready condition failed", rc);
   }
 
-  free(buf);
+  delete buf;
 
   logit("buffer destroyed");
 

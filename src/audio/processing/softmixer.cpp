@@ -1,4 +1,4 @@
-// src/audio/processing/softmixer.c
+// src/audio/processing/softmixer.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -16,13 +16,11 @@
 #include "config.h"
 #endif
 
-#include <assert.h>
-#include <stdio.h>
-#include <string.h>
-#include <strings.h>
-#include <assert.h>
-#include <stdint.h>
-#include <math.h>
+#include <cassert>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
 
 /* #define DEBUG */
 
