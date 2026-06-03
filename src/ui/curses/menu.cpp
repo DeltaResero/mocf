@@ -1,4 +1,4 @@
-// src/ui/curses/menu.c
+// src/ui/curses/menu.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,10 +13,10 @@
 #include "config.h"
 #endif
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <assert.h>
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 #include "core/common.h"
 #include "ui/curses/menu.h"
@@ -253,7 +253,7 @@ struct menu *menu_new(WINDOW *win, const int posx, const int posy,
   assert(width > 0);
   assert(height > 0);
 
-  menu = (struct menu *)xmalloc(sizeof(struct menu));
+  menu = new struct menu;
 
   menu->win = win;
   menu->items = NULL;
@@ -287,7 +287,7 @@ struct menu_item *menu_add(struct menu *menu, const char *title,
   assert(menu != NULL);
   assert(title != NULL);
 
-  mi = (struct menu_item *)xmalloc(sizeof(struct menu_item));
+  mi = new menu_item;
 
   mi->title = xstrdup(title);
   mi->type = type;
@@ -417,7 +417,7 @@ static void menu_item_free(struct menu_item *mi)
     free(mi->file);
   }
 
-  free(mi);
+  delete mi;
 }
 
 void menu_free(struct menu *menu)
@@ -437,7 +437,7 @@ void menu_free(struct menu *menu)
 
   rb_tree_free(menu->search_tree);
 
-  free(menu);
+  delete menu;
 }
 
 void menu_driver(struct menu *menu, const enum menu_request req)

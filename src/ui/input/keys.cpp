@@ -1,4 +1,4 @@
-// src/ui/input/keys.c
+// src/ui/input/keys.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,12 +13,12 @@
 #include "config.h"
 #endif
 
-#include <string.h>
-#include <strings.h>
-#include <assert.h>
-#include <stdio.h>
-#include <errno.h>
-#include <ctype.h>
+#include <cassert>
+#include <cctype>
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
+#include <vector>
 
 #define DEBUG
 
@@ -940,7 +940,7 @@ static void make_help()
     {
       len += strlen(unassigned);
     }
-    help[i] = xcalloc(sizeof(char), len);
+    help[i] = new char[len]();
     snprintf(help[i], len, "%-*s%s", HELP_INDENT, get_command_keys(i),
             commands[i].help);
     if (commands[i].keys[0] == -1)
@@ -971,7 +971,7 @@ void keys_cleanup()
 
   for (i = 0; i < COMMANDS_NUM; i += 1)
   {
-    free(help[i]);
+    delete[] help[i];
   }
 }
 

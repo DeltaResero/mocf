@@ -1,4 +1,4 @@
-// src/ui/curses/interface.c
+// src/ui/curses/interface.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,20 +13,19 @@
 #include "config.h"
 #endif
 
-#include <stdarg.h>
-#include <locale.h>
-#include <assert.h>
-#include <string.h>
-#include <strings.h>
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include <signal.h>
-#include <ctype.h>
-#include <unistd.h>
+#include <cassert>
+#include <cctype>
+#include <cerrno>
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <csignal>
 #include <dirent.h>
+#include <locale.h>
 #include <sys/select.h>
+#include <unistd.h>
 
 #ifdef HAVE_SYS_INOTIFY_H
 #include <sys/inotify.h>
@@ -167,11 +166,11 @@ static int send_tags_request(const char *file, const int tags_sel)
 
 static void init_playlists()
 {
-  dir_plist = (struct plist *)xmalloc(sizeof(struct plist));
+  dir_plist = new plist;
   plist_init(dir_plist);
-  playlist = (struct plist *)xmalloc(sizeof(struct plist));
+  playlist = new plist;
   plist_init(playlist);
-  queue = (struct plist *)xmalloc(sizeof(struct plist));
+  queue = new plist;
   plist_init(queue);
 }
 
@@ -3248,9 +3247,9 @@ void interface_end()
   plist_free(dir_plist);
   plist_free(playlist);
   plist_free(queue);
-  free(dir_plist);
-  free(playlist);
-  free(queue);
+  delete dir_plist;
+  delete playlist;
+  delete queue;
 
   event_queue_free(&events);
 

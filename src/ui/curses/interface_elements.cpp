@@ -1,4 +1,4 @@
-// src/ui/curses/interface_elements.c
+// src/ui/curses/interface_elements.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -15,18 +15,18 @@
 #include "config.h"
 #endif
 
-#include <stdlib.h>
-#include <string.h>
-#include <strings.h>
-#include <stdio.h>
-#include <assert.h>
-#include <errno.h>
-#include <math.h>
-#include <time.h>
+#include <cassert>
+#include <cctype>
+#include <cerrno>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <cwchar>
+#include <cwctype>
 #include <unistd.h>
-#include <ctype.h>
-#include <wctype.h>
-#include <wchar.h>
+#include <vector>
 
 #include "core/common.h"
 #include "ui/curses/menu.h"
@@ -351,10 +351,6 @@ static char *entry_history_get(const struct entry_history *h, const int num)
 static void entry_draw(const struct entry *e, WINDOW *w, const int posx,
                        const int posy)
 {
-  char *text;
-  wchar_t *text_ucs;
-  int len;
-
   assert(e != NULL);
   assert(w != NULL);
   assert(posx >= 0);
@@ -365,27 +361,24 @@ static void entry_draw(const struct entry *e, WINDOW *w, const int posx,
   xwprintw(w, "%s", e->title);
 
   wattrset(w, get_color(CLR_ENTRY));
-  len = wcslen(e->text_ucs) - e->display_from;
+  size_t len = wcslen(e->text_ucs) - e->display_from;
 
-  text_ucs = (wchar_t *)xmalloc(sizeof(wchar_t) * (len + 1));
-  memcpy(text_ucs, e->text_ucs + e->display_from, sizeof(wchar_t) * (len + 1));
-  if (len > e->width)
+  std::vector<wchar_t> text_ucs(len + 1);
+  memcpy(text_ucs.data(), e->text_ucs + e->display_from, sizeof(wchar_t) * (len + 1));
+  if (len > (size_t)e->width)
   {
     text_ucs[e->width] = L'\0';
   }
-  len = wcstombs(NULL, text_ucs, 0) + 1;
-  assert(len >= 1);
+  size_t mlen = wcstombs(NULL, text_ucs.data(), 0) + 1;
+  assert(mlen >= 1);
 
-  text = (char *)xmalloc(len);
-  wcstombs(text, text_ucs, len);
+  std::vector<char> text(mlen);
+  wcstombs(text.data(), text_ucs.data(), mlen);
 
-  xwprintw(w, " %-*s", e->width, text);
+  xwprintw(w, " %-*s", e->width, text.data());
 
   /* Move the cursor */
   wmove(w, posy, e->cur_pos - e->display_from + strwidth(e->title) + posx + 1);
-
-  free(text);
-  free(text_ucs);
 }
 
 static void entry_init(struct entry *e, const enum entry_type type,
@@ -421,12 +414,14 @@ static void entry_init(struct entry *e, const enum entry_type type,
   e->text_ucs[0] = L'\0';
   e->saved_ucs[0] = L'\0';
   e->file = NULL;
-  e->title = xmalloc(strlen(title) + 2);
-  strcpy(e->title, title);
+  e->title = xstrdup(title);
   if (e->title[strlen(e->title) - 1] != ':' &&
       e->title[strlen(e->title) - 1] != '?')
   {
-    strcat(e->title, ":");
+    char *t = static_cast<char *>(xmalloc(strlen(e->title) + 2));
+    snprintf(t, strlen(e->title) + 2, "%s:", e->title);
+    free(e->title);
+    e->title = t;
   }
   e->width = width - strwidth(title);
   e->cur_pos = 0;
@@ -2782,7 +2777,7 @@ static struct queued_message *queued_message_create(enum message_type type)
 {
   struct queued_message *result;
 
-  result = (struct queued_message *)xmalloc(sizeof(struct queued_message));
+  result = new queued_message;
   result->next = NULL;
   result->type = type;
   result->msg = NULL;
@@ -2807,7 +2802,7 @@ static void queued_message_destroy(struct queued_message *msg)
     free(msg->prompt);
   }
 
-  free(msg);
+  delete msg;
 }
 
 static void set_startup_message(struct info_win *w)

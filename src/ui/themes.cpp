@@ -1,4 +1,4 @@
-// src/ui/themes.c
+// src/ui/themes.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -25,11 +25,10 @@
 #include <curses.h>
 #endif
 
-#include <stdio.h>
-#include <assert.h>
-#include <string.h>
-#include <strings.h>
-#include <errno.h>
+#include <cassert>
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
 
 /* Platform-specific headers for executable path resolution */
 #if defined(__linux__)
