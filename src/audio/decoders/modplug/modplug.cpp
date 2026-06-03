@@ -1,4 +1,4 @@
-// src/audio/decoders/modplug/modplug.c
+// src/audio/decoders/modplug/modplug.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -20,9 +20,10 @@
 #include "config.h"
 #endif
 
-#include <strings.h>
-#include <limits.h>
-#include <assert.h>
+#include <cassert>
+#include <climits>
+#include <cstring>
+#include <vector>
 #include <libmodplug/modplug.h>
 
 #define DEBUG
@@ -91,7 +92,7 @@ static struct modplug_data *make_modplug_data(const char *file)
 {
   struct modplug_data *data;
 
-  data = (struct modplug_data *)xmalloc(sizeof(struct modplug_data));
+  data = new modplug_data;
 
   data->modplugfile = NULL;
   decoder_error_init(&data->error);
@@ -124,17 +125,12 @@ static struct modplug_data *make_modplug_data(const char *file)
     return data;
   }
 
-  char *filedata = (char *)xmalloc((size_t)size);
+  std::vector<char> filedata((size_t)size);
 
-  io_read(s, filedata, (size_t)size);
+  io_read(s, filedata.data(), (size_t)size);
   io_close(s);
 
-  data->modplugfile = ModPlug_Load(filedata, (int)size);
-
-  /* libmodplug copies everything it needs during ModPlug_Load; the source
-   * buffer is not referenced afterwards and can be freed immediately.
-   * This halves the steady-state RAM cost during playback. */
-  free(filedata);
+  data->modplugfile = ModPlug_Load(filedata.data(), (int)size);
 
   if (data->modplugfile == NULL)
   {
@@ -177,7 +173,7 @@ static void modplug_close(void *void_data)
   }
 
   decoder_error_clear(&data->error);
-  free(data);
+  delete data;
 }
 
 static void modplug_info(const char *file_name, struct file_tags *info,

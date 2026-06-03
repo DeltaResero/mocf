@@ -1,4 +1,4 @@
-// src/audio/decoders/mpg123/mpg123.c
+// src/audio/decoders/mpg123/mpg123.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,13 +13,13 @@
 #include "config.h"
 #endif
 
-#include <limits.h>
-#include <inttypes.h>
-#include <string.h>
-#include <strings.h>
-#include <stdio.h>
-#include <errno.h>
-#include <assert.h>
+#include <cassert>
+#include <cerrno>
+#include <cinttypes>
+#include <climits>
+#include <cstdio>
+#include <cstring>
+#include <string>
 #include <mpg123.h>
 
 #define DEBUG
@@ -51,8 +51,6 @@ struct mpg123_data
 // zeros.
 char *safe_string(char text[30])
 {
-  char *out;
-
   int n = 0;
   while (n < 29 && text[n] != 0)
   {
@@ -62,11 +60,8 @@ char *safe_string(char text[30])
   {
     n--;
   }
-
-  out = xmalloc((n + 2) * sizeof(char));
-  memcpy(out, text, (n + 1) * sizeof(char));
-  out[n + 1] = 0;
-  return out;
+  std::string s(text, n + 1);
+  return xstrdup(s.c_str());
 }
 
 static void get_tags(mpg123_handle *mf, struct file_tags *info)
@@ -100,9 +95,7 @@ static void get_tags(mpg123_handle *mf, struct file_tags *info)
       size_t i, j;
       for (i = 0; i < v2->texts; ++i)
       {
-        // null-terminate tag name
-        char *tag_id;
-        tag_id = xmalloc(5 * sizeof(char));
+        char tag_id[5];
         memcpy(tag_id, v2->text[i].id, 4);
         tag_id[4] = 0;
 
@@ -111,8 +104,6 @@ static void get_tags(mpg123_handle *mf, struct file_tags *info)
         {
           debug("TG: track number found.");
 
-          // since track number may be in form 07/23, we need to extract the
-          // first number
           for (j = 0; j < v2->text[i].text.fill; ++j)
           {
             if (v2->text[i].text.p[j] == '/')
@@ -120,23 +111,17 @@ static void get_tags(mpg123_handle *mf, struct file_tags *info)
               break;
             }
           }
-          // debug("TG: track number j=%d",(int)j);
           if (j > 0)
           {
-            char *num;
-
-            num = xmalloc((j + 1) * sizeof(char));
-            memcpy(num, v2->text[i].text.p, j);
-            long track_num = strtol(num, NULL, 10);
+            std::string num(v2->text[i].text.p, j);
+            long track_num = strtol(num.c_str(), nullptr, 10);
             if (track_num > 0)
             {
               info->track = (int)track_num;
             }
             debug("TG: track v2 %d.", info->track);
-            free(num);
           }
         }
-        free(tag_id);
       }
     }
 
@@ -372,7 +357,7 @@ err:
 static void *mpg123_openX(const char *file)
 {
   struct mpg123_data *data;
-  data = (struct mpg123_data *)xmalloc(sizeof(struct mpg123_data));
+  data = new mpg123_data;
   data->ok = 0;
 
   decoder_error_init(&data->error);
@@ -408,7 +393,7 @@ static void mpg123_closeX(void *prv_data)
   {
     tags_free(data->tags);
   }
-  free(data);
+  delete data;
 }
 
 static int mpg123_seekX(void *prv_data, int sec)

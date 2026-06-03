@@ -1,4 +1,4 @@
-// src/audio/decoders/flac/flac.c
+// src/audio/decoders/flac/flac.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -14,10 +14,10 @@
 #include "config.h"
 #endif
 
-#include <string.h>
+#include <cstdlib>
+#include <cstring>
+#include <string>
 #include <FLAC/all.h>
-#include <stdlib.h>
-#include <strings.h>
 
 #define DEBUG
 
@@ -252,7 +252,7 @@ static void *flac_open_internal(const char *file, const int buffered)
 {
   struct flac_data *data;
 
-  data = (struct flac_data *)xmalloc(sizeof(struct flac_data));
+  data = new flac_data;
   decoder_error_init(&data->error);
 
   data->decoder = NULL;
@@ -338,15 +338,13 @@ static void flac_close(void *void_data)
 
   io_close(data->stream);
   decoder_error_clear(&data->error);
-  free(data);
+  delete data;
 }
 
 static void fill_tag(FLAC__StreamMetadata_VorbisComment_Entry *comm,
                      struct file_tags *tags)
 {
-  char *name, *value;
-  FLAC__byte *eq;
-  int value_length;
+  const FLAC__byte *eq;
 
   eq = memchr(comm->entry, '=', comm->length);
   if (!eq)
@@ -354,44 +352,32 @@ static void fill_tag(FLAC__StreamMetadata_VorbisComment_Entry *comm,
     return;
   }
 
-  name = (char *)xmalloc(sizeof(char) * (eq - comm->entry + 1));
-  strncpy(name, (char *)comm->entry, eq - comm->entry);
-  name[eq - comm->entry] = 0;
-  value_length = comm->length - (eq - comm->entry + 1);
+  std::string name((char *)comm->entry, eq - comm->entry);
+  size_t value_length = comm->length - (eq - comm->entry + 1);
 
   if (value_length == 0)
   {
-    free(name);
     return;
   }
 
-  value = (char *)xmalloc(sizeof(char) * (value_length + 1));
-  strncpy(value, (char *)(eq + 1), value_length);
-  value[value_length] = 0;
+  std::string value((char *)(eq + 1), value_length);
 
-  if (!strcasecmp(name, "title"))
+  if (!strcasecmp(name.c_str(), "title"))
   {
-    tags->title = value;
+    tags->title = xstrdup(value.c_str());
   }
-  else if (!strcasecmp(name, "artist"))
+  else if (!strcasecmp(name.c_str(), "artist"))
   {
-    tags->artist = value;
+    tags->artist = xstrdup(value.c_str());
   }
-  else if (!strcasecmp(name, "album"))
+  else if (!strcasecmp(name.c_str(), "album"))
   {
-    tags->album = value;
+    tags->album = xstrdup(value.c_str());
   }
-  else if (!strcasecmp(name, "tracknumber") || !strcasecmp(name, "track"))
+  else if (!strcasecmp(name.c_str(), "tracknumber") || !strcasecmp(name.c_str(), "track"))
   {
-    tags->track = (int)strtol(value, NULL, 10);
-    free(value);
+    tags->track = (int)strtol(value.c_str(), NULL, 10);
   }
-  else
-  {
-    free(value);
-  }
-
-  free(name);
 }
 
 static void get_vorbiscomments(const char *filename, struct file_tags *tags)

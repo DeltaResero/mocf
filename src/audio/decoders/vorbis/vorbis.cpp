@@ -1,4 +1,4 @@
-// src/audio/decoders/vorbis/vorbis.c
+// src/audio/decoders/vorbis/vorbis.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,13 +13,12 @@
 #include "config.h"
 #endif
 
-#include <limits.h>
-#include <inttypes.h>
-#include <string.h>
-#include <strings.h>
-#include <stdio.h>
-#include <errno.h>
-#include <assert.h>
+#include <cassert>
+#include <cerrno>
+#include <cinttypes>
+#include <climits>
+#include <cstdio>
+#include <cstring>
 #ifndef HAVE_TREMOR
 #include <vorbis/vorbisfile.h>
 #else
@@ -255,7 +254,7 @@ static void *vorbis_open(const char *file)
 {
   struct vorbis_data *data;
 
-  data = (struct vorbis_data *)xmalloc(sizeof(struct vorbis_data));
+  data = new vorbis_data;
   data->ok = 0;
 
   decoder_error_init(&data->error);
@@ -299,7 +298,7 @@ static void vorbis_close(void *prv_data)
   {
     tags_free(data->tags);
   }
-  free(data);
+  delete data;
 }
 
 static int vorbis_seek(void *prv_data, int sec)

@@ -1,4 +1,4 @@
-// src/audio/decoders/speex/speex.c
+// src/audio/decoders/speex/speex.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -16,10 +16,10 @@
 #include "config.h"
 #endif
 
-#include <string.h>
-#include <strings.h>
-#include <inttypes.h>
-#include <assert.h>
+#include <cassert>
+#include <cinttypes>
+#include <cstring>
+#include <vector>
 #include <speex/speex.h>
 #include <speex/speex_header.h>
 #include <speex/speex_stereo.h>
@@ -58,7 +58,7 @@ struct spx_data
   int frames_per_packet;
   int bitrate;
 
-  int16_t *output;
+  std::vector<int16_t> output;
   int output_start;
   int output_left;
   char *comment_packet;
@@ -192,8 +192,8 @@ static int read_speex_header(struct spx_data *data)
             data->frames_per_packet = 1;
           }
 
-          data->output = xmalloc(data->frame_size * data->nchannels *
-                                 data->frames_per_packet * sizeof(int16_t));
+          data->output.resize(data->frame_size * data->nchannels *
+                              data->frames_per_packet);
           data->output_start = 0;
           data->output_left = 0;
 
@@ -221,7 +221,7 @@ static struct spx_data *spx_open_internal(struct io_stream *stream)
   struct spx_data *data;
   SpeexStereoState stereo = SPEEX_STEREO_STATE_INIT;
 
-  data = (struct spx_data *)xmalloc(sizeof(struct spx_data));
+  data = new spx_data;
 
   decoder_error_init(&data->error);
   data->stream = stream;
@@ -229,7 +229,6 @@ static struct spx_data *spx_open_internal(struct io_stream *stream)
   data->st = NULL;
   data->stereo = stereo;
   data->header = NULL;
-  data->output = NULL;
   data->comment_packet = NULL;
   data->bitrate = -1;
   ogg_sync_init(&data->oy);
@@ -287,10 +286,6 @@ static void spx_close(void *prv_data)
     {
       free(data->comment_packet);
     }
-    if (data->output)
-    {
-      free(data->output);
-    }
     speex_bits_destroy(&data->bits);
     ogg_stream_clear(&data->os);
     ogg_sync_clear(&data->oy);
@@ -338,8 +333,7 @@ static void get_comments(struct spx_data *data, struct file_tags *tags)
     char *c = data->comment_packet;
     int len, i, nb_fields;
     char *end;
-    char *temp = NULL;
-    int temp_len = 0;
+    std::vector<char> temp;
 
     /* Parse out vendor string */
     end = c + data->comment_packet_len;
@@ -366,10 +360,6 @@ static void get_comments(struct spx_data *data, struct file_tags *tags)
     {
       if (c + 4 > end)
       {
-        if (temp)
-        {
-          free(temp);
-        }
         logit("Broken comment");
         return;
       }
@@ -379,30 +369,20 @@ static void get_comments(struct spx_data *data, struct file_tags *tags)
       if (c + len > end)
       {
         logit("Broken comment");
-        if (temp)
-        {
-          free(temp);
-        }
         return;
       }
 
-      if (temp_len < len + 1)
+      if ((int)temp.size() < len + 1)
       {
-        temp_len = len + 1;
-        temp = xrealloc(temp, temp_len);
+        temp.resize(len + 1);
       }
 
-      strncpy(temp, c, len);
+      strncpy(temp.data(), c, len);
       temp[len] = '\0';
-      debug("COMMENT: '%s'", temp);
-      parse_comment(temp, tags);
+      debug("COMMENT: '%s'", temp.data());
+      parse_comment(temp.data(), tags);
 
       c += len;
-    }
-
-    if (temp)
-    {
-      free(temp);
     }
   }
 }
@@ -612,7 +592,7 @@ static int spx_decode(void *prv_data, char *sound_buf, int nbytes,
 
       to_copy = MIN(data->output_left, to_copy);
 
-      memcpy(out, data->output + data->output_start, to_copy * sizeof(int16_t));
+      memcpy(out, data->output.data() + data->output_start, to_copy * sizeof(int16_t));
 
       out += to_copy;
       data->output_start += to_copy;
@@ -622,7 +602,7 @@ static int spx_decode(void *prv_data, char *sound_buf, int nbytes,
     }
     else if (ogg_stream_packetout(&data->os, &data->op) == 1)
     {
-      int16_t *temp_output = data->output;
+      int16_t *temp_output = data->output.data();
 
       /* Decode some more samples */
 

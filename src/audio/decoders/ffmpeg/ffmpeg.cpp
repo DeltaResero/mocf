@@ -1,4 +1,4 @@
-// src/audio/decoders/ffmpeg/ffmpeg.c
+// src/audio/decoders/ffmpeg/ffmpeg.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -18,14 +18,14 @@
 #include "config.h"
 #endif
 
-#include <stdlib.h>
-#include <stdio.h>
+#include <cassert>
+#include <cerrno>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <pthread.h>
-#include <string.h>
-#include <strings.h>
-#include <assert.h>
-#include <stdint.h>
-#include <errno.h>
+#include <vector>
 
 #ifdef __cplusplus
 extern "C" {
@@ -83,8 +83,7 @@ struct ffmpeg_data
   const AVCodec *codec;
   AVDictionary *opts;
 
-  char *remain_buf;
-  int remain_buf_len;
+  std::vector<char> remain_buf;
 
   bool delay; /* FFmpeg may buffer samples */
   bool eof;   /* end of file seen */
@@ -328,7 +327,7 @@ static int locking_cb(void **mutex, enum AVLockOp op)
   switch (op)
   {
     case AV_LOCK_CREATE:
-      *mutex = xmalloc(sizeof(pthread_mutex_t));
+      *mutex = new pthread_mutex_t;
       result = pthread_mutex_init(*mutex, NULL);
       break;
     case AV_LOCK_OBTAIN:
@@ -339,8 +338,8 @@ static int locking_cb(void **mutex, enum AVLockOp op)
       break;
     case AV_LOCK_DESTROY:
       result = pthread_mutex_destroy(*mutex);
-      free(*mutex);
-      *mutex = NULL;
+      delete static_cast<pthread_mutex_t *>(*mutex);
+      *mutex = nullptr;
       break;
     default:
       /* We could return -1 here, but examination of the FFmpeg
@@ -674,7 +673,7 @@ static struct ffmpeg_data *ffmpeg_make_data(void)
 {
   struct ffmpeg_data *data;
 
-  data = (struct ffmpeg_data *)xmalloc(sizeof(struct ffmpeg_data));
+  data = new ffmpeg_data;
 
   data->ic = NULL;
   data->pb = NULL;
@@ -682,8 +681,6 @@ static struct ffmpeg_data *ffmpeg_make_data(void)
   data->enc = NULL;
   data->codec = NULL;
   data->opts = NULL;
-  data->remain_buf = NULL;
-  data->remain_buf_len = 0;
   data->delay = false;
   data->eof = false;
   data->eos = false;
@@ -926,48 +923,37 @@ static void put_in_remain_buf(struct ffmpeg_data *data, const char *buf,
                               const int len)
 {
   debug("Remain: %dB", len);
-
-  data->remain_buf_len = len;
-  data->remain_buf = (char *)xmalloc(len);
-  memcpy(data->remain_buf, buf, len);
+  data->remain_buf.assign(buf, buf + len);
 }
 
 static void add_to_remain_buf(struct ffmpeg_data *data, const char *buf,
                               const int len)
 {
   debug("Adding %dB to remain_buf", len);
-
-  data->remain_buf =
-      (char *)xrealloc(data->remain_buf, data->remain_buf_len + len);
-  memcpy(data->remain_buf + data->remain_buf_len, buf, len);
-  data->remain_buf_len += len;
-
-  debug("remain_buf is %dB long", data->remain_buf_len);
+  data->remain_buf.insert(data->remain_buf.end(), buf, buf + len);
+  debug("remain_buf is %zuB long", data->remain_buf.size());
 }
 
 /* Free the remainder buffer. */
 static void free_remain_buf(struct ffmpeg_data *data)
 {
-  free(data->remain_buf);
-  data->remain_buf = NULL;
-  data->remain_buf_len = 0;
+  data->remain_buf.clear();
 }
 
 /* Satisfy the request from previously decoded samples. */
 static int take_from_remain_buf(struct ffmpeg_data *data, char *buf,
                                 int buf_len)
 {
-  int to_copy = MIN(buf_len, data->remain_buf_len);
+  int to_copy = MIN(buf_len, (int)data->remain_buf.size());
 
   debug("Copying %d bytes from the remain buf", to_copy);
 
-  memcpy(buf, data->remain_buf, to_copy);
+  memcpy(buf, data->remain_buf.data(), to_copy);
 
-  if (to_copy < data->remain_buf_len)
+  if (to_copy < (int)data->remain_buf.size())
   {
-    memmove(data->remain_buf, data->remain_buf + to_copy,
-            data->remain_buf_len - to_copy);
-    data->remain_buf_len -= to_copy;
+    data->remain_buf.erase(data->remain_buf.begin(),
+                           data->remain_buf.begin() + to_copy);
   }
   else
   {
@@ -1217,11 +1203,13 @@ static int decode_packet(struct ffmpeg_data *data, AVPacket *pkt, char *buf,
 
     packed_size = frame->nb_samples * data->sample_width * nb_channels;
 
+    std::vector<char> packed_buf;
     if (is_planar && nb_channels > 1)
     {
       int sample, ch;
 
-      packed = xmalloc(packed_size);
+      packed_buf.resize(packed_size);
+      packed = packed_buf.data();
 
       for (sample = 0; sample < frame->nb_samples; sample += 1)
       {
@@ -1240,11 +1228,6 @@ static int decode_packet(struct ffmpeg_data *data, AVPacket *pkt, char *buf,
     buf_len -= copied;
 
     debug("Copying %dB (%dB filled)", packed_size, filled);
-
-    if (packed != (char *)frame->extended_data[0])
-    {
-      free(packed);
-    }
   } while (pkt->size > 0);
 
 #ifdef HAVE_AV_FRAME_FNS
@@ -1355,7 +1338,7 @@ static int ffmpeg_decode(void *prv_data, char *buf, int buf_len,
   }
 #endif
 
-  if (data->remain_buf)
+  if (!data->remain_buf.empty())
   {
     return take_from_remain_buf(data, buf, buf_len);
   }
@@ -1403,7 +1386,7 @@ static int ffmpeg_decode(void *prv_data, char *buf, int buf_len,
   {
     data->bitrate =
         compute_bitrate(sound_params, bytes_used,
-                        bytes_produced + data->remain_buf_len, data->bitrate);
+                        bytes_produced + (int)data->remain_buf.size(), data->bitrate);
   }
 
   return bytes_produced;
@@ -1478,7 +1461,7 @@ static void ffmpeg_close(void *prv_data)
 
   decoder_error_clear(&data->error);
   free(data->filename);
-  free(data);
+  delete data;
 }
 
 static struct io_stream *ffmpeg_get_iostream(void *prv_data)

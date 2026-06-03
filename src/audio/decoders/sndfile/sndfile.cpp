@@ -1,4 +1,4 @@
-// src/audio/decoders/sndfile/sndfile.c
+// src/audio/decoders/sndfile/sndfile.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,15 +13,14 @@
 #include "config.h"
 #endif
 
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <cassert>
+#include <cerrno>
+#include <cstdint>
+#include <cstring>
 #include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
-#include <stdint.h>
-#include <errno.h>
-#include <string.h>
-#include <strings.h>
-#include <assert.h>
 #include <sndfile.h>
 
 #define DEBUG
@@ -160,7 +159,7 @@ static void *sndfile_open(const char *file)
   int fd;
   struct sndfile_data *data;
 
-  data = (struct sndfile_data *)xmalloc(sizeof(struct sndfile_data));
+  data = new sndfile_data;
 
   decoder_error_init(&data->error);
   memset(&data->snd_info, 0, sizeof(data->snd_info));
@@ -230,7 +229,7 @@ static void sndfile_close(void *void_data)
   }
 
   decoder_error_clear(&data->error);
-  free(data);
+  delete data;
 }
 
 static void sndfile_info(const char *file_name, struct file_tags *info,

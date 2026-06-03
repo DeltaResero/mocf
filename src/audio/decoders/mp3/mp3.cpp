@@ -1,4 +1,4 @@
-// src/audio/decoders/mp3/mp3.c
+// src/audio/decoders/mp3/mp3.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -19,15 +19,14 @@
 #include "config.h"
 #endif
 
+#include <cassert>
+#include <cerrno>
+#include <cinttypes>
+#include <cstdlib>
+#include <cstring>
 #include <unistd.h>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <errno.h>
-#include <string.h>
-#include <strings.h>
 #include <mad.h>
 #include <id3tag.h>
-#include <assert.h>
 #ifdef HAVE_ICONV
 #include <iconv.h>
 #endif
@@ -351,7 +350,7 @@ static struct mp3_data *mp3_open_internal(const char *file, const int buffered)
 {
   struct mp3_data *data;
 
-  data = (struct mp3_data *)xmalloc(sizeof(struct mp3_data));
+  data = new mp3_data;
   data->ok = 0;
   decoder_error_init(&data->error);
 
@@ -419,7 +418,7 @@ static void mp3_close(void *void_data)
   }
   io_close(data->io_stream);
   decoder_error_clear(&data->error);
-  free(data);
+  delete data;
 }
 
 /* Get the time for mp3 file, return -1 on error.

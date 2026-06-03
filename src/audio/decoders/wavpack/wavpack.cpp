@@ -1,4 +1,4 @@
-// src/audio/decoders/wavpack/wavpack.c
+// src/audio/decoders/wavpack/wavpack.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -18,10 +18,11 @@
 #include "config.h"
 #endif
 
-#include <string.h>
-#include <strings.h>
-#include <stdint.h>
-#include <assert.h>
+#include <cassert>
+#include <cstdint>
+#include <cstring>
+#include <string>
+#include <vector>
 #include <wavpack/wavpack.h>
 
 #define DEBUG
@@ -64,7 +65,7 @@ static void wav_data_init(struct wavpack_data *data)
 static void *wav_open(const char *file)
 {
   struct wavpack_data *data;
-  data = (struct wavpack_data *)xmalloc(sizeof(struct wavpack_data));
+  data = new wavpack_data;
   data->ok = 0;
   decoder_error_init(&data->error);
 
@@ -95,7 +96,7 @@ static void wav_close(void *prv_data)
   }
 
   decoder_error_clear(&data->error);
-  free(data);
+  delete data;
   logit("File closed");
 }
 
@@ -172,28 +173,30 @@ static void wav_info(const char *file_name, struct file_tags *info,
   {
     if ((tag_len = WavpackGetTagItem(wpc, "title", NULL, 0)) > 0)
     {
-      info->title = (char *)xmalloc(++tag_len);
-      WavpackGetTagItem(wpc, "title", info->title, tag_len);
+      std::vector<char> buf(++tag_len);
+      WavpackGetTagItem(wpc, "title", buf.data(), tag_len);
+      info->title = xstrdup(buf.data());
     }
 
     if ((tag_len = WavpackGetTagItem(wpc, "artist", NULL, 0)) > 0)
     {
-      info->artist = (char *)xmalloc(++tag_len);
-      WavpackGetTagItem(wpc, "artist", info->artist, tag_len);
+      std::vector<char> buf(++tag_len);
+      WavpackGetTagItem(wpc, "artist", buf.data(), tag_len);
+      info->artist = xstrdup(buf.data());
     }
 
     if ((tag_len = WavpackGetTagItem(wpc, "album", NULL, 0)) > 0)
     {
-      info->album = (char *)xmalloc(++tag_len);
-      WavpackGetTagItem(wpc, "album", info->album, tag_len);
+      std::vector<char> buf(++tag_len);
+      WavpackGetTagItem(wpc, "album", buf.data(), tag_len);
+      info->album = xstrdup(buf.data());
     }
 
     if ((tag_len = WavpackGetTagItem(wpc, "track", NULL, 0)) > 0)
     {
-      tag = (char *)xmalloc(++tag_len);
-      WavpackGetTagItem(wpc, "track", tag, tag_len);
-      info->track = (int)strtol(tag, NULL, 10);
-      free(tag);
+      std::vector<char> buf(++tag_len);
+      WavpackGetTagItem(wpc, "track", buf.data(), tag_len);
+      info->track = (int)strtol(buf.data(), NULL, 10);
     }
 
     info->filled |= TAGS_COMMENTS;
@@ -219,20 +222,19 @@ static int wav_decode(void *prv_data, char *buf, int buf_len,
 
   decoder_error_clear(&data->error);
 
-  int32_t *dbuf = (int32_t *)xcalloc(s_num, data->channels * 4);
+  std::vector<int32_t> dbuf(s_num * data->channels);
 
-  ret = WavpackUnpackSamples(data->wpc, dbuf, s_num);
+  ret = WavpackUnpackSamples(data->wpc, dbuf.data(), s_num);
 
   if (ret == 0)
   {
-    free(dbuf);
     return 0;
   }
 
   if (data->mode & MODE_FLOAT)
   {
     sound_params->fmt = SFMT_FLOAT;
-    memcpy(buf, dbuf, ret * oBps);
+    memcpy(buf, dbuf.data(), ret * oBps);
   }
   else
   {
@@ -272,7 +274,6 @@ static int wav_decode(void *prv_data, char *buf, int buf_len,
   sound_params->channels = data->channels;
   sound_params->rate = data->sample_rate;
 
-  free(dbuf);
   return ret * oBps;
 }
 

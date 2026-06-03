@@ -1,4 +1,4 @@
-// src/audio/decoders/mp3/xing.c
+// src/audio/decoders/mp3/xing.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer

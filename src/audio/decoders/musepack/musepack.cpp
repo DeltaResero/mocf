@@ -1,4 +1,4 @@
-// src/audio/decoders/musepack/musepack.c
+// src/audio/decoders/musepack/musepack.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,12 +13,12 @@
 #include "config.h"
 #endif
 
-#include <inttypes.h>
-#include <string.h>
-#include <strings.h>
-#include <stdio.h>
-#include <errno.h>
-#include <assert.h>
+#include <cassert>
+#include <cerrno>
+#include <cinttypes>
+#include <cstdio>
+#include <cstring>
+#include <vector>
 
 #ifdef MPC_IS_OLD_API
 #include <mpcdec/mpcdec.h>
@@ -50,8 +50,7 @@ struct musepack_data
   int bitrate;
   struct decoder_error error;
   int ok; /* was this stream successfully opened? */
-  MPC_SAMPLE_FORMAT *remain_buf;
-  size_t remain_buf_len; /* in samples (sizeof(MPC_SAMPLE_FORMAT)) */
+  std::vector<MPC_SAMPLE_FORMAT> remain_buf;
 };
 
 #ifdef MPC_IS_OLD_API
@@ -183,8 +182,6 @@ static void musepack_open_stream_internal(struct musepack_data *data)
   data->avg_bitrate = (int)(data->info.average_bitrate / 1000);
   debug("Avg bitrate: %d", data->avg_bitrate);
 
-  data->remain_buf = NULL;
-  data->remain_buf_len = 0;
   data->bitrate = 0;
   data->ok = 1;
 }
@@ -193,7 +190,7 @@ static void *musepack_open(const char *file)
 {
   struct musepack_data *data;
 
-  data = (struct musepack_data *)xmalloc(sizeof(struct musepack_data));
+  data = new musepack_data;
   data->ok = 0;
   decoder_error_init(&data->error);
 
@@ -226,15 +223,11 @@ static void musepack_close(void *prv_data)
 #ifndef MPC_IS_OLD_API
     mpc_demux_exit(data->demux);
 #endif
-    if (data->remain_buf)
-    {
-      free(data->remain_buf);
-    }
   }
 
   io_close(data->stream);
   decoder_error_clear(&data->error);
-  free(data);
+  delete data;
 }
 
 static char *tag_str(const char *str)
@@ -314,11 +307,9 @@ static int musepack_seek(void *prv_data, int sec)
   }
 #endif
 
-  if (res != -1 && data->remain_buf)
+  if (res != -1 && !data->remain_buf.empty())
   {
-    free(data->remain_buf);
-    data->remain_buf = NULL;
-    data->remain_buf_len = 0;
+    data->remain_buf.clear();
   }
 
   return res;
@@ -339,26 +330,24 @@ static int musepack_decode(void *prv_data, char *buf, int buf_len,
   mpc_uint32_t vbrUpd = 0;
 #endif
   MPC_SAMPLE_FORMAT decode_buf[MPC_DECODER_BUFFER_LENGTH];
-  if (data->remain_buf)
+  if (!data->remain_buf.empty())
   {
     size_t to_copy =
-        MIN((unsigned int)buf_len, data->remain_buf_len * sizeof(MPC_SAMPLE_FORMAT));
+        MIN((unsigned int)buf_len, data->remain_buf.size() * sizeof(MPC_SAMPLE_FORMAT));
 
     debug("Copying %zu bytes from the remain buf", to_copy);
 
-    memcpy(buf, data->remain_buf, to_copy);
-    if (to_copy / sizeof(MPC_SAMPLE_FORMAT) < data->remain_buf_len)
+    memcpy(buf, data->remain_buf.data(), to_copy);
+    size_t consumed = to_copy / sizeof(MPC_SAMPLE_FORMAT);
+    if (consumed < data->remain_buf.size())
     {
-      memmove(data->remain_buf, data->remain_buf + to_copy,
-              data->remain_buf_len * sizeof(MPC_SAMPLE_FORMAT) - to_copy);
-      data->remain_buf_len -= to_copy / sizeof(MPC_SAMPLE_FORMAT);
+      data->remain_buf.erase(data->remain_buf.begin(),
+                             data->remain_buf.begin() + consumed);
     }
     else
     {
       debug("Remain buf is now empty");
-      free(data->remain_buf);
-      data->remain_buf = NULL;
-      data->remain_buf_len = 0;
+      data->remain_buf.clear();
     }
 
     return to_copy;
@@ -428,10 +417,9 @@ static int musepack_decode(void *prv_data, char *buf, int buf_len,
     debug("Copying %zu bytes", to_copy);
 
     memcpy(buf, decode_buf, to_copy);
-    data->remain_buf_len = (bytes_from_decoder - to_copy) / sizeof(MPC_SAMPLE_FORMAT);
-    data->remain_buf = (MPC_SAMPLE_FORMAT *)xmalloc(data->remain_buf_len * sizeof(MPC_SAMPLE_FORMAT));
-    memcpy(data->remain_buf, decode_buf + to_copy,
-           data->remain_buf_len * sizeof(MPC_SAMPLE_FORMAT));
+    size_t remain_len = (bytes_from_decoder - to_copy) / sizeof(MPC_SAMPLE_FORMAT);
+    data->remain_buf.assign(decode_buf + to_copy / sizeof(MPC_SAMPLE_FORMAT),
+                            decode_buf + to_copy / sizeof(MPC_SAMPLE_FORMAT) + remain_len);
     decoded = to_copy;
   }
   else

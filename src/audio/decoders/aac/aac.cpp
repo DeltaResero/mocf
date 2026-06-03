@@ -1,4 +1,4 @@
-// src/audio/decoders/aac/aac.c
+// src/audio/decoders/aac/aac.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -14,11 +14,10 @@
 #include "config.h"
 #endif
 
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#include <strings.h>
-#include <assert.h>
+#include <cassert>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
 
 #include <neaacdec.h>
 #include <id3tag.h>
@@ -308,7 +307,7 @@ static struct aac_data *aac_open_internal(struct io_stream *stream,
   int n;
 
   /* init private struct */
-  data = xcalloc(1, sizeof *data);
+  data = new aac_data();
   data->decoder = NeAACDecOpen();
 
   /* set decoder config */
@@ -390,7 +389,7 @@ static void aac_close(void *prv_data)
   NeAACDecClose(data->decoder);
   io_close(data->stream);
   decoder_error_clear(&data->error);
-  free(data);
+  delete data;
 }
 
 static void *aac_open(const char *file)

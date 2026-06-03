@@ -1,4 +1,4 @@
-// src/audio/decoders/opus/opus.c
+// src/audio/decoders/opus/opus.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -13,13 +13,12 @@
 #include "config.h"
 #endif
 
-#include <limits.h>
-#include <inttypes.h>
-#include <string.h>
-#include <strings.h>
-#include <stdio.h>
-#include <errno.h>
-#include <assert.h>
+#include <cassert>
+#include <cerrno>
+#include <cinttypes>
+#include <climits>
+#include <cstdio>
+#include <cstring>
 #include <opusfile.h>
 
 #define DEBUG
@@ -250,7 +249,7 @@ static void opus_open_stream_internal(struct opus_data *data)
 static void *opus_open(const char *file)
 {
   struct opus_data *data;
-  data = (struct opus_data *)xmalloc(sizeof(struct opus_data));
+  data = new opus_data;
   data->ok = 0;
 
   decoder_error_init(&data->error);
@@ -286,7 +285,7 @@ static void opus_close(void *prv_data)
   {
     tags_free(data->tags);
   }
-  free(data);
+  delete data;
 }
 
 static int opus_seek(void *prv_data, int sec)
