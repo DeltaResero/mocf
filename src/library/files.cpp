@@ -91,9 +91,8 @@ int is_dir(const char *file)
 
   if (stat(file, &file_stat) == -1)
   {
-    char *err = xstrerror(errno);
-    error("Can't stat %s: %s", file, err);
-    free(err);
+    std::string err = xstrerror(errno);
+    error("Can't stat %s: %s", file, err.c_str());
     return -1;
   }
   return S_ISDIR(file_stat.st_mode) ? 1 : 0;
@@ -502,9 +501,8 @@ static int read_directory_recurr_internal(const char *directory,
 
   if (stat(directory, &st))
   {
-    char *err = xstrerror(errno);
-    error("Can't stat %s: %s", directory, err);
-    free(err);
+    std::string err = xstrerror(errno);
+    error("Can't stat %s: %s", directory, err.c_str());
     return 0;
   }
 

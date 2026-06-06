@@ -263,7 +263,7 @@ static void *precache_thread(void *data)
   precache->f->get_error(precache->decoder_data, &err);
   if (err.type != ERROR_OK)
   {
-    logit("Failed to open the file for precache: %s", err.err);
+    logit("Failed to open the file for precache: %s", err.err.c_str());
     decoder_error_clear(&err);
     precache->f->close(precache->decoder_data);
     return NULL;
@@ -293,7 +293,7 @@ static void *precache_thread(void *data)
 
     if (err.type == ERROR_FATAL)
     {
-      logit("Error reading file for precache: %s", err.err);
+      logit("Error reading file for precache: %s", err.err.c_str());
       decoder_error_clear(&err);
       precache->f->close(precache->decoder_data);
       return NULL;
@@ -511,7 +511,7 @@ static void decode_loop(const struct decoder *f, void *decoder_data,
         md5->okay = false;
         if (err.type != ERROR_STREAM || options_get_bool("ShowStreamErrors"))
         {
-          error("%s", err.err);
+          error("%s", err.err.c_str());
         }
         decoder_error_clear(&err);
       }
@@ -786,7 +786,7 @@ static void play_file(const char *file, const struct decoder *f,
       md5.okay = false;
       if (err.type != ERROR_STREAM || options_get_bool("ShowStreamErrors"))
       {
-        error("%s", err.err);
+        error("%s", err.err.c_str());
       }
       decoder_error_clear(&err);
     }
@@ -821,7 +821,7 @@ static void play_file(const char *file, const struct decoder *f,
     {
       f->close(decoder_data);
       status_msg("");
-      engine_error(file, err.err);
+      engine_error(file, err.err.c_str());
       decoder_error_clear(&err);
       logit("Can't open file, exiting");
       return;

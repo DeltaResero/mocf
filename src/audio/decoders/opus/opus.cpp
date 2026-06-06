@@ -181,7 +181,7 @@ static int read_cb(void *datasource, unsigned char *ptr, int bytes)
 {
   ssize_t res;
 
-  res = io_read(datasource, ptr, bytes);
+  res = io_read(static_cast<io_stream *>(datasource), ptr, bytes);
   if (res < 0)
   {
     logit("Read error");
@@ -196,14 +196,14 @@ static int seek_cb(void *datasource, opus_int64 offset, int whence)
   debug("Seek request to %" PRId64 " (%s)", (int64_t)offset,
         whence == SEEK_SET ? "SEEK_SET"
                            : (whence == SEEK_CUR ? "SEEK_CUR" : "SEEK_END"));
-  return io_seek(datasource, offset, whence) < 0 ? -1 : 0;
+  return io_seek(static_cast<io_stream *>(datasource), offset, whence) < 0 ? -1 : 0;
 }
 
 static int close_cb(void *datasource ATTR_UNUSED) { return 0; }
 
 static opus_int64 tell_cb(void *datasource)
 {
-  return (opus_int64)io_tell(datasource);
+  return (opus_int64)io_tell(static_cast<io_stream *>(datasource));
 }
 
 static void opus_open_stream_internal(struct opus_data *data)

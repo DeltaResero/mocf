@@ -62,7 +62,7 @@ static mpc_int32_t read_cb(mpc_reader *t, void *buf, mpc_int32_t size)
 #ifdef MPC_IS_OLD_API
   struct musepack_data *data = (struct musepack_data *)t;
 #else
-  struct musepack_data *data = t->data;
+  struct musepack_data *data = static_cast<struct musepack_data *>(t->data);
 #endif
   ssize_t res;
 
@@ -85,7 +85,7 @@ static mpc_bool_t seek_cb(mpc_reader *t, mpc_int32_t offset)
 #ifdef MPC_IS_OLD_API
   struct musepack_data *data = (struct musepack_data *)t;
 #else
-  struct musepack_data *data = t->data;
+  struct musepack_data *data = static_cast<struct musepack_data *>(t->data);
 #endif
 
   debug("Seek request to %" PRId32, offset);
@@ -102,7 +102,7 @@ static mpc_int32_t tell_cb(mpc_reader *t)
 #ifdef MPC_IS_OLD_API
   struct musepack_data *data = (struct musepack_data *)t;
 #else
-  struct musepack_data *data = t->data;
+  struct musepack_data *data = static_cast<struct musepack_data *>(t->data);
 #endif
 
   debug("tell callback");
@@ -119,7 +119,7 @@ static mpc_int32_t get_size_cb(mpc_reader *t)
 #ifdef MPC_IS_OLD_API
   struct musepack_data *data = (struct musepack_data *)t;
 #else
-  struct musepack_data *data = t->data;
+  struct musepack_data *data = static_cast<struct musepack_data *>(t->data);
 #endif
 
   debug("size callback");
@@ -136,7 +136,7 @@ static mpc_bool_t canseek_cb(mpc_reader *t)
 #ifdef MPC_IS_OLD_API
   struct musepack_data *data = (struct musepack_data *)t;
 #else
-  struct musepack_data *data = t->data;
+  struct musepack_data *data = static_cast<struct musepack_data *>(t->data);
 #endif
 
   return io_seekable(data->stream);
@@ -274,7 +274,7 @@ static void musepack_info(const char *file_name, struct file_tags *info,
 
   if (tags_sel & TAGS_TIME)
   {
-    struct musepack_data *data = musepack_open(file_name);
+    struct musepack_data *data = static_cast<struct musepack_data *>(musepack_open(file_name));
 
     if (data->error.type == ERROR_OK)
     {

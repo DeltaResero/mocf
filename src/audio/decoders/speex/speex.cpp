@@ -203,7 +203,7 @@ static int read_speex_header(struct spx_data *data)
         {
           data->comment_packet_len = data->op.bytes;
           data->comment_packet =
-              xmalloc(sizeof(char) * data->comment_packet_len);
+              static_cast<char *>(xmalloc(sizeof(char) * data->comment_packet_len));
           memcpy(data->comment_packet, data->op.packet,
                  data->comment_packet_len);
         }

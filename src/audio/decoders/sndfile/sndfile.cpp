@@ -170,9 +170,8 @@ static void *sndfile_open(const char *file)
   fd = open(file, O_RDONLY);
   if (fd == -1)
   {
-    char *err = xstrerror(errno);
-    decoder_error(&data->error, ERROR_FATAL, 0, "Can't open file: %s", err);
-    free(err);
+    std::string err = xstrerror(errno);
+    decoder_error(&data->error, ERROR_FATAL, 0, "Can't open file: %s", err.c_str());
     return data;
   }
 
@@ -236,7 +235,7 @@ static void sndfile_info(const char *file_name, struct file_tags *info,
                          const int tags_sel)
 {
   struct sndfile_data *data;
-  data = sndfile_open(file_name);
+  data = static_cast<struct sndfile_data *>(sndfile_open(file_name));
   if (!data->sndfile)
   {
     sndfile_close(data);

@@ -293,7 +293,7 @@ static void run_extern_cmd(const char *event)
 
   if (command)
   {
-    char *args[2], *err;
+    char *args[2];
 
     args[0] = xstrdup(command);
     args[1] = NULL;
@@ -303,12 +303,13 @@ static void run_extern_cmd(const char *event)
       case 0:
         execve(command, args, environ);
         fatal("Error when running %s command '%s': %s", event, command,
-              xstrerror(errno));
+              xstrerror(errno).c_str());
       case -1:
-        err = xstrerror(errno);
-        logit("Error when running %s command '%s': %s", event, command, err);
-        free(err);
+      {
+        std::string err = xstrerror(errno);
+        logit("Error when running %s command '%s': %s", event, command, err.c_str());
         break;
+      }
     }
 
     free(command);
@@ -341,11 +342,12 @@ static void add_event_all(const int event, const void *data)
     if (event == EV_QUEUE_ADD)
     {
       data_copy = plist_new_item();
-      plist_item_copy(data_copy, data);
+      plist_item_copy(static_cast<plist_item *>(data_copy),
+                      static_cast<const plist_item *>(data));
     }
     else if (event == EV_QUEUE_DEL || event == EV_STATUS_MSG)
     {
-      data_copy = xstrdup(data);
+      data_copy = xstrdup(static_cast<const char *>(data));
     }
     else if (event == EV_SRV_ERROR)
     {

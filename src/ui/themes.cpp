@@ -171,7 +171,7 @@ static enum color_index find_color_element_name(const char *name)
   size_t ix;
   static struct
   {
-    char *name;
+    const char *name;
     enum color_index idx;
   } color_tab[] = {{"background", CLR_BACKGROUND},
                    {"frame", CLR_FRAME},
@@ -228,7 +228,7 @@ static short find_color_name(const char *name)
   size_t ix;
   static struct
   {
-    char *name;
+    const char *name;
     short color;
   } color_tab[] = {{"black", COLOR_BLACK},     {"red", COLOR_RED},
                    {"green", COLOR_GREEN},     {"yellow", COLOR_YELLOW},
@@ -713,7 +713,8 @@ void theme_init(bool has_xterm)
 
   if (has_colors())
   {
-    char *theme, *file;
+    const char *theme;
+    char *file;
 
     theme = options_get_str("ForceTheme");
     if (!theme && has_xterm)

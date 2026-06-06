@@ -66,9 +66,8 @@ static int open_dev()
 {
   if ((dsp_fd = open(options_get_str("OSSDevice"), O_WRONLY)) == -1)
   {
-    char *err = xstrerror(errno);
-    error("Can't open %s: %s", options_get_str("OSSDevice"), err);
-    free(err);
+    std::string err = xstrerror(errno);
+    error("Can't open %s: %s", options_get_str("OSSDevice"), err.c_str());
     return 0;
   }
 
@@ -253,10 +252,9 @@ static int oss_init(struct output_driver_caps *caps)
   mixer_fd = open(options_get_str("OSSMixerDevice"), O_RDWR);
   if (mixer_fd == -1)
   {
-    char *err = xstrerror(errno);
+    std::string err = xstrerror(errno);
     error("Can't open mixer device %s: %s", options_get_str("OSSMixerDevice"),
-          err);
-    free(err);
+          err.c_str());
   }
   else
   {
@@ -395,9 +393,8 @@ static int oss_set_params()
   req_channels = params.channels;
   if (ioctl(dsp_fd, SNDCTL_DSP_CHANNELS, &req_channels) == -1)
   {
-    char *err = xstrerror(errno);
-    error("Can't set number of channels to %d: %s", params.channels, err);
-    free(err);
+    std::string err = xstrerror(errno);
+    error("Can't set number of channels to %d: %s", params.channels, err.c_str());
     oss_close();
     return 0;
   }
@@ -413,9 +410,8 @@ static int oss_set_params()
   /* Set sample rate */
   if (ioctl(dsp_fd, SNDCTL_DSP_SPEED, &params.rate) == -1)
   {
-    char *err = xstrerror(errno);
-    error("Can't set sampling rate to %d: %s", params.rate, err);
-    free(err);
+    std::string err = xstrerror(errno);
+    error("Can't set sampling rate to %d: %s", params.rate, err.c_str());
     oss_close();
     return 0;
   }

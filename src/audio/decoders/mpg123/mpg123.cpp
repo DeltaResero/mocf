@@ -196,7 +196,7 @@ static ssize_t read_cb(void *datasource, void *ptr, size_t bytes)
 {
   ssize_t res;
 
-  res = io_read(datasource, ptr, bytes);
+  res = io_read(static_cast<io_stream *>(datasource), ptr, bytes);
   if (res < 0)
   {
     logit("Read error");
@@ -211,7 +211,7 @@ static off_t seek_cb(void *datasource, off_t offset, int whence)
   debug("Seek request to %" PRId64 " (%s)", (int64_t)offset,
         whence == SEEK_SET ? "SEEK_SET"
                            : (whence == SEEK_CUR ? "SEEK_CUR" : "SEEK_END"));
-  off_t res = io_seek(datasource, offset, whence);
+  off_t res = io_seek(static_cast<io_stream *>(datasource), offset, whence);
   return res;
 }
 

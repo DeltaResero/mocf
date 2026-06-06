@@ -555,7 +555,7 @@ struct poptOption *clone_popt_options(struct poptOption *opts)
 
     if (opts[ix].argInfo == POPT_ARG_INCLUDE_TABLE)
     {
-      result[iy++].arg = clone_popt_options(opts[ix].arg);
+      result[iy++].arg = clone_popt_options(static_cast<struct poptOption *>(opts[ix].arg));
       continue;
     }
 
@@ -595,7 +595,7 @@ void free_popt_clone(struct poptOption *opts)
   {
     if (opts[ix].argInfo == POPT_ARG_INCLUDE_TABLE)
     {
-      free_popt_clone(opts[ix].arg);
+      free_popt_clone(static_cast<struct poptOption *>(opts[ix].arg));
     }
   }
 
@@ -623,7 +623,7 @@ struct poptOption *find_popt_option(struct poptOption *opts, int wanted)
     switch (opts[ix].argInfo)
     {
       case POPT_ARG_INCLUDE_TABLE:
-        result = find_popt_option(opts[ix].arg, wanted);
+        result = find_popt_option(static_cast<struct poptOption *>(opts[ix].arg), wanted);
         if (result)
         {
           return result;

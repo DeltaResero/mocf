@@ -890,9 +890,9 @@ static float *resample_sound(struct audio_conversion *conv, const float *buf,
       resample_data.input_frames * resample_data.src_ratio;
 
   assert(conv->resample_buf || conv->resample_buf_nsamples == 0);
-  conv->resample_buf =
+  conv->resample_buf = static_cast<float *>(
       xrealloc(conv->resample_buf,
-               sizeof(float) * nchannels * resample_data.input_frames);
+               sizeof(float) * nchannels * resample_data.input_frames));
   new_input_start = conv->resample_buf + conv->resample_buf_nsamples;
 
   output =

@@ -148,7 +148,7 @@ static inline char *alsa_strerror(int errnum)
 
   if (errnum < SND_ERROR_BEGIN)
   {
-    result = xstrerror(errnum);
+    result = xstrdup(xstrerror(errnum).c_str());
   }
   else
   {
@@ -225,7 +225,7 @@ static void alsa_log_cb(const char *unused1 ATTR_UNUSED,
                         const char *unused3 ATTR_UNUSED,
                         int unused4 ATTR_UNUSED, const char *fmt, ...)
 {
-  char *msg;
+  std::string msg;
   va_list va;
 
   assert(fmt);
@@ -234,8 +234,7 @@ static void alsa_log_cb(const char *unused1 ATTR_UNUSED,
   msg = format_msg_va(fmt, va);
   va_end(va);
 
-  logit("ALSA said: %s", msg);
-  free(msg);
+  logit("ALSA said: %s", msg.c_str());
 }
 #endif
 
@@ -426,13 +425,16 @@ static int alsa_read_mixer_raw(snd_mixer_elem_t *elem, bool raw)
 
     for (i = 0; i < SND_MIXER_SCHN_LAST; i++)
     {
-      if (snd_mixer_selem_has_playback_channel(elem, i))
+      if (snd_mixer_selem_has_playback_channel(
+              elem, static_cast<snd_mixer_selem_channel_id_t>(i)))
       {
         long vol;
 
         nchannels++;
-        rc = raw ? snd_mixer_selem_get_playback_volume(elem, i, &vol)
-                 : snd_mixer_selem_get_playback_dB(elem, i, &vol);
+        rc = raw ? snd_mixer_selem_get_playback_volume(
+                       elem, static_cast<snd_mixer_selem_channel_id_t>(i), &vol)
+                 : snd_mixer_selem_get_playback_dB(
+                       elem, static_cast<snd_mixer_selem_channel_id_t>(i), &vol);
         if (rc < 0)
         {
           error_errno("Can't read mixer", rc);
@@ -964,7 +966,7 @@ static void alsa_close()
   snd_pcm_close(handle);
   logit("ALSA device closed");
 
-  params.format = 0;
+  params.format = static_cast<snd_pcm_format_t>(0);
   params.rate = 0;
   params.channels = 0;
   buffer_frames = 0;

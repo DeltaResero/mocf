@@ -14,15 +14,7 @@
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "audio/decoder.h"
-
-#ifdef __cplusplus
-}
-#endif
 
 #ifdef __cplusplus
 

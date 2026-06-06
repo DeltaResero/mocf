@@ -23,7 +23,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 add_compile_definitions(_FILE_OFFSET_BITS=64)
 add_compile_definitions(HAVE_CONFIG_H)
 add_compile_definitions(_GNU_SOURCE)
-add_compile_options(-fpermissive)
 
 # Ensure checks use GNU_SOURCE too
 set(CMAKE_REQUIRED_DEFINITIONS "-D_GNU_SOURCE")

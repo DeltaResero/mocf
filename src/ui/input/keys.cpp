@@ -38,8 +38,8 @@
 struct command
 {
   enum key_cmd cmd;         /* the command */
-  char *name;               /* name of the command (in keymap file) */
-  char *help;               /* help string for the command */
+  const char *name;         /* name of the command (in keymap file) */
+  const char *help;         /* help string for the command */
   enum key_context context; /* context - where the command isused */
   int keys[6];              /* array of keys ended with -1 */
   int default_keys;         /* number of default keys */
@@ -541,7 +541,7 @@ static struct command commands[] = {
 
 static struct special_keys
 {
-  char *name;
+  const char *name;
   int key;
 } special_keys[] = {{"DOWN", KEY_DOWN},       {"UP", KEY_UP},
                     {"LEFT", KEY_LEFT},       {"RIGHT", KEY_RIGHT},
@@ -819,7 +819,7 @@ static void load_key_map(const char *file_name)
 
 /* Get a nice key name.
  * Returned memory may be static. */
-static char *get_key_name(const int key)
+static const char *get_key_name(const int key)
 {
   size_t i;
   static char key_str[4];

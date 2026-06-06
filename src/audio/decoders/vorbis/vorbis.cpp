@@ -184,7 +184,7 @@ static size_t read_cb(void *ptr, size_t size, size_t nmemb, void *datasource)
 {
   ssize_t res;
 
-  res = io_read(datasource, ptr, size * nmemb);
+  res = io_read(static_cast<io_stream *>(datasource), ptr, size * nmemb);
 
   /* libvorbisfile expects the read callback to return >= 0 with errno
    * set to non zero on error. */
@@ -210,12 +210,12 @@ static int seek_cb(void *datasource, ogg_int64_t offset, int whence)
   debug("Seek request to %" PRId64 " (%s)", offset,
         whence == SEEK_SET ? "SEEK_SET"
                            : (whence == SEEK_CUR ? "SEEK_CUR" : "SEEK_END"));
-  return io_seek(datasource, offset, whence) == -1 ? -1 : 0;
+  return io_seek(static_cast<io_stream *>(datasource), offset, whence) == -1 ? -1 : 0;
 }
 
 static int close_cb(void *unused ATTR_UNUSED) { return 0; }
 
-static long tell_cb(void *datasource) { return (long)io_tell(datasource); }
+static long tell_cb(void *datasource) { return (long)io_tell(static_cast<io_stream *>(datasource)); }
 
 static void vorbis_open_stream_internal(struct vorbis_data *data)
 {
@@ -391,7 +391,7 @@ static int vorbis_decode(void *prv_data, char *buf, int buf_len,
     else
     {
       float *out;
-      out = malloc(buf_len);
+      out = static_cast<float *>(malloc(buf_len));
       int i, j;
 
       assert(sizeof(float) * ret * sound_params->channels <= (unsigned)buf_len);

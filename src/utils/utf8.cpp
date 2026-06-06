@@ -328,7 +328,7 @@ int xwprintw(WINDOW *win, const char *fmt, ...)
 {
   va_list va;
   int res;
-  char *buf;
+  std::string buf;
 
   va_start(va, fmt);
   buf = format_msg_va(fmt, va);
@@ -336,17 +336,15 @@ int xwprintw(WINDOW *win, const char *fmt, ...)
 
   if (using_utf8)
   {
-    res = waddstr(win, buf);
+    res = waddstr(win, buf.c_str());
   }
   else
   {
-    char *lstr = iconv_str(iconv_desc, buf);
+    char *lstr = iconv_str(iconv_desc, buf.c_str());
 
     res = waddstr(win, lstr);
     free(lstr);
   }
-
-  free(buf);
 
   return res;
 }

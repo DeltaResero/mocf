@@ -626,7 +626,7 @@ static ssize_t io_peek_internal(struct io_stream *s, void *buf, size_t count)
     pthread_cond_wait(&s->buf_fill_cond, &s->buf_mtx);
   }
 
-  received = fifo_buf_peek(s->buf, buf, count);
+  received = fifo_buf_peek(s->buf, static_cast<char *>(buf), count);
   debug("Read %zd bytes", received);
 
   UNLOCK(s->buf_mtx);
@@ -673,7 +673,7 @@ static ssize_t io_read_unbuffered(struct io_stream *s, const int dont_move,
 
   assert(!s->eof);
 
-  res = io_internal_read(s, dont_move, buf, count);
+  res = io_internal_read(s, dont_move, static_cast<char *>(buf), count);
 
   if (!dont_move)
   {
@@ -749,7 +749,7 @@ char *io_strerror(struct io_stream *s)
 
   if (s->errno_val)
   {
-    s->strerror = xstrerror(s->errno_val);
+    s->strerror = xstrdup(xstrerror(s->errno_val).c_str());
   }
   else
   {

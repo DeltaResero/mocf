@@ -179,7 +179,7 @@ static int buffer_fill_frame(struct aac_data *data)
     }
 
     len = buffer_length(data);
-    datap = buffer_data(data);
+    datap = static_cast<unsigned char *>(buffer_data(data));
 
     /* scan for a frame */
     for (n = 0; n < len - 5; n++)
@@ -254,8 +254,10 @@ static int aac_count_time(struct aac_data *data)
       break;
     }
 
-    sample_buf = NeAACDecDecode(data->decoder, &frame_info, buffer_data(data),
-                                buffer_length(data));
+    sample_buf = static_cast<int16_t *>(
+        NeAACDecDecode(data->decoder, &frame_info,
+                       static_cast<unsigned char *>(buffer_data(data)),
+                       buffer_length(data)));
 
     if (frame_info.error == 0 && frame_info.samples > 0)
     {
@@ -353,7 +355,8 @@ static struct aac_data *aac_open_internal(struct io_stream *stream,
   /* init decoder, returns the length of the header (if any) */
   channels = (unsigned char)data->channels;
   sample_rate = data->sample_rate;
-  n = NeAACDecInit(data->decoder, buffer_data(data), buffer_length(data),
+  n = NeAACDecInit(data->decoder, static_cast<unsigned char *>(buffer_data(data)),
+                   buffer_length(data),
                    &sample_rate, &channels);
   data->channels = channels;
   data->sample_rate = (int)sample_rate;
@@ -528,12 +531,12 @@ static int decode_one_frame(struct aac_data *data, void *buffer, int count)
     return rc;
   }
 
-  aac_data = buffer_data(data);
+  aac_data = static_cast<unsigned char *>(buffer_data(data));
   aac_data_size = buffer_length(data);
 
   /* aac data -> raw pcm */
-  sample_buf =
-      NeAACDecDecode(data->decoder, &frame_info, aac_data, aac_data_size);
+  sample_buf = static_cast<char *>(
+      NeAACDecDecode(data->decoder, &frame_info, aac_data, aac_data_size));
 
   buffer_consume(data, frame_info.bytesconsumed);
 

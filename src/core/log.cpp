@@ -119,7 +119,7 @@ static void locked_logit(const char *file, const int line, const char *function,
 
   len = snprintf(NULL, 0, fmt, time_str, utc_time.tv_nsec / 1000L, file, line,
                  function, msg);
-  str = xmalloc(len + 1);
+  str = static_cast<char *>(xmalloc(len + 1));
   snprintf(str, len + 1, fmt, time_str, utc_time.tv_nsec / 1000L, file, line,
            function, msg);
 
@@ -172,7 +172,7 @@ void internal_logit(const char *file LOGIT_ONLY, const int line LOGIT_ONLY,
 {
 #ifndef NDEBUG
   int saved_errno = errno;
-  char *msg;
+  std::string msg;
   va_list va;
 
   LOCK(logging_mtx);
@@ -202,8 +202,7 @@ void internal_logit(const char *file LOGIT_ONLY, const int line LOGIT_ONLY,
   va_start(va, format);
   msg = format_msg_va(format, va);
   va_end(va);
-  locked_logit(file, line, function, msg);
-  free(msg);
+  locked_logit(file, line, function, msg.c_str());
 
   flush_log();
 
@@ -216,11 +215,10 @@ end:
 #endif
 }
 
-/* Initialize logging stream */
 void log_init_stream(FILE *f LOGIT_ONLY, const char *fn LOGIT_ONLY)
 {
 #ifndef NDEBUG
-  char *msg;
+  std::string msg;
 
   LOCK(logging_mtx);
 
@@ -248,16 +246,12 @@ void log_init_stream(FILE *f LOGIT_ONLY, const char *fn LOGIT_ONLY)
   }
 
   msg = format_msg("Writing log to: %s", fn);
-  locked_logit(__FILE__, __LINE__, __func__, msg);
-  free(msg);
-  msg = NULL;
+  locked_logit(__FILE__, __LINE__, __func__, msg.c_str());
 
   if (log_records_spilt > 0)
   {
     msg = format_msg("%d log records spilt", log_records_spilt);
-    locked_logit(__FILE__, __LINE__, __func__, msg);
-    free(msg);
-    msg = NULL;
+    locked_logit(__FILE__, __LINE__, __func__, msg.c_str());
   }
 
   flush_log();

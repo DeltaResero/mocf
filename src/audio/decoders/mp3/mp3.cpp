@@ -111,7 +111,7 @@ static size_t fill_buff(struct mp3_data *data)
   }
 
   mad_stream_buffer(&data->stream, data->in_buff, read_size + remaining);
-  data->stream.error = 0;
+  data->stream.error = MAD_ERROR_NONE;
 
   return read_size;
 }

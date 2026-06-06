@@ -1379,6 +1379,7 @@ static long decode_masked_formats(lists_t_strs *list)
   if (lists_strs_size(list) != __builtin_popcount(fmt))
   {
     fatal("Incorrect setting for MaskOutputFormats");
+    return 0;
   }
   else
   {

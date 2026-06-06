@@ -126,7 +126,7 @@ static inline char *bdb_strerror(int errnum)
 
   if (errnum > 0)
   {
-    result = xstrerror(errnum);
+    result = xstrdup(xstrerror(errnum).c_str());
   }
   else
   {
@@ -353,7 +353,7 @@ static int cache_record_deserialize(struct cache_record *rec,
     p += sizeof(str_len);                                                      \
     if (bytes_left < str_len)                                                  \
       goto err;                                                                \
-    var = xmalloc(str_len + 1);                                                \
+    var = static_cast<char *>(xmalloc(str_len + 1));                          \
     memcpy(var, p, str_len);                                                   \
     var[str_len] = '\0';                                                       \
     p += str_len;                                                              \
@@ -514,7 +514,7 @@ static void tags_cache_gc(struct tags_cache *c)
       break;
     }
 
-    if (cache_record_deserialize(&rec, serialized_cache_rec.data,
+    if (cache_record_deserialize(&rec, static_cast<const char *>(serialized_cache_rec.data),
                                  serialized_cache_rec.size, 1) &&
         rec.atime < last_referenced_atime)
     {
@@ -674,7 +674,7 @@ static void *locked_read_add(struct tags_cache *c, const char *file,
   {
     struct cache_record rec;
 
-    if (cache_record_deserialize(&rec, serialized_cache_rec->data,
+    if (cache_record_deserialize(&rec, static_cast<const char *>(serialized_cache_rec->data),
                                  serialized_cache_rec->size, 0))
     {
       time_t curr_mtime = get_mtime(file);
@@ -900,7 +900,7 @@ static void *locked_add_request(struct tags_cache *c, const char *file,
     return NULL;
   }
 
-  if (cache_record_deserialize(&rec, serialized_cache_rec->data,
+  if (cache_record_deserialize(&rec, static_cast<const char *>(serialized_cache_rec->data),
                                serialized_cache_rec->size, 0))
   {
     if (rec.mod_time == get_mtime(file) &&
@@ -1022,9 +1022,8 @@ static int purge_directory(const char *dir_path)
   dir = opendir(dir_path);
   if (!dir)
   {
-    char *err = xstrerror(errno);
-    logit("Can't open directory %s: %s", dir_path, err);
-    free(err);
+    std::string err = xstrerror(errno);
+    logit("Can't open directory %s: %s", dir_path, err.c_str());
     return 0;
   }
 
@@ -1041,9 +1040,8 @@ static int purge_directory(const char *dir_path)
 
     if (stat(fpath.c_str(), &st) < 0)
     {
-      char *err = xstrerror(errno);
-      logit("Can't stat %s: %s", fpath.c_str(), err);
-      free(err);
+      std::string err = xstrerror(errno);
+      logit("Can't stat %s: %s", fpath.c_str(), err.c_str());
       closedir(dir);
       return 0;
     }
@@ -1059,9 +1057,8 @@ static int purge_directory(const char *dir_path)
       logit("Removing directory %s...", fpath.c_str());
       if (rmdir(fpath.c_str()) < 0)
       {
-        char *err = xstrerror(errno);
-        logit("Can't remove %s: %s", fpath.c_str(), err);
-        free(err);
+        std::string err = xstrerror(errno);
+        logit("Can't remove %s: %s", fpath.c_str(), err.c_str());
         closedir(dir);
         return 0;
       }
@@ -1072,9 +1069,8 @@ static int purge_directory(const char *dir_path)
 
       if (unlink(fpath.c_str()) < 0)
       {
-        char *err = xstrerror(errno);
-        logit("Can't remove %s: %s", fpath.c_str(), err);
-        free(err);
+        std::string err = xstrerror(errno);
+        logit("Can't remove %s: %s", fpath.c_str(), err.c_str());
         closedir(dir);
         return 0;
       }

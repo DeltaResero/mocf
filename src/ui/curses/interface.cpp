@@ -452,15 +452,13 @@ static int ask_for_tags(const struct plist *plist, const int tags_sel)
 static void interface_message(const char *format, ...)
 {
   va_list va;
-  char *msg;
+  std::string msg;
 
   va_start(va, format);
   msg = format_msg_va(format, va);
   va_end(va);
 
-  iface_message(msg);
-
-  free(msg);
+  iface_message(msg.c_str());
 }
 
 /* Update tags (and titles) for the given item on the playlist with new tags. */
@@ -2383,9 +2381,8 @@ static void add_themes_to_list(lists_t_strs *themes, const char *themes_dir)
 
   if (!(dir = opendir(themes_dir)))
   {
-    char *err = xstrerror(errno);
-    logit("Can't open themes directory %s: %s", themes_dir, err);
-    free(err);
+    std::string err = xstrerror(errno);
+    logit("Can't open themes directory %s: %s", themes_dir, err.c_str());
     return;
   }
 
@@ -3260,7 +3257,7 @@ void interface_end()
 
 void interface_fatal(const char *format, ...)
 {
-  char *msg;
+  std::string msg;
   va_list va;
 
   va_start(va, format);
@@ -3268,7 +3265,7 @@ void interface_fatal(const char *format, ...)
   va_end(va);
 
   windows_end();
-  fatal("%s", msg);
+  fatal("%s", msg.c_str());
 }
 
 void interface_error(const char *msg) { iface_error(msg); }

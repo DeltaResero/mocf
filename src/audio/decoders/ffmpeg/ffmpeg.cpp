@@ -116,33 +116,30 @@ struct extn_list
 
 static lists_t_strs *supported_extns = NULL;
 
-static void ffmpeg_log_repeats(char *msg LOGIT_ONLY)
+static void ffmpeg_log_repeats(const char *msg LOGIT_ONLY)
 {
 #ifndef NDEBUG
   static int msg_count = 0;
-  static char *prev_msg = NULL;
+  static std::string prev_msg;
   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
   /* We need to gate the decoder and precaching threads. */
   LOCK(mutex);
 
-  if (prev_msg && (!msg || strcmp(msg, prev_msg)))
+  if (!prev_msg.empty() && (!msg || prev_msg != msg))
   {
     if (msg_count > 1)
     {
       logit("FFmpeg said: Last message repeated %d times", msg_count);
     }
-    free(prev_msg);
-    prev_msg = NULL;
+    prev_msg.clear();
     msg_count = 0;
   }
-  if (prev_msg && msg)
+  if (!prev_msg.empty() && msg)
   {
-    free(msg);
-    msg = NULL;
     msg_count += 1;
   }
-  if (!prev_msg && msg)
+  if (prev_msg.empty() && msg)
   {
     int count, ix;
     lists_t_strs *lines;
@@ -166,8 +163,7 @@ static void ffmpeg_log_repeats(char *msg LOGIT_ONLY)
 static void ffmpeg_log_cb(void *unused ATTR_UNUSED, int level, const char *fmt,
                           va_list vl)
 {
-  int len;
-  char *msg;
+  std::string msg;
 
   assert(fmt);
 
@@ -183,19 +179,18 @@ static void ffmpeg_log_cb(void *unused ATTR_UNUSED, int level, const char *fmt,
   /* Drop this message because it is issued repeatedly and is pointless. */
   const char skipping[] = "Skipping 0 bytes of junk";
 
-  if (!strncmp(skipping, msg, sizeof(skipping) - 1))
+  if (!strncmp(skipping, msg.c_str(), sizeof(skipping) - 1))
   {
-    free(msg);
     return;
   }
 #endif
 
-  for (len = strlen(msg); len > 0 && msg[len - 1] == '\n'; len -= 1)
+  while (!msg.empty() && msg.back() == '\n')
   {
-    msg[len - 1] = 0x00;
+    msg.pop_back();
   }
 
-  ffmpeg_log_repeats(msg);
+  ffmpeg_log_repeats(msg.c_str());
 }
 #else
 /* Release build: suppress FFmpeg log output entirely to prevent it from
@@ -213,7 +208,7 @@ static inline char *ffmpeg_strerror(int errnum)
   char *result;
 
   ffmpeg_log_repeats(NULL);
-  result = xmalloc(256);
+  result = static_cast<char *>(xmalloc(256));
   av_strerror(errnum, result, 256);
   result[255] = 0;
 

@@ -42,15 +42,13 @@ void internal_error(const char *file, int line, const char *function,
 {
   int saved_errno = errno;
   va_list va;
-  char *msg;
+  std::string msg;
 
   va_start(va, format);
   msg = format_msg_va(format, va);
   va_end(va);
 
-  server_error(file, line, function, msg);
-
-  free(msg);
+  server_error(file, line, function, msg.c_str());
 
   errno = saved_errno;
 }
@@ -60,21 +58,19 @@ void internal_fatal(const char *file LOGIT_ONLY, int line LOGIT_ONLY,
                     const char *function LOGIT_ONLY, const char *format, ...)
 {
   va_list va;
-  char *msg;
+  std::string msg;
 
   windows_reset();
 
   va_start(va, format);
   msg = format_msg_va(format, va);
-  fprintf(stderr, "\nFATAL_ERROR: %s\n\n", msg);
+  fprintf(stderr, "\nFATAL_ERROR: %s\n\n", msg.c_str());
 #ifndef NDEBUG
-  internal_logit(file, line, function, "FATAL ERROR: %s", msg);
+  internal_logit(file, line, function, "FATAL ERROR: %s", msg.c_str());
 #endif
   va_end(va);
 
   log_close();
-
-  free(msg);
 
   exit(EXIT_FATAL);
 }
@@ -142,7 +138,7 @@ void xsleep(size_t ticks, size_t ticks_per_sec)
   if (ticks > 0)
   {
     int rc;
-    struct timespec delay = {.tv_sec = ticks};
+    struct timespec delay = {.tv_sec = static_cast<time_t>(ticks)};
 
     if (ticks_per_sec > 1)
     {
@@ -165,7 +161,7 @@ void xsleep(size_t ticks, size_t ticks_per_sec)
       rc = nanosleep(&delay, &delay);
       if (rc == -1 && errno != EINTR)
       {
-        fatal("nanosleep() failed: %s", xstrerror(errno));
+        fatal("nanosleep() failed: %s", xstrerror(errno).c_str());
       }
     } while (rc != 0);
   }
@@ -176,14 +172,14 @@ static pthread_mutex_t xstrerror_mtx = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
 #if !HAVE_DECL_STRERROR_R
-/* Return error message in malloc() buffer (for strerror(3)). */
-char *xstrerror(int errnum)
+/* Return error message as std::string (for strerror(3)). */
+std::string xstrerror(int errnum)
 {
-  char *result;
+  std::string result;
 
   LOCK(xstrerror_mtx);
 
-  result = xstrdup(strerror(errnum));
+  result = strerror(errnum);
 
   UNLOCK(xstrerror_mtx);
 
@@ -192,11 +188,12 @@ char *xstrerror(int errnum)
 #endif
 
 #if HAVE_DECL_STRERROR_R
-/* Return error message in malloc() buffer (for strerror_r(3)). */
-char *xstrerror(int errnum)
+/* Return error message as std::string (for strerror_r(3)). */
+std::string xstrerror(int errnum)
 {
   int saved_errno = errno;
-  char *err_str, err_buf[256];
+  const char *err_str;
+  char err_buf[256];
 
 #ifdef STRERROR_R_CHAR_P
   /* strerror_r(3) is GNU variant. */
@@ -214,7 +211,7 @@ char *xstrerror(int errnum)
 
   errno = saved_errno;
 
-  return xstrdup(err_str);
+  return std::string(err_str);
 }
 #endif
 
@@ -229,7 +226,7 @@ void xsignal(int signum, void (*func)(int))
 
   if (sigaction(signum, &act, 0) == -1)
   {
-    fatal("sigaction() failed: %s", xstrerror(errno));
+    fatal("sigaction() failed: %s", xstrerror(errno).c_str());
   }
 }
 
@@ -249,14 +246,14 @@ char *str_repl(char *target, const char *oldstr, const char *newstr)
     if (target_len + 1 > target_max)
     {
       target_max = MAX(target_len + 1, target_max * 2);
-      target = xrealloc(target, target_max);
+      target = static_cast<char *>(xrealloc(target, target_max));
     }
     memmove(target + p + newstr_len, target + p + oldstr_len,
             target_len - p - newstr_len + 1);
     memcpy(target + p, newstr, newstr_len);
   }
 
-  target = xrealloc(target, target_len + 1);
+  target = static_cast<char *>(xrealloc(target, target_len + 1));
 
   return target;
 }
@@ -300,11 +297,10 @@ char *trim(const char *src, size_t len)
   return result;
 }
 
-/* Format argument values according to 'format' and return it as a
- * malloc()ed string. */
-char *format_msg(const char *format, ...)
+/* Format argument values according to 'format' and return it as a std::string. */
+std::string format_msg(const char *format, ...)
 {
-  char *result;
+  std::string result;
   va_list va;
 
   va_start(va, format);
@@ -314,19 +310,18 @@ char *format_msg(const char *format, ...)
   return result;
 }
 
-/* Format a vararg list according to 'format' and return it as a
- * malloc()ed string. */
-char *format_msg_va(const char *format, va_list va)
+/* Format a vararg list according to 'format' and return it as a std::string. */
+std::string format_msg_va(const char *format, va_list va)
 {
   int len;
-  char *result;
   va_list va_copy;
 
   va_copy(va_copy, va);
-  len = vsnprintf(nullptr, 0, format, va_copy) + 1;
+  len = vsnprintf(nullptr, 0, format, va_copy);
   va_end(va_copy);
-  result = xmalloc(len);
-  vsnprintf(result, len, format, va);
+
+  std::string result(len, '\0');
+  vsnprintf(&result[0], len + 1, format, va);
 
   return result;
 }
@@ -442,9 +437,8 @@ const char *get_home()
       }
       else if (errno != 0)
       {
-        char *err = xstrerror(errno);
-        logit("getpwuid(%d): %s", geteuid(), err);
-        free(err);
+        std::string err = xstrerror(errno);
+        logit("getpwuid(%d): %s", geteuid(), err.c_str());
       }
     }
   }
@@ -459,7 +453,7 @@ char *pathstrcpy(char *restrict dst, const char *restrict src)
   {
     fatal("Path too long!");
   }
-  return memcpy(dst, src, len + 1);
+  return static_cast<char *>(memcpy(dst, src, len + 1));
 }
 
 void common_cleanup()

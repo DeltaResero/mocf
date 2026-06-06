@@ -346,7 +346,7 @@ static void fill_tag(FLAC__StreamMetadata_VorbisComment_Entry *comm,
 {
   const FLAC__byte *eq;
 
-  eq = memchr(comm->entry, '=', comm->length);
+  eq = static_cast<const FLAC__byte *>(memchr(comm->entry, '=', comm->length));
   if (!eq)
   {
     return;
@@ -437,7 +437,7 @@ static void flac_info(const char *file_name, struct file_tags *info,
   {
     struct flac_data *data;
 
-    data = flac_open_internal(file_name, 0);
+    data = static_cast<struct flac_data *>(flac_open_internal(file_name, 0));
     if (data->ok)
     {
       info->time = data->length;

@@ -2704,7 +2704,7 @@ static void bar_init(struct bar *b, const int width, const char *title,
 
   if (show_val)
   {
-    b->orig_title = xmalloc(b->width + 1);
+    b->orig_title = static_cast<char *>(xmalloc(b->width + 1));
     bar_set_title(b, title);
   }
   else
@@ -2754,7 +2754,7 @@ static void bar_resize(struct bar *b, const int width)
 
   if (b->show_val && b->width < width)
   {
-    char *new_title = xmalloc(width + 1);
+    char *new_title = static_cast<char *>(xmalloc(width + 1));
     strcpy(new_title, b->orig_title);
     free(b->orig_title);
     b->orig_title = new_title;
@@ -3160,7 +3160,7 @@ static void info_win_set_block_title(struct info_win *w)
       end_pos = w->time_bar.width - 1;
     }
 
-    new_title = xmalloc(w->time_bar.width + 1);
+    new_title = static_cast<char *>(xmalloc(w->time_bar.width + 1));
     memset(new_title, ' ', w->time_bar.width);
     decorators = options_get_str("BlockDecorators");
     if (start_pos == end_pos)

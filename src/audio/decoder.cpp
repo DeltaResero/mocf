@@ -658,71 +658,50 @@ void decoder_cleanup()
 
 /* Fill the error structure with an error of a given type and message.
  * strerror(add_errno) is appended at the end of the message if add_errno != 0.
- * The old error message is free()ed.
  * This is thread safe; use this instead of constructs using strerror(). */
 void decoder_error(struct decoder_error *error,
                    const enum decoder_error_type type, const int add_errno,
                    const char *format, ...)
 {
-  char *err_str;
   va_list va;
-
-  if (error->err)
-  {
-    free(error->err);
-  }
 
   error->type = type;
 
   va_start(va, format);
-  err_str = format_msg_va(format, va);
+  error->err = format_msg_va(format, va);
   va_end(va);
 
   if (add_errno)
   {
-    char *err_buf;
-
-    err_buf = xstrerror(add_errno);
-    error->err = format_msg("%s%s", err_str, err_buf);
-    free(err_buf);
+    error->err += xstrerror(add_errno);
   }
-  else
-  {
-    error->err = format_msg("%s", err_str);
-  }
-
-  free(err_str);
 }
 
 /* Initialize the decoder_error structure. */
 void decoder_error_init(struct decoder_error *error)
 {
   error->type = ERROR_OK;
-  error->err = NULL;
+  error->err.clear();
 }
 
 /* Set the decoder_error structure to contain "success" information. */
 void decoder_error_clear(struct decoder_error *error)
 {
   error->type = ERROR_OK;
-  if (error->err)
-  {
-    free(error->err);
-    error->err = NULL;
-  }
+  error->err.clear();
 }
 
 void decoder_error_copy(struct decoder_error *dst,
                         const struct decoder_error *src)
 {
   dst->type = src->type;
-  dst->err = xstrdup(src->err);
+  dst->err = src->err;
 }
 
 /* Return the error text from the decoder_error variable. */
 const char *decoder_error_text(const struct decoder_error *error)
 {
-  return error->err;
+  return error->err.c_str();
 }
 
 // EOF

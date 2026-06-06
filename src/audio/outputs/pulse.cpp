@@ -140,14 +140,14 @@ static void pulse_save_volume(void)
 static void context_state_callback(pa_context *context ATTR_UNUSED,
                                    void *userdata)
 {
-  pa_threaded_mainloop *m = userdata;
+  pa_threaded_mainloop *m = static_cast<pa_threaded_mainloop *>(userdata);
 
   pa_threaded_mainloop_signal(m, 0);
 }
 
 static void stream_state_callback(pa_stream *stream ATTR_UNUSED, void *userdata)
 {
-  pa_threaded_mainloop *m = userdata;
+  pa_threaded_mainloop *m = static_cast<pa_threaded_mainloop *>(userdata);
 
   pa_threaded_mainloop_signal(m, 0);
 }
@@ -155,7 +155,7 @@ static void stream_state_callback(pa_stream *stream ATTR_UNUSED, void *userdata)
 static void stream_write_callback(pa_stream *stream ATTR_UNUSED,
                                   size_t nbytes ATTR_UNUSED, void *userdata)
 {
-  pa_threaded_mainloop *m = userdata;
+  pa_threaded_mainloop *m = static_cast<pa_threaded_mainloop *>(userdata);
 
   pa_threaded_mainloop_signal(m, 0);
 }
@@ -370,9 +370,10 @@ static int pulse_open(struct sound_params *sound_params)
    * volume to stream_volume (100 at startup) on every session open. */
   /* Ignore return value, rely on failed stream state instead. */
   pa_stream_connect_playback(s, NULL, &ba,
-                             PA_STREAM_INTERPOLATE_TIMING |
+                             static_cast<pa_stream_flags_t>(
+                                 PA_STREAM_INTERPOLATE_TIMING |
                                  PA_STREAM_AUTO_TIMING_UPDATE |
-                                 PA_STREAM_ADJUST_LATENCY,
+                                 PA_STREAM_ADJUST_LATENCY),
                              NULL, NULL);
 
   while (1)
@@ -525,7 +526,7 @@ static int pulse_play(const char *buff, const size_t size)
 
 static void volume_cb(const pa_cvolume *v, void *userdata)
 {
-  int *result = userdata;
+  int *result = static_cast<int *>(userdata);
 
   if (v)
   {
@@ -694,7 +695,7 @@ static int pulse_get_buff_fill(void)
 static void flush_callback(pa_stream *s ATTR_UNUSED, int success,
                            void *userdata)
 {
-  int *result = userdata;
+  int *result = static_cast<int *>(userdata);
 
   *result = success;
 
@@ -764,7 +765,7 @@ static void pulse_toggle_mixer_channel(void)
 static void sink_name_cb(pa_context *c ATTR_UNUSED, const pa_sink_info *i,
                          int eol ATTR_UNUSED, void *userdata)
 {
-  char **result = userdata;
+  char **result = static_cast<char **>(userdata);
 
   if (i && !*result)
   {
@@ -815,7 +816,7 @@ static char *pulse_get_mixer_channel_name(void)
 static void cork_callback(pa_stream *s ATTR_UNUSED, int success,
                           void *userdata)
 {
-  int *result = userdata;
+  int *result = static_cast<int *>(userdata);
 
   *result = success;
 
