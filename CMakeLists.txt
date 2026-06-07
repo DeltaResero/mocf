@@ -4,6 +4,17 @@ project(
   VERSION 2.6
   LANGUAGES C CXX)
 
+# Guard against in-source builds. Running cmake from the source root causes
+# file(WRITE ...) calls that target ${CMAKE_BINARY_DIR} to write generated
+# headers directly into the source tree, where they can be accidentally
+# committed. Always configure from a dedicated build directory.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+  message(FATAL_ERROR
+    "In-source builds are not allowed.\n"
+    "Please create a separate build directory and run cmake from there:\n"
+    "  mkdir build && cd build && cmake ..")
+endif()
+
 # --- Package Metadata ---
 set(PACKAGE_NAME "Music on Console Framebuffer")
 set(PACKAGE_VERSION "2.6")
