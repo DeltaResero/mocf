@@ -290,7 +290,7 @@ char *trim(const char *src, size_t len)
 
   last += 1;
   size_t result_len = static_cast<size_t>(last - first);
-  char *result = new char[result_len + 1];
+  char *result = static_cast<char *>(xmalloc(result_len + 1));
   memcpy(result, first, result_len);
   result[result_len] = '\0';
 
