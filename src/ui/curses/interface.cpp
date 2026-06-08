@@ -1024,7 +1024,7 @@ static int go_to_dir(const char *dir, const int reload)
   }
 
   old_dir_plist = dir_plist;
-  dir_plist = (struct plist *)xmalloc(sizeof(struct plist));
+  dir_plist = new plist;
   plist_init(dir_plist);
   dirs = lists_strs_new(FILES_LIST_INIT_SIZE);
   playlists = lists_strs_new(FILES_LIST_INIT_SIZE);
@@ -1035,7 +1035,7 @@ static int go_to_dir(const char *dir, const int reload)
     plist_free(dir_plist);
     lists_strs_free(dirs);
     lists_strs_free(playlists);
-    free(dir_plist);
+    delete dir_plist;
     dir_plist = old_dir_plist;
     return 0;
   }
@@ -1044,7 +1044,7 @@ static int go_to_dir(const char *dir, const int reload)
    playlist?) */
 
   plist_free(old_dir_plist);
-  free(old_dir_plist);
+  delete old_dir_plist;
 
 #ifdef HAVE_SYS_INOTIFY_H
   if (!reload && inotify_wd >= 0)
