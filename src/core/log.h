@@ -12,6 +12,9 @@
 #define LOG_H
 
 #include <stdio.h>
+#ifdef __cplusplus
+#include <string>
+#endif
 
 #ifdef __cplusplus
 extern "C"
@@ -49,9 +52,8 @@ extern "C"
 #define log_errno(format, errnum)                                              \
   do                                                                           \
   {                                                                            \
-    char *err##__LINE__ = STRERROR_FN(errnum);                                 \
-    logit(format ": %s", err##__LINE__);                                       \
-    free(err##__LINE__);                                                       \
+    std::string err##__LINE__ = STRERROR_FN(errnum);                          \
+    logit(format ": %s", err##__LINE__.c_str());                               \
   } while (0)
 #else
 #define log_errno(...)                                                         \
