@@ -260,7 +260,7 @@ static void *spx_open(const char *file)
   }
   else
   {
-    data = (struct spx_data *)xmalloc(sizeof(struct spx_data));
+    data = new spx_data;
     data->stream = stream;
     data->header = NULL;
     decoder_error_init(&data->error);
@@ -295,7 +295,7 @@ static void spx_close(void *prv_data)
   decoder_error_clear(&data->error);
 
   free(data->header);
-  free(data);
+  delete data;
 }
 
 #define readint(buf, base)                                                     \
