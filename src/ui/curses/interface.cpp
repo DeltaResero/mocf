@@ -918,6 +918,10 @@ static void server_event(const int event, void *data)
       break;
     case EV_AUDIO_STOP:
       break;
+    case EV_TAGS:
+      if (curr_file.file)
+        send_tags_request(curr_file.file, TAGS_COMMENTS);
+      break;
     default:
       interface_fatal("Unknown event: 0x%02x!", event);
   }
