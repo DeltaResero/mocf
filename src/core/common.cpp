@@ -320,8 +320,9 @@ std::string format_msg_va(const char *format, va_list va)
   len = vsnprintf(nullptr, 0, format, va_copy);
   va_end(va_copy);
 
-  std::string result(len, '\0');
+  std::string result(len + 1, '\0');
   vsnprintf(&result[0], len + 1, format, va);
+  result.resize(len);
 
   return result;
 }
