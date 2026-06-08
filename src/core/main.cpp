@@ -127,6 +127,10 @@ static void start_moc(const struct parameters *params, lists_t_strs *args)
     }
     log_init_stream(logfp, "mocf.log");
   }
+  else
+  {
+    log_init_stream(NULL, NULL);
+  }
 
   if (pthread_create(&server_thread, NULL, server_thread_func, th_args) != 0)
   {
