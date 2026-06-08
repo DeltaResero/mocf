@@ -155,9 +155,7 @@ extern "C" void *sidplayfp_open(const char *file)
     if (init_db)
         init_database();
 
-    struct sidplayfp_data *s = (struct sidplayfp_data *)
-        xmalloc(sizeof(sidplayfp_data));
-    memset(s, 0, sizeof(*s));
+    struct sidplayfp_data *s = new sidplayfp_data();
     decoder_error_init(&s->error);
 
     s->frequency = options_get_int(OPT_FREQ);
@@ -266,7 +264,7 @@ extern "C" void sidplayfp_close(void *void_data)
     delete[] s->sublengths_ms;
 
     decoder_error_clear(&s->error);
-    free(s);
+    delete s;
 }
 
 // ---------------------------------------------------------------------------
@@ -374,7 +372,7 @@ extern "C" int sidplayfp_decode(void *void_data, char *buf, int buf_len,
         return 0;
 
     int samples_to_render = frames_to_render * 2;
-    int samples_rendered = s->engine->play(reinterpret_cast<short *>(buf), samples_to_render);
+    int samples_rendered = s->engine->play(reinterpret_cast<int16_t *>(buf), samples_to_render);
 
     if (samples_rendered <= 0)
         return 0;
@@ -386,7 +384,7 @@ extern "C" int sidplayfp_decode(void *void_data, char *buf, int buf_len,
     sound_params->rate     = s->frequency;
     sound_params->fmt      = s->sample_format;
 
-    return (int)(samples_rendered * sizeof(short));
+    return (int)(samples_rendered * sizeof(int16_t));
 }
 
 // ---------------------------------------------------------------------------

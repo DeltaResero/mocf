@@ -18,13 +18,13 @@ extern "C"
 {
 #endif
 
-  /** Sound formats.
+  /** Sound format and endianness flags.
    *
-   * Sound format bits. Only one can be set in the format, the exception is
-   * when we want to hold a list of supported formats - they can be
-   * bitwise-or'd.
+   * Sound format bits. Only one format bit can be set at a time, the
+   * exception is when holding a list of supported formats. One
+   * endianness bit must be set for 16-bit and 24-bit formats.
    */
-  enum sfmt_fmt
+  enum sfmt_flags
   {
     SFMT_S8 = 0x00000001,    /*!< signed 8-bit */
     SFMT_U8 = 0x00000002,    /*!< unsigned 8-bit */
@@ -36,15 +36,8 @@ extern "C"
     SFMT_U32 = 0x00000080,   /*!< unsigned 24-bit (for 24-bit data LSB is 0) */
     SFMT_S24_3 = 0x00000100, /*!< signed 24-bit (in 3bytes format) */
     SFMT_U24_3 = 0x00000200, /*!< unsigned 24-bit (in 3bytes format) */
-    SFMT_FLOAT = 0x00000400  /*!< float in range -1.0 to 1.0 */
-  };
+    SFMT_FLOAT = 0x00000400, /*!< float in range -1.0 to 1.0 */
 
-  /** Sample endianness.
-   *
-   * Sample endianness - one of them must be set for 16-bit and 24-bit formats.
-   */
-  enum sfmt_endianness
-  {
     SFMT_LE = 0x00001000, /*!< little-endian */
     SFMT_BE = 0x00002000, /*!< big-endian */
 
@@ -52,7 +45,7 @@ extern "C"
 #ifdef WORDS_BIGENDIAN
     SFMT_NE = SFMT_BE
 #else
-  SFMT_NE = SFMT_LE
+    SFMT_NE = SFMT_LE
 #endif
   };
 
@@ -103,7 +96,7 @@ extern "C"
   {
     int min_channels; /*!< Minimum number of channels */
     int max_channels; /*!< Maximum number of channels */
-    long formats;     /*!< Supported sample formats (or'd sfmt_fmt mask
+    long formats;     /*!< Supported sample formats (or'd sfmt_flags mask
             with endianness') */
     int min_rate;     /*!< Minimum sample rate in Hz */
     int max_rate;     /*!< Maximum sample rate in Hz */

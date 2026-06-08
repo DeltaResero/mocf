@@ -53,14 +53,16 @@ extern "C"
     ENTRY_USER_QUERY
   };
 
+  enum iface_key_type
+  {
+    IFACE_KEY_CHAR,    /* Regular char */
+    IFACE_KEY_FUNCTION /* Function key (arrow, F12, etc.) */
+  };
+
   struct iface_key
   {
     /* Type of the key */
-    enum
-    {
-      IFACE_KEY_CHAR,    /* Regular char */
-      IFACE_KEY_FUNCTION /* Function key (arrow, F12, etc.) */
-    } type;
+    iface_key_type type;
 
     union
     {

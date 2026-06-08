@@ -44,7 +44,7 @@ extern "C"
   /* Ownership preserving functions. */
   void lists_strs_append(lists_t_strs *list, const char *s);
   void lists_strs_remove(lists_t_strs *list);
-  void lists_strs_replace(lists_t_strs *list, int index, char *s);
+  void lists_strs_replace(lists_t_strs *list, int index, const char *s);
 
   /* Helper functions. */
   int lists_strs_split(lists_t_strs *list, const char *s, const char *delim);

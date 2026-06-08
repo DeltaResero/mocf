@@ -19,6 +19,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <limits.h>
+#include <string>
 
 #include "core/compat.h"
 
@@ -128,9 +129,8 @@ struct timespec;
 #define error_errno(format, errnum)                                            \
   do                                                                           \
   {                                                                            \
-    char *err##__LINE__ = STRERROR_FN(errnum);                                 \
-    error(format ": %s", err##__LINE__);                                       \
-    free(err##__LINE__);                                                       \
+    std::string err##__LINE__ = STRERROR_FN(errnum);                          \
+    error(format ": %s", err##__LINE__.c_str());                               \
   } while (0)
 
 #ifdef __cplusplus
@@ -143,7 +143,6 @@ extern "C"
   void *xrealloc(void *ptr, const size_t size);
   char *xstrdup(const char *s);
   void xsleep(size_t ticks, size_t ticks_per_sec);
-  char *xstrerror(int errnum);
   void xsignal(int signum, void (*func)(int));
 
   void internal_error(const char *file, int line, const char *function,
@@ -152,8 +151,6 @@ extern "C"
                       const char *format, ...) ATTR_NORETURN ATTR_PRINTF(4, 5);
   char *str_repl(char *target, const char *oldstr, const char *newstr);
   char *trim(const char *src, size_t len);
-  char *format_msg(const char *format, ...);
-  char *format_msg_va(const char *format, va_list va);
   bool is_valid_symbol(const char *candidate);
   char *create_file_name(const char *file);
   int get_realtime(struct timespec *ts);
@@ -165,6 +162,10 @@ extern "C"
 #ifdef __cplusplus
 }
 #endif
+
+std::string xstrerror(int errnum);
+std::string format_msg(const char *format, ...) ATTR_PRINTF(1, 2);
+std::string format_msg_va(const char *format, va_list va);
 
 #endif
 

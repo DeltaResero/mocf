@@ -15,10 +15,7 @@
 #include "library/playlist.h"
 #include "io/io.h"
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
+#include <string>
 
 /** Version of the decoder API.
  *
@@ -26,24 +23,29 @@ extern "C"
  * MOC will not load plugins compiled with older/newer decoder.h. */
 #define DECODER_API_VERSION 7
 
-  /** Type of the decoder error. */
-  enum decoder_error_type
-  {
-    ERROR_OK,     /*!< There was no error. */
-    ERROR_STREAM, /*!< Recoverable error in the stream. */
-    ERROR_FATAL   /*!< Fatal error in the stream - further decoding can't
-              be performed. */
-  };
+/** Type of the decoder error. */
+enum decoder_error_type
+{
+  ERROR_OK,     /*!< There was no error. */
+  ERROR_STREAM, /*!< Recoverable error in the stream. */
+  ERROR_FATAL   /*!< Fatal error in the stream - further decoding can't
+            be performed. */
+};
 
-  /** Decoder error.
-   *
-   * Describes decoder error. Fields don't need to be accessed directly,
-   * there are functions to modify/access decoder_error object. */
-  struct decoder_error
-  {
-    enum decoder_error_type type; /*!< Type of the error. */
-    char *err;                    /*!< malloc()ed error string or NULL. */
-  };
+/** Decoder error.
+ *
+ * Describes decoder error. Fields don't need to be accessed directly,
+ * there are functions to modify/access decoder_error object. */
+struct decoder_error
+{
+  enum decoder_error_type type; /*!< Type of the error. */
+  std::string err;              /*!< Error string. */
+};
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
   /** @struct decoder
    * Functions provided by the decoder plugin.
@@ -249,72 +251,73 @@ extern "C"
   void decoder_cleanup();
   char *file_type_name(const char *file);
 
-  /** @defgroup decoder_error_funcs Decoder error functions
-   *
-   * These functions can be used to modify variables of the decoder_error
-   * structure.
-   */
-  /*@{*/
-
-  /** Fill decoder_error structure with an error.
-   *
-   * Fills decoder error variable with an error. It can be used like printf().
-   *
-   * \param error Pointer to the decoder_error object to fill.
-   * \param type Type of the error.
-   * \param add_errno If this value is non-zero, a space and a string
-   * describing system error for errno equal to the value of add_errno
-   * is appended to the error message.
-   * \param format Format, like in the printf() function.
-   */
-  void decoder_error(struct decoder_error *error,
-                     const enum decoder_error_type type, const int add_errno,
-                     const char *format, ...) ATTR_PRINTF(4, 5);
-
-  /** Clear decoder_error structure.
-   *
-   * Clear decoder_error structure. Set the system type to ERROR_OK and
-   * the error message to NULL. Frees all memory used by the error's fields.
-   *
-   * \param error Pointer to the decoder_error object to be cleared.
-   */
-  void decoder_error_clear(struct decoder_error *error);
-
-  /** Copy decoder_error variable.
-   *
-   * Copies the decoder_error variable to another decoder_error variable.
-   *
-   * \param dst Destination.
-   * \param src Source.
-   */
-  void decoder_error_copy(struct decoder_error *dst,
-                          const struct decoder_error *src);
-
-  /** Return the error text from the decoder_error variable.
-   *
-   * Returns the error text from the decoder_error variable.  NULL may be
-   * returned if decoder_error() has not been called.
-   *
-   * \param error Pointer to the source decoder_error object.
-   *
-   * \return The address of the error text or NULL.
-   */
-  const char *decoder_error_text(const struct decoder_error *error);
-
-  /** Initialize decoder_error variable.
-   *
-   * Initialize decoder_error variable and set the error to ERROR_OK with no
-   * message.
-   *
-   * \param error Pointer to the decoder_error object to be initialised.
-   */
-  void decoder_error_init(struct decoder_error *error);
-
-  /*@}*/
-
 #ifdef __cplusplus
 }
 #endif
+
+/** @defgroup decoder_error_funcs Decoder error functions
+ *
+ * These functions can be used to modify variables of the decoder_error
+ * structure.
+ */
+/*@{*/
+
+/** Fill decoder_error structure with an error.
+ *
+ * Fills decoder error variable with an error. It can be used like printf().
+ *
+ * \param error Pointer to the decoder_error object to fill.
+ * \param type Type of the error.
+ * \param add_errno If this value is non-zero, a space and a string
+ * describing system error for errno equal to the value of add_errno
+ * is appended to the error message.
+ * \param format Format, like in the printf() function.
+ */
+void decoder_error(struct decoder_error *error,
+                   const enum decoder_error_type type, const int add_errno,
+                   const char *format, ...) ATTR_PRINTF(4, 5);
+
+/** Clear decoder_error structure.
+ *
+ * Clear decoder_error structure. Set the system type to ERROR_OK and
+ * the error message to empty. Releases all resources used by the error's
+ * fields.
+ *
+ * \param error Pointer to the decoder_error object to be cleared.
+ */
+void decoder_error_clear(struct decoder_error *error);
+
+/** Copy decoder_error variable.
+ *
+ * Copies the decoder_error variable to another decoder_error variable.
+ *
+ * \param dst Destination.
+ * \param src Source.
+ */
+void decoder_error_copy(struct decoder_error *dst,
+                        const struct decoder_error *src);
+
+/** Return the error text from the decoder_error variable.
+ *
+ * Returns the error text from the decoder_error variable.  An empty
+ * string may be returned if decoder_error() has not been called.
+ *
+ * \param error Pointer to the source decoder_error object.
+ *
+ * \return The address of the error text.
+ */
+const char *decoder_error_text(const struct decoder_error *error);
+
+/** Initialize decoder_error variable.
+ *
+ * Initialize decoder_error variable and set the error to ERROR_OK with no
+ * message.
+ *
+ * \param error Pointer to the decoder_error object to be initialised.
+ */
+void decoder_error_init(struct decoder_error *error);
+
+/*@}*/
 
 #endif
 
