@@ -583,7 +583,7 @@ void engine_queue_add(const char *file)
   add_event_all(EV_QUEUE_ADD, item);
 
   plist_free_item_fields(item);
-  free(item);
+  delete item;
 }
 
 void engine_queue_del(const char *file)
