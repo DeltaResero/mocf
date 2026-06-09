@@ -384,7 +384,7 @@ static void read_mocf_poptrc(poptContext ctx, const char *env_poptrc)
   {
     const char *fn;
 
-    fn = lists_strs_at(files, ix);
+    fn = lists_strs_at(files, ix).c_str();
     if (!strlen(fn))
     {
       continue;
@@ -672,7 +672,7 @@ static char *render_popt_command_line()
 
   while (1)
   {
-    char *str;
+    std::string str;
     const char *arg;
     struct poptOption *opt;
 
@@ -699,20 +699,18 @@ static char *render_popt_command_line()
 
     if (opt->longName)
     {
-      std::string s = arg
-                      ? std::string("--") + opt->longName + "='" + arg + "'"
-                      : std::string("--") + opt->longName;
-      str = xstrdup(s.c_str());
+      str = arg
+            ? std::string("--") + opt->longName + "='" + arg + "'"
+            : std::string("--") + opt->longName;
     }
     else
     {
-      std::string s = arg
-                      ? std::string("-") + opt->shortName + " '" + arg + "'"
-                      : std::string(1, '-') + opt->shortName;
-      str = xstrdup(s.c_str());
+      str = arg
+            ? std::string("-") + opt->shortName + " '" + arg + "'"
+            : std::string(1, '-') + opt->shortName;
     }
 
-    lists_strs_push(cmdline, str);
+    lists_strs_push(cmdline, std::move(str));
     free((void *)arg);
   }
 
@@ -722,7 +720,7 @@ static char *render_popt_command_line()
     lists_strs_load(cmdline, rest);
   }
 
-  result = lists_strs_fmt(cmdline, "%s ");
+  result = xstrdup(lists_strs_fmt(cmdline, "%s ").c_str());
 
 err:
   poptFreeContext(ctx);
@@ -925,17 +923,17 @@ static void process_deferred_overrides(lists_t_strs *deferred)
 
   for (ix = 0; ix < lists_strs_size(deferred); ix += 1)
   {
-    override_config_option(lists_strs_at(deferred, ix), NULL);
+    override_config_option(lists_strs_at(deferred, ix).c_str(), NULL);
   }
 
   cleared = lists_strs_empty(decoders_option) ||
-            strcmp(lists_strs_at(decoders_option, 0), marker) != 0;
+            lists_strs_at(decoders_option, 0) != marker;
   lists_strs_reverse(decoders_option);
   if (!cleared)
   {
     char **override_decoders;
 
-    free(lists_strs_pop(decoders_option));
+    lists_strs_pop(decoders_option);
     override_decoders = lists_strs_save(decoders_option);
     lists_strs_clear(decoders_option);
     lists_strs_load(decoders_option, (const char **)config_decoders);
@@ -970,9 +968,8 @@ static void log_command_line()
   lists_t_strs *cmdline = lists_strs_new(mocf_argc);
   if (lists_strs_load(cmdline, mocf_argv) > 0)
   {
-    char *str = lists_strs_fmt(cmdline, "%s ");
-    logit("%s", str);
-    free(str);
+    std::string str = lists_strs_fmt(cmdline, "%s ");
+    logit("%s", str.c_str());
   }
   else
   {

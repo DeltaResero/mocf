@@ -382,27 +382,24 @@ static int is_subdir(const char *dir1, const char *dir2)
   return !strncmp(dir1, dir2, strlen(dir1)) ? 1 : 0;
 }
 
-static int sort_strcmp_func(const void *a, const void *b)
+static bool sort_strcmp_func(const std::string &a, const std::string &b)
 {
-  return strcoll(*(char **)a, *(char **)b);
+  return strcoll(a.c_str(), b.c_str()) < 0;
 }
 
-static int sort_dirs_func(const void *a, const void *b)
+static bool sort_dirs_func(const std::string &a, const std::string &b)
 {
-  char *sa = *(char **)a;
-  char *sb = *(char **)b;
-
   /* '../' is always first */
-  if (!strcmp(sa, "../"))
+  if (a == "../")
   {
-    return -1;
+    return true;
   }
-  if (!strcmp(sb, "../"))
+  if (b == "../")
   {
-    return 1;
+    return false;
   }
 
-  return strcmp(sa, sb);
+  return strcmp(a.c_str(), b.c_str()) < 0;
 }
 
 static int get_tags_setting()
@@ -1275,7 +1272,7 @@ static void process_multiple_args(lists_t_strs *args)
     int dir;
     char path[2 * PATH_MAX];
 
-    arg = lists_strs_at(args, ix);
+    arg = lists_strs_at(args, ix).c_str();
     dir = is_dir(arg);
 
     if (arg[0] == '/')
@@ -1327,7 +1324,7 @@ static void process_args(lists_t_strs *args)
   const char *arg;
 
   size = lists_strs_size(args);
-  arg = lists_strs_at(args, 0);
+  arg = lists_strs_at(args, 0).c_str();
 
   if (size == 1 && is_dir(arg) == 1)
   {
@@ -2419,19 +2416,15 @@ static void add_themes_to_list(lists_t_strs *themes, const char *themes_dir)
 }
 
 /* Compare two pathnames based on filename. */
-static int themes_cmp(const void *a, const void *b)
+static bool themes_cmp(const std::string &a, const std::string &b)
 {
-  int result;
-  char *sa = *(char **)a;
-  char *sb = *(char **)b;
-
-  result = strcoll(strrchr(sa, '/') + 1, strrchr(sb, '/') + 1);
-  if (result == 0)
+  int result = strcoll(strrchr(a.c_str(), '/') + 1, strrchr(b.c_str(), '/') + 1);
+  if (result != 0)
   {
-    result = strcoll(sa, sb);
+    return result < 0;
   }
 
-  return result;
+  return strcoll(a.c_str(), b.c_str()) < 0;
 }
 
 /* Add themes found in the directories to the theme selection menu.
@@ -2452,9 +2445,8 @@ static int add_themes_to_menu(const char *user_themes,
 
   for (ix = 0; ix < lists_strs_size(themes); ix += 1)
   {
-    char *file;
+    const char *file = lists_strs_at(themes, ix).c_str();
 
-    file = lists_strs_at(themes, ix);
     iface_add_file(file, strrchr(file, '/') + 1, F_THEME);
   }
 

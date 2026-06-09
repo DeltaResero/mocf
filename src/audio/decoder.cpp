@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 #include "core/common.h"
 #include "audio/decoder.h"
@@ -353,7 +354,7 @@ static int lookup_decoder_by_name(const char *name)
 static char *list_decoder_names(int *decoder_list, int count)
 {
   int ix;
-  char *result;
+  std::string result;
   lists_t_strs *names;
 
   if (count == 0)
@@ -391,7 +392,7 @@ static char *list_decoder_names(int *decoder_list, int count)
   result = lists_strs_fmt(names, " %s");
   lists_strs_free(names);
 
-  return result;
+  return xstrdup(result.c_str());
 }
 
 
@@ -482,7 +483,7 @@ static void load_decoders(decoder_t_preference *pref, lists_t_strs *tokens)
    * Note the position following the first asterisk. */
   for (ix = 1; ix < lists_strs_size(tokens); ix += 1)
   {
-    name = lists_strs_at(tokens, ix);
+    name = lists_strs_at(tokens, ix).c_str();
     if (strcmp(name, "*"))
     {
       load_each_decoder(pref, name);
@@ -530,7 +531,7 @@ static void load_each_preference(const char *preference)
 
   tokens = lists_strs_new(4);
   lists_strs_split(tokens, preference, "(,)");
-  prefix = lists_strs_at(tokens, 0);
+  prefix = lists_strs_at(tokens, 0).c_str();
   pref = make_preference(prefix);
 #ifdef DEBUG
   pref->source = preference;
@@ -552,7 +553,7 @@ static void load_preferences()
 
   for (ix = 0; ix < lists_strs_size(list); ix += 1)
   {
-    preference = lists_strs_at(list, ix);
+    preference = lists_strs_at(list, ix).c_str();
     load_each_preference(preference);
   }
 

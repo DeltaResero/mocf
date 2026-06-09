@@ -1005,7 +1005,7 @@ int options_check_list(const char *name, const char *val)
   result = 1;
   for (ix = 0; ix < size; ix += 1)
   {
-    if (!options[opt].check(opt, lists_strs_at(list, ix)))
+    if (!options[opt].check(opt, lists_strs_at(list, ix).c_str()))
     {
       result = 0;
       break;
@@ -1141,8 +1141,9 @@ static char *substitute_variable(const char *name_in, const char *value_in)
           list = options_get_list(name);
           if (!lists_strs_empty(list))
           {
-            value = lists_strs_fmt(list, "%s:");
-            value[strlen(value) - 1] = 0x00;
+            std::string s = lists_strs_fmt(list, "%s:");
+            s.pop_back();
+            value = xstrdup(s.c_str());
           }
           break;
         case OPTION_FREE:
@@ -1176,7 +1177,7 @@ static char *substitute_variable(const char *name_in, const char *value_in)
   {
     lists_strs_append(strs, ptr);
     free(result);
-    result = lists_strs_cat(strs);
+    result = xstrdup(lists_strs_cat(strs).c_str());
   }
   lists_strs_free(strs);
 

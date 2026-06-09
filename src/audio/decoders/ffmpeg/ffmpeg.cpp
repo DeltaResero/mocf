@@ -148,7 +148,7 @@ static void ffmpeg_log_repeats(const char *msg LOGIT_ONLY)
     count = lists_strs_split(lines, msg, "\n");
     for (ix = 0; ix < count; ix += 1)
     {
-      logit("FFmpeg said: %s", lists_strs_at(lines, ix));
+      logit("FFmpeg said: %s", lists_strs_at(lines, ix).c_str());
     }
     lists_strs_free(lines);
 

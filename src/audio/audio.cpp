@@ -1239,7 +1239,7 @@ static void find_working_driver(lists_t_strs *drivers, struct hw_funcs *funcs)
   {
     const char *name;
 
-    name = lists_strs_at(drivers, ix);
+    name = lists_strs_at(drivers, ix).c_str();
 
 #ifdef HAVE_SNDIO
     if (!strcasecmp(name, "sndio"))

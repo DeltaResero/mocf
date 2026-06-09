@@ -952,30 +952,30 @@ static bool parse_layout(struct main_win_layout *l, lists_t_strs *fmt)
     struct window_params p;
 
     lists_strs_clear(format);
-    menu = lists_strs_at(fmt, ix);
+    menu = lists_strs_at(fmt, ix).c_str();
     if (lists_strs_split(format, menu, "(,)") != 5)
     {
       goto err;
     }
 
-    name = lists_strs_at(format, 0);
+    name = lists_strs_at(format, 0).c_str();
 
-    if (!parse_layout_coordinate(lists_strs_at(format, 1), &p.x, COLS))
+    if (!parse_layout_coordinate(lists_strs_at(format, 1).c_str(), &p.x, COLS))
     {
       logit("Coordinate parse error when parsing X");
       goto err;
     }
-    if (!parse_layout_coordinate(lists_strs_at(format, 2), &p.y, LINES - 4))
+    if (!parse_layout_coordinate(lists_strs_at(format, 2).c_str(), &p.y, LINES - 4))
     {
       logit("Coordinate parse error when parsing Y");
       goto err;
     }
-    if (!parse_layout_coordinate(lists_strs_at(format, 3), &p.width, COLS))
+    if (!parse_layout_coordinate(lists_strs_at(format, 3).c_str(), &p.width, COLS))
     {
       logit("Coordinate parse error when parsing width");
       goto err;
     }
-    if (!parse_layout_coordinate(lists_strs_at(format, 4), &p.height,
+    if (!parse_layout_coordinate(lists_strs_at(format, 4).c_str(), &p.height,
                                  LINES - 4))
     {
       logit("Coordinate parse error when parsing height");
@@ -1225,7 +1225,7 @@ static void side_menu_make_list_content(struct side_menu *m,
           if (options_get_bool("FileNamesIconv"))
       {
         char *conv_title =
-            files_iconv_str(strrchr(lists_strs_at(dirs, i), '/') + 1);
+            files_iconv_str(strrchr(lists_strs_at(dirs, i).c_str(), '/') + 1);
 
         strcpy(title, conv_title);
         strcat(title, "/");
@@ -1234,11 +1234,11 @@ static void side_menu_make_list_content(struct side_menu *m,
       }
       else
       {
-        strcpy(title, strrchr(lists_strs_at(dirs, i), '/') + 1);
+        strcpy(title, strrchr(lists_strs_at(dirs, i).c_str(), '/') + 1);
         strcat(title, "/");
       }
 
-      added = menu_add(m->menu.list.main, title, F_DIR, lists_strs_at(dirs, i));
+      added = menu_add(m->menu.list.main, title, F_DIR, lists_strs_at(dirs, i).c_str());
       menu_item_set_attr_normal(added, get_color(CLR_MENU_ITEM_DIR));
       menu_item_set_attr_sel(added, get_color(CLR_MENU_ITEM_DIR_SELECTED));
     }
@@ -1249,8 +1249,8 @@ static void side_menu_make_list_content(struct side_menu *m,
     for (i = 0; i < lists_strs_size(playlists); i++)
     {
       added = menu_add(m->menu.list.main,
-                       strrchr(lists_strs_at(playlists, i), '/') + 1,
-                       F_PLAYLIST, lists_strs_at(playlists, i));
+                       strrchr(lists_strs_at(playlists, i).c_str(), '/') + 1,
+                       F_PLAYLIST, lists_strs_at(playlists, i).c_str());
       menu_item_set_attr_normal(added, get_color(CLR_MENU_ITEM_PLAYLIST));
       menu_item_set_attr_sel(added, get_color(CLR_MENU_ITEM_PLAYLIST_SELECTED));
     }

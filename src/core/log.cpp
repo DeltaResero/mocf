@@ -126,6 +126,7 @@ static void locked_logit(const char *file, const int line, const char *function,
   if (logging_state == BUFFERING)
   {
     lists_strs_push(buffered_log, str);
+    free(str);
     return;
   }
 
@@ -137,11 +138,13 @@ static void locked_logit(const char *file, const int line, const char *function,
   }
   if (circular_ptr < lists_strs_size(circular_log))
   {
-    free(lists_strs_swap(circular_log, circular_ptr, str));
+    lists_strs_swap(circular_log, circular_ptr, str);
+    free(str);
   }
   else
   {
     lists_strs_push(circular_log, str);
+    free(str);
   }
   circular_ptr += 1;
 }
@@ -232,7 +235,7 @@ void log_init_stream(FILE *f LOGIT_ONLY, const char *fn LOGIT_ONLY)
 
       for (ix = 0; ix < lists_strs_size(buffered_log); ix += 1)
       {
-        fprintf(logfp, "%s", lists_strs_at(buffered_log, ix));
+        fprintf(logfp, "%s", lists_strs_at(buffered_log, ix).c_str());
       }
     }
     lists_strs_free(buffered_log);
@@ -335,14 +338,14 @@ void log_circular_log()
 
   for (ix = circular_ptr; ix < lists_strs_size(circular_log); ix += 1)
   {
-    fprintf(logfp, "%s", lists_strs_at(circular_log, ix));
+    fprintf(logfp, "%s", lists_strs_at(circular_log, ix).c_str());
   }
 
   fflush(logfp);
 
   for (ix = 0; ix < circular_ptr; ix += 1)
   {
-    fprintf(logfp, "%s", lists_strs_at(circular_log, ix));
+    fprintf(logfp, "%s", lists_strs_at(circular_log, ix).c_str());
   }
 
   fprintf(logfp, "\n* Circular Log Ends *\n\n");
