@@ -290,14 +290,17 @@ extern "C" void sidplayfp_info(const char *file_name, struct file_tags *info,
 
     const SidTuneInfo *ti = st.getInfo();
 
-    auto fill_tag = [&](char **dst, unsigned int idx, int flag) {
+    auto fill_tag = [&](std::string *dst, unsigned int idx, int flag) {
         if (ti->numberOfInfoStrings() > idx
                 && ti->infoString(idx)
                 && ti->infoString(idx)[0]) {
-            *dst = trim(ti->infoString(idx),
-                        strlen(ti->infoString(idx)));
-            if (*dst)
+            char *tmp = trim(ti->infoString(idx),
+                             strlen(ti->infoString(idx)));
+            if (tmp) {
+                *dst = tmp;
+                free(tmp);
                 info->filled |= flag;
+            }
         }
     };
 
