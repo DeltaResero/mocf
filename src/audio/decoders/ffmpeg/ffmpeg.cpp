@@ -506,17 +506,17 @@ static void ffmpeg_info(const char *file_name, struct file_tags *info,
   entry = av_dict_get(md, "title", NULL, 0);
   if (entry && entry->value && entry->value[0])
   {
-    info->title = xstrdup(entry->value);
+    info->title = entry->value;
   }
   entry = av_dict_get(md, "artist", NULL, 0);
   if (entry && entry->value && entry->value[0])
   {
-    info->artist = xstrdup(entry->value);
+    info->artist = entry->value;
   }
   entry = av_dict_get(md, "album", NULL, 0);
   if (entry && entry->value && entry->value[0])
   {
-    info->album = xstrdup(entry->value);
+    info->album = entry->value;
   }
 
 end:

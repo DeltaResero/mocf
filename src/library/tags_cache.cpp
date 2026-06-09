@@ -250,10 +250,6 @@ static char *request_queue_pop(struct request_queue *q, int *tags_sel)
 }
 
 #ifdef HAVE_DB_H
-static size_t strlen_null(const char *s) { return s ? strlen(s) : 0; }
-#endif
-
-#ifdef HAVE_DB_H
 static char *cache_record_serialize(const struct cache_record *rec, int *len)
 {
   char *buf;
@@ -262,9 +258,9 @@ static char *cache_record_serialize(const struct cache_record *rec, int *len)
   size_t album_len;
   size_t title_len;
 
-  artist_len = strlen_null(rec->tags->artist);
-  album_len = strlen_null(rec->tags->album);
-  title_len = strlen_null(rec->tags->title);
+  artist_len = rec->tags->artist.size();
+  album_len  = rec->tags->album.size();
+  title_len  = rec->tags->title.size();
 
   *len = sizeof(rec->mod_time) + sizeof(rec->atime) +
          sizeof(size_t) * 3 /* lengths of title, artist, time. */
@@ -283,7 +279,7 @@ static char *cache_record_serialize(const struct cache_record *rec, int *len)
   p += sizeof(artist_len);
   if (artist_len)
   {
-    memcpy(p, rec->tags->artist, artist_len);
+    std::memcpy(p, rec->tags->artist.c_str(), artist_len);
     p += artist_len;
   }
 
@@ -291,7 +287,7 @@ static char *cache_record_serialize(const struct cache_record *rec, int *len)
   p += sizeof(album_len);
   if (album_len)
   {
-    memcpy(p, rec->tags->album, album_len);
+    std::memcpy(p, rec->tags->album.c_str(), album_len);
     p += album_len;
   }
 
@@ -299,7 +295,7 @@ static char *cache_record_serialize(const struct cache_record *rec, int *len)
   p += sizeof(title_len);
   if (title_len)
   {
-    memcpy(p, rec->tags->title, title_len);
+    std::memcpy(p, rec->tags->title.c_str(), title_len);
     p += title_len;
   }
 
@@ -353,9 +349,7 @@ static int cache_record_deserialize(struct cache_record *rec,
     p += sizeof(str_len);                                                      \
     if (bytes_left < str_len)                                                  \
       goto err;                                                                \
-    var = static_cast<char *>(xmalloc(str_len + 1));                          \
-    memcpy(var, p, str_len);                                                   \
-    var[str_len] = '\0';                                                       \
+    (var).assign(p, str_len);                                                  \
     p += str_len;                                                              \
   } while (0)
 
@@ -370,23 +364,14 @@ static int cache_record_deserialize(struct cache_record *rec,
     extract_num(rec->tags->track);
     extract_num(rec->tags->time);
 
-    if (rec->tags->title)
+    if (!rec->tags->title.empty())
     {
       rec->tags->filled |= TAGS_COMMENTS;
     }
     else
     {
-      if (rec->tags->artist)
-      {
-        free(rec->tags->artist);
-      }
-      rec->tags->artist = NULL;
-
-      if (rec->tags->album)
-      {
-        free(rec->tags->album);
-      }
-      rec->tags->album = NULL;
+      rec->tags->artist.clear();
+      rec->tags->album.clear();
     }
 
     if (rec->tags->time >= 0)

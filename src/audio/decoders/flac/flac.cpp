@@ -364,15 +364,15 @@ static void fill_tag(FLAC__StreamMetadata_VorbisComment_Entry *comm,
 
   if (!strcasecmp(name.c_str(), "title"))
   {
-    tags->title = xstrdup(value.c_str());
+    tags->title = value;
   }
   else if (!strcasecmp(name.c_str(), "artist"))
   {
-    tags->artist = xstrdup(value.c_str());
+    tags->artist = value;
   }
   else if (!strcasecmp(name.c_str(), "album"))
   {
-    tags->album = xstrdup(value.c_str());
+    tags->album = value;
   }
   else if (!strcasecmp(name.c_str(), "tracknumber") || !strcasecmp(name.c_str(), "track"))
   {

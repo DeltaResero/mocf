@@ -216,7 +216,7 @@ void make_tags_title(struct plist *plist, const int num)
 
   assert(plist->items[num].file != NULL);
 
-  if (plist->items[num].tags->title)
+  if (!plist->items[num].tags->title.empty())
   {
     title = build_title(plist->items[num].tags);
     plist_set_title_tags(plist, num, title);
@@ -382,7 +382,7 @@ struct file_tags *read_file_tags(const char *file, struct file_tags *tags,
 
   /* This makes sure that we don't cause a memory leak */
   assert(!((needed_tags & TAGS_COMMENTS) &&
-           (tags->title || tags->artist || tags->album)));
+           (!tags->title.empty() || !tags->artist.empty() || !tags->album.empty())));
 
   df->info(file, tags, needed_tags);
 

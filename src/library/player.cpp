@@ -404,9 +404,9 @@ void player_init()
 
 static void show_tags(const struct file_tags *tags DEBUG_ONLY)
 {
-  debug("TAG[title]: %s", tags->title ? tags->title : "N/A");
-  debug("TAG[album]: %s", tags->album ? tags->album : "N/A");
-  debug("TAG[artist]: %s", tags->artist ? tags->artist : "N/A");
+  debug("TAG[title]: %s", tags->title.empty() ? "N/A" : tags->title.c_str());
+  debug("TAG[album]: %s", tags->album.empty() ? "N/A" : tags->album.c_str());
+  debug("TAG[artist]: %s", tags->artist.empty() ? "N/A" : tags->artist.c_str());
   debug("TAG[track]: %d", tags->track);
 }
 
@@ -421,7 +421,7 @@ static void update_tags(const struct decoder *f, void *decoder_data,
 
   LOCK(curr_tags_mtx);
   if (f->current_tags && f->current_tags(decoder_data, new_tags) &&
-      new_tags->title)
+      !new_tags->title.empty())
   {
     tags_changed = 1;
     tags_copy(curr_tags, new_tags);

@@ -24,6 +24,7 @@
 #include <cinttypes>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <unistd.h>
 #include <mad.h>
 #include <id3tag.h>
@@ -148,11 +149,12 @@ int __unique_frame(struct id3_tag *tag, struct id3_frame *frame)
   return 1;
 }
 
-static char *get_tag(struct id3_tag *tag, const char *what)
+static std::string get_tag(struct id3_tag *tag, const char *what)
 {
   struct id3_frame *frame;
   union id3_field *field;
   const id3_ucs4_t *ucs4;
+  std::string result;
   char *comm = NULL;
 
   frame = id3_tag_findframe(tag, what, 0);
@@ -185,7 +187,13 @@ static char *get_tag(struct id3_tag *tag, const char *what)
     }
   }
 
-  return comm;
+  if (comm)
+  {
+    result = comm;
+    free(comm);
+  }
+
+  return result;
 }
 
 static int count_time_internal(struct mp3_data *data)
@@ -454,8 +462,6 @@ static void mp3_info(const char *file_name, struct file_tags *info,
   {
     struct id3_tag *tag;
     struct id3_file *id3file;
-    char *track = NULL;
-
     id3file = id3_file_open(file_name, ID3_FILE_MODE_READONLY);
     if (!id3file)
     {
@@ -467,18 +473,18 @@ static void mp3_info(const char *file_name, struct file_tags *info,
       info->artist = get_tag(tag, ID3_FRAME_ARTIST);
       info->title = get_tag(tag, ID3_FRAME_TITLE);
       info->album = get_tag(tag, ID3_FRAME_ALBUM);
-      track = get_tag(tag, ID3_FRAME_TRACK);
+      std::string track = get_tag(tag, ID3_FRAME_TRACK);
 
-      if (track)
+      if (!track.empty())
       {
+        const char *track_c = track.c_str();
         char *end;
 
-        info->track = strtol(track, &end, 10);
-        if (end == track)
+        info->track = strtol(track_c, &end, 10);
+        if (end == track_c)
         {
           info->track = -1;
         }
-        free(track);
       }
     }
     id3_file_close(id3file);

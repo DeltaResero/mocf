@@ -497,21 +497,15 @@ static void update_item_tags(struct plist *plist, const int num,
 }
 
 /* Truncate string at screen-upsetting whitespace. */
-static void sanitise_string(char *str)
+static void sanitise_string(std::string &str)
 {
-  if (!str)
+  for (size_t i = 0; i < str.size(); i++)
   {
-    return;
-  }
-
-  while (*str)
-  {
-    if (*str != ' ' && isspace(*str))
+    if (str[i] != ' ' && isspace(static_cast<unsigned char>(str[i])))
     {
-      *str = 0x00;
+      str.resize(i);
       break;
     }
-    str++;
   }
 }
 
@@ -526,26 +520,10 @@ static void ev_file_tags(const struct tag_ev_response *data)
 
   debug("Received tags for %s", data->file);
 
-  sanitise_string(data->tags->title);
-  if (data->tags->title && !data->tags->title[0])
-  {
-    free(data->tags->title);
-    ((struct file_tags *)data->tags)->title = NULL;
-  }
-
-  sanitise_string(data->tags->artist);
-  if (data->tags->artist && !data->tags->artist[0])
-  {
-    free(data->tags->artist);
-    ((struct file_tags *)data->tags)->artist = NULL;
-  }
-
-  sanitise_string(data->tags->album);
-  if (data->tags->album && !data->tags->album[0])
-  {
-    free(data->tags->album);
-    ((struct file_tags *)data->tags)->album = NULL;
-  }
+  struct file_tags *mutable_tags = const_cast<struct file_tags *>(data->tags);
+  sanitise_string(mutable_tags->title);
+  sanitise_string(mutable_tags->artist);
+  sanitise_string(mutable_tags->album);
 
   if ((n = plist_find_fname(dir_plist, data->file)) != -1)
   {

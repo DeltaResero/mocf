@@ -175,21 +175,21 @@ static void wav_info(const char *file_name, struct file_tags *info,
     {
       std::vector<char> buf(++tag_len);
       WavpackGetTagItem(wpc, "title", buf.data(), tag_len);
-      info->title = xstrdup(buf.data());
+      info->title = buf.data();
     }
 
     if ((tag_len = WavpackGetTagItem(wpc, "artist", NULL, 0)) > 0)
     {
       std::vector<char> buf(++tag_len);
       WavpackGetTagItem(wpc, "artist", buf.data(), tag_len);
-      info->artist = xstrdup(buf.data());
+      info->artist = buf.data();
     }
 
     if ((tag_len = WavpackGetTagItem(wpc, "album", NULL, 0)) > 0)
     {
       std::vector<char> buf(++tag_len);
       WavpackGetTagItem(wpc, "album", buf.data(), tag_len);
-      info->album = xstrdup(buf.data());
+      info->album = buf.data();
     }
 
     if ((tag_len = WavpackGetTagItem(wpc, "track", NULL, 0)) > 0)

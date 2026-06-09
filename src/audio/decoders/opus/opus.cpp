@@ -54,17 +54,17 @@ static void get_comment_tags(OggOpusFile *of, struct file_tags *info)
   {
     if (!strncasecmp(comments->user_comments[i], "title=", strlen("title=")))
     {
-      info->title = xstrdup(comments->user_comments[i] + strlen("title="));
+      info->title = (comments->user_comments[i] + strlen("title="));
     }
     else if (!strncasecmp(comments->user_comments[i],
                           "artist=", strlen("artist=")))
     {
-      info->artist = xstrdup(comments->user_comments[i] + strlen("artist="));
+      info->artist = (comments->user_comments[i] + strlen("artist="));
     }
     else if (!strncasecmp(comments->user_comments[i],
                           "album=", strlen("album=")))
     {
-      info->album = xstrdup(comments->user_comments[i] + strlen("album="));
+      info->album = (comments->user_comments[i] + strlen("album="));
     }
     else if (!strncasecmp(comments->user_comments[i],
                           "tracknumber=", strlen("tracknumber=")))

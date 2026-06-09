@@ -49,7 +49,7 @@ struct mpg123_data
 
 // ID3v1 tag values may not be null-terminated. Truncate trailing spaces and
 // zeros.
-char *safe_string(char text[30])
+std::string safe_string(char text[30])
 {
   int n = 0;
   while (n < 29 && text[n] != 0)
@@ -60,8 +60,7 @@ char *safe_string(char text[30])
   {
     n--;
   }
-  std::string s(text, n + 1);
-  return xstrdup(s.c_str());
+  return std::string(text, n + 1);
 }
 
 static void get_tags(mpg123_handle *mf, struct file_tags *info)
@@ -78,18 +77,18 @@ static void get_tags(mpg123_handle *mf, struct file_tags *info)
       debug("TG: v2 tags present");
       if (v2->title && v2->title->p)
       {
-        info->title = xstrdup(v2->title->p);
-        debug("TG: title v2 %s.", info->title);
+        info->title = v2->title->p;
+        debug("TG: title v2 %s.", info->title.c_str());
       }
       if (v2->artist && v2->artist->p)
       {
-        info->artist = xstrdup(v2->artist->p);
-        debug("TG: artist v2 %s.", info->artist);
+        info->artist = v2->artist->p;
+        debug("TG: artist v2 %s.", info->artist.c_str());
       }
       if (v2->album && v2->album->p)
       {
-        info->album = xstrdup(v2->album->p);
-        debug("TG: album v2 %s.", info->album);
+        info->album = v2->album->p;
+        debug("TG: album v2 %s.", info->album.c_str());
       }
 
       size_t i, j;
@@ -129,20 +128,20 @@ static void get_tags(mpg123_handle *mf, struct file_tags *info)
     {
       debug("TG: v1 tags present");
 
-      if (!info->title)
+      if (info->title.empty())
       {
         info->title = safe_string(v1->title);
-        debug("TG: title v1 %s.", info->title);
+        debug("TG: title v1 %s.", info->title.c_str());
       }
-      if (!info->artist)
+      if (info->artist.empty())
       {
         info->artist = safe_string(v1->artist);
-        debug("TG: artist v1 %s.", info->artist);
+        debug("TG: artist v1 %s.", info->artist.c_str());
       }
-      if (!info->album)
+      if (info->album.empty())
       {
         info->album = safe_string(v1->album);
-        debug("TG: album v1 %s.", info->album);
+        debug("TG: album v1 %s.", info->album.c_str());
       }
       if (info->track == -1 && v1->comment[28] == 0 && v1->comment[29] > 0)
       {

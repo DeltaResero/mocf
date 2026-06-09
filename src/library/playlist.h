@@ -11,14 +11,10 @@
 #ifndef PLAYLIST_H
 #define PLAYLIST_H
 
+#include <string>
 #include <sys/types.h>
 
 #include "utils/rbtree.h"
-
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   /* Flags for the info decoder function. */
   enum tags_select
@@ -29,9 +25,9 @@ extern "C"
 
   struct file_tags
   {
-    char *title;
-    char *artist;
-    char *album;
+    std::string title;
+    std::string artist;
+    std::string album;
     int track;
     int time;
     int filled; /* Which tags are filled: TAGS_COMMENTS, TAGS_TIME. */
@@ -119,10 +115,6 @@ extern "C"
   void plist_swap_files(struct plist *plist, const char *file1,
                         const char *file2);
   int plist_get_position(const struct plist *plist, int num);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

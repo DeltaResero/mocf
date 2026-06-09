@@ -252,15 +252,15 @@ static void sndfile_info(const char *file_name, struct file_tags *info,
     const char *res;
     if ((res = sf_get_string(data->sndfile, SF_STR_TITLE)))
     {
-      info->title = xstrdup(res);
+      info->title = res;
     }
     if ((res = sf_get_string(data->sndfile, SF_STR_ARTIST)))
     {
-      info->artist = xstrdup(res);
+      info->artist = res;
     }
     if ((res = sf_get_string(data->sndfile, SF_STR_ALBUM)))
     {
-      info->album = xstrdup(res);
+      info->album = res;
     }
     if ((res = sf_get_string(data->sndfile, SF_STR_TRACKNUMBER)))
     {

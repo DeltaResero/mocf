@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 #include <neaacdec.h>
 #include <id3tag.h>
@@ -423,12 +424,12 @@ static void *aac_open(const char *file)
   return data;
 }
 
-static char *get_tag(struct id3_tag *tag, const char *what)
+static std::string get_tag(struct id3_tag *tag, const char *what)
 {
   struct id3_frame *frame;
   union id3_field *field;
   const id3_ucs4_t *ucs4;
-  char *comm = NULL;
+  std::string result;
 
   frame = id3_tag_findframe(tag, what, 0);
   if (frame && (field = &frame->fields[1]))
@@ -436,11 +437,16 @@ static char *get_tag(struct id3_tag *tag, const char *what)
     ucs4 = id3_field_getstrings(field, 0);
     if (ucs4)
     {
-      comm = (char *)id3_ucs4_utf8duplicate(ucs4);
+      char *comm = (char *)id3_ucs4_utf8duplicate(ucs4);
+      if (comm)
+      {
+        result = comm;
+        free(comm);
+      }
     }
   }
 
-  return comm;
+  return result;
 }
 
 /* Fill info structure with data from aac comments */
@@ -451,7 +457,7 @@ static void aac_info(const char *file_name, struct file_tags *info,
   {
     struct id3_tag *tag;
     struct id3_file *id3file;
-    char *track = NULL;
+    std::string track;
 
     id3file = id3_file_open(file_name, ID3_FILE_MODE_READONLY);
     if (!id3file)
@@ -466,16 +472,16 @@ static void aac_info(const char *file_name, struct file_tags *info,
       info->album = get_tag(tag, ID3_FRAME_ALBUM);
       track = get_tag(tag, ID3_FRAME_TRACK);
 
-      if (track)
+      if (!track.empty())
       {
+        const char *track_c = track.c_str();
         char *end;
 
-        info->track = strtol(track, &end, 10);
-        if (end == track)
+        info->track = strtol(track_c, &end, 10);
+        if (end == track_c)
         {
           info->track = -1;
         }
-        free(track);
       }
     }
     id3_file_close(id3file);

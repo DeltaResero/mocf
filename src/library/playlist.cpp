@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <utility>
 
 #define DEBUG
 
@@ -39,19 +40,6 @@ void tags_free(struct file_tags *tags)
 {
   assert(tags != NULL);
 
-  if (tags->title)
-  {
-    free(tags->title);
-  }
-  if (tags->artist)
-  {
-    free(tags->artist);
-  }
-  if (tags->album)
-  {
-    free(tags->album);
-  }
-
   delete tags;
 }
 
@@ -59,22 +47,9 @@ void tags_clear(struct file_tags *tags)
 {
   assert(tags != NULL);
 
-  if (tags->title)
-  {
-    free(tags->title);
-  }
-  if (tags->artist)
-  {
-    free(tags->artist);
-  }
-  if (tags->album)
-  {
-    free(tags->album);
-  }
-
-  tags->title = NULL;
-  tags->artist = NULL;
-  tags->album = NULL;
+  tags->title.clear();
+  tags->artist.clear();
+  tags->album.clear();
   tags->track = -1;
   tags->time = -1;
   tags->filled = 0;
@@ -83,24 +58,9 @@ void tags_clear(struct file_tags *tags)
 /* Copy the tags data from src to dst freeing old fields if necessary. */
 void tags_copy(struct file_tags *dst, const struct file_tags *src)
 {
-  if (dst->title)
-  {
-    free(dst->title);
-  }
-  dst->title = xstrdup(src->title);
-
-  if (dst->artist)
-  {
-    free(dst->artist);
-  }
-  dst->artist = xstrdup(src->artist);
-
-  if (dst->album)
-  {
-    free(dst->album);
-  }
-  dst->album = xstrdup(src->album);
-
+  dst->title = src->title;
+  dst->artist = src->artist;
+  dst->album = src->album;
   dst->track = src->track;
   dst->time = src->time;
   dst->filled = src->filled;
@@ -113,25 +73,22 @@ void tags_update(struct file_tags *dst, struct file_tags *src, int move)
 
   if (!(dst->filled & TAGS_COMMENTS) && (src->filled & TAGS_COMMENTS))
   {
-    assert(!dst->title && !dst->artist && !dst->album);
+    assert(dst->title.empty() && dst->artist.empty() && dst->album.empty());
 
     dst->track = src->track;
 
     if (move)
     {
-      dst->title = src->title;
-      src->title = NULL;
-      dst->artist = src->artist;
-      src->artist = NULL;
-      dst->album = src->album;
-      src->album = NULL;
+      dst->title = std::move(src->title);
+      dst->artist = std::move(src->artist);
+      dst->album = std::move(src->album);
       src->filled &= ~TAGS_COMMENTS;
     }
     else
     {
-      dst->title = xstrdup(src->title);
-      dst->artist = xstrdup(src->artist);
-      dst->album = xstrdup(src->album);
+      dst->title = src->title;
+      dst->artist = src->artist;
+      dst->album = src->album;
     }
     dst->filled |= TAGS_COMMENTS;
   }
@@ -144,13 +101,10 @@ void tags_update(struct file_tags *dst, struct file_tags *src, int move)
 
 struct file_tags *tags_new()
 {
-  auto *tags    = new file_tags;
-  tags->title   = nullptr;
-  tags->artist  = nullptr;
-  tags->album   = nullptr;
-  tags->track   = -1;
-  tags->time    = -1;
-  tags->filled  = 0;
+  auto *tags   = new file_tags;
+  tags->track  = -1;
+  tags->time   = -1;
+  tags->filled = 0;
   return tags;
 }
 
@@ -509,8 +463,6 @@ const char *plist_get_next_dead_entry(const struct plist *plist,
   return NULL;
 }
 
-#define if_not_empty(str) (tags && (str) && *(str) ? (str) : NULL)
-
 static const char *title_expn_subs(char fmt, const struct file_tags *tags)
 {
   static char track[16];
@@ -525,11 +477,11 @@ static const char *title_expn_subs(char fmt, const struct file_tags *tags)
       snprintf(track, sizeof(track), "%d", tags->track);
       return track;
     case 'a':
-      return if_not_empty(tags->artist);
+      return (tags && !tags->artist.empty()) ? tags->artist.c_str() : NULL;
     case 'A':
-      return if_not_empty(tags->album);
+      return (tags && !tags->album.empty()) ? tags->album.c_str() : NULL;
     case 't':
-      return if_not_empty(tags->title);
+      return (tags && !tags->title.empty()) ? tags->title.c_str() : NULL;
     default:
       fatal("Error parsing format string!");
   }

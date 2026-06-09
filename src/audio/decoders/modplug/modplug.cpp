@@ -195,7 +195,7 @@ static void modplug_info(const char *file_name, struct file_tags *info,
 
   if (tags_sel & TAGS_COMMENTS)
   {
-    info->title = xstrdup(ModPlug_GetName(data->modplugfile));
+    info->title = ModPlug_GetName(data->modplugfile);
     info->filled |= TAGS_COMMENTS;
   }
 

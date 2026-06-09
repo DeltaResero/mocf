@@ -18,6 +18,7 @@
 #include <cinttypes>
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include <vector>
 
 #ifdef MPC_IS_OLD_API
@@ -230,9 +231,9 @@ static void musepack_close(void *prv_data)
   delete data;
 }
 
-static char *tag_str(const char *str)
+static std::string tag_str(const char *str)
 {
-  return str && str[0] ? xstrdup(str) : NULL;
+  return str ? str : "";
 }
 
 /* Fill info structure with data from musepack comments */
