@@ -26,25 +26,6 @@ extern "C"
     QUIT_APP  /* quit the application and audio engine */
   };
 
-  /* Information about the currently played file. */
-  struct file_tags;
-  struct file_info
-  {
-    char *file;
-    struct file_tags *tags;
-    char *title;
-    int avg_bitrate;
-    int bitrate;
-    int rate;
-    int curr_time;
-    int total_time;
-    int channels;
-    int state; /* STATE_* */
-    char *block_file;
-    int block_start;
-    int block_end;
-  };
-
   void init_interface(struct engine_event_queue *eq, lists_t_strs *args);
   void interface_loop();
   void interface_end();
