@@ -20,7 +20,9 @@
 #include <cerrno>
 #include <cmath>
 #include <cstring>
-#include <pthread.h>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 
 #ifdef OUT_TEST
 #include <unistd.h>
@@ -41,12 +43,12 @@
 struct out_buf
 {
   struct fifo_buf *buf;
-  pthread_mutex_t mutex;
-  pthread_t tid; /* Thread id of the reading thread. */
+  std::mutex mutex;
+  std::thread tid; /* Thread id of the reading thread. */
 
   /* Signals. */
-  pthread_cond_t play_cond;  /* Something was written to the buffer. */
-  pthread_cond_t ready_cond; /* There is some space in the buffer. */
+  std::condition_variable play_cond;  /* Something was written to the buffer. */
+  std::condition_variable ready_cond; /* There is some space in the buffer. */
 
   /* Optional callback called when there is some free space in
    * the buffer. */
@@ -98,9 +100,8 @@ static void set_realtime_prio()
 }
 
 /* Reading thread of the buffer. */
-static void *read_thread(void *arg)
+static void read_thread(struct out_buf *buf)
 {
-  struct out_buf *buf = (struct out_buf *)arg;
   int audio_dev_closed = 0;
   int hw_paused = 0;
 
@@ -108,7 +109,7 @@ static void *read_thread(void *arg)
 
   set_realtime_prio();
 
-  LOCK(buf->mutex);
+  std::unique_lock<std::mutex> lock(buf->mutex);
 
   while (1)
   {
@@ -132,13 +133,13 @@ static void *read_thread(void *arg)
     {
       /* unlock the mutex to make calls to out_buf functions
        * possible in the callback */
-      UNLOCK(buf->mutex);
+      lock.unlock();
       buf->free_callback();
-      LOCK(buf->mutex);
+      lock.lock();
     }
 
     debug("sending the signal");
-    pthread_cond_broadcast(&buf->ready_cond);
+    buf->ready_cond.notify_all();
 
     if ((fifo_buf_get_fill(buf->buf) == 0 || buf->pause || buf->stop) &&
         !buf->exit)
@@ -161,7 +162,7 @@ static void *read_thread(void *arg)
 
       debug("waiting for something in the buffer");
       buf->read_thread_waiting = 1;
-      pthread_cond_wait(&buf->play_cond, &buf->mutex);
+      buf->play_cond.wait(lock);
       debug("something appeared in the buffer");
     }
 
@@ -223,7 +224,7 @@ static void *read_thread(void *arg)
           audio_bpf;
       play_buf_fill =
           fifo_buf_get(buf->buf, play_buf, play_buf_frames * audio_bpf);
-      UNLOCK(buf->mutex);
+      lock.unlock();
 
       debug("playing %d bytes", play_buf_fill);
 
@@ -241,7 +242,7 @@ static void *read_thread(void *arg)
 
       /*logit ("done sending PCM");*/
 
-      LOCK(buf->mutex);
+      lock.lock();
 
       /* Update time */
       if (play_buf_fill && audio_get_bps())
@@ -252,11 +253,8 @@ static void *read_thread(void *arg)
     }
   }
 
-  UNLOCK(buf->mutex);
-
+  // Lock goes out of scope here
   logit("exiting");
-
-  return NULL;
 }
 
 /* Allocate and initialize the buf structure, size is the buffer size. */
@@ -279,19 +277,7 @@ struct out_buf *out_buf_new(int size)
   buf->read_thread_waiting = 0;
   buf->free_callback = NULL;
 
-  pthread_mutex_init(&buf->mutex, NULL);
-  pthread_cond_init(&buf->play_cond, NULL);
-  pthread_cond_init(&buf->ready_cond, NULL);
-
-#ifdef OUT_TEST
-  fd = open("out_test", O_CREAT | O_TRUNC | O_WRONLY, 0600);
-#endif
-
-  rc = pthread_create(&buf->tid, NULL, read_thread, buf);
-  if (rc != 0)
-  {
-    fatal("Can't create buffer thread: %s", xstrerror(rc));
-  }
+  buf->tid = std::thread(read_thread, buf);
 
   return buf;
 }
@@ -300,41 +286,26 @@ struct out_buf *out_buf_new(int size)
  * structure.  Can be used only if nothing is played. */
 void out_buf_free(struct out_buf *buf)
 {
-  int rc;
+  {
+    std::lock_guard<std::mutex> lock(buf->mutex);
+    buf->exit = 1;
+    buf->play_cond.notify_one();
+  }
 
-  assert(buf != NULL);
-
-  LOCK(buf->mutex);
-  buf->exit = 1;
-  pthread_cond_signal(&buf->play_cond);
-  UNLOCK(buf->mutex);
-
-  pthread_join(buf->tid, NULL);
+  if (buf->tid.joinable()) {
+    buf->tid.join();
+  }
 
   /* Let other threads using this buffer know that the state of the
    * buffer has changed. */
-  LOCK(buf->mutex);
-  fifo_buf_clear(buf->buf);
-  pthread_cond_broadcast(&buf->ready_cond);
-  UNLOCK(buf->mutex);
+  {
+    std::lock_guard<std::mutex> lock(buf->mutex);
+    fifo_buf_clear(buf->buf);
+    buf->ready_cond.notify_all();
+  }
 
   fifo_buf_free(buf->buf);
   buf->buf = NULL;
-  rc = pthread_mutex_destroy(&buf->mutex);
-  if (rc != 0)
-  {
-    log_errno("Destroying buffer mutex failed", rc);
-  }
-  rc = pthread_cond_destroy(&buf->play_cond);
-  if (rc != 0)
-  {
-    log_errno("Destroying buffer play condition failed", rc);
-  }
-  rc = pthread_cond_destroy(&buf->ready_cond);
-  if (rc != 0)
-  {
-    log_errno("Destroying buffer ready condition failed", rc);
-  }
 
   delete buf;
 
@@ -355,20 +326,18 @@ int out_buf_put(struct out_buf *buf, const char *data, int size)
   while (size)
   {
     int written;
-
-    LOCK(buf->mutex);
+    std::unique_lock<std::mutex> lock(buf->mutex);
 
     if (fifo_buf_get_space(buf->buf) == 0 && !buf->stop)
     {
       /*logit ("buffer full, waiting for the signal");*/
-      pthread_cond_wait(&buf->ready_cond, &buf->mutex);
+      buf->ready_cond.wait(lock);
       /*logit ("buffer ready");*/
     }
 
     if (buf->stop)
     {
       logit("the buffer is stopped, refusing to write to the buffer");
-      UNLOCK(buf->mutex);
       return 0;
     }
 
@@ -376,12 +345,10 @@ int out_buf_put(struct out_buf *buf, const char *data, int size)
 
     if (written)
     {
-      pthread_cond_signal(&buf->play_cond);
+      buf->play_cond.notify_one();
       size -= written;
       pos += written;
     }
-
-    UNLOCK(buf->mutex);
   }
 
   return 1;
@@ -389,17 +356,15 @@ int out_buf_put(struct out_buf *buf, const char *data, int size)
 
 void out_buf_pause(struct out_buf *buf)
 {
-  LOCK(buf->mutex);
+  std::lock_guard<std::mutex> lock(buf->mutex);
   buf->pause = 1;
-  UNLOCK(buf->mutex);
 }
 
 void out_buf_unpause(struct out_buf *buf)
 {
-  LOCK(buf->mutex);
+  std::lock_guard<std::mutex> lock(buf->mutex);
   buf->pause = 0;
-  pthread_cond_signal(&buf->play_cond);
-  UNLOCK(buf->mutex);
+  buf->play_cond.notify_one();
 }
 
 /* Stop playing, after that buffer will refuse to play anything and ignore data
@@ -407,16 +372,15 @@ void out_buf_unpause(struct out_buf *buf)
 void out_buf_stop(struct out_buf *buf)
 {
   logit("stopping the buffer");
-  LOCK(buf->mutex);
+  std::unique_lock<std::mutex> lock(buf->mutex);
   buf->stop = 1;
   buf->pause = 0;
   buf->reset_dev = 1;
   logit("sending signal");
-  pthread_cond_signal(&buf->play_cond);
+  buf->play_cond.notify_one();
   logit("waiting for signal");
-  pthread_cond_wait(&buf->ready_cond, &buf->mutex);
+  buf->ready_cond.wait(lock);
   logit("done");
-  UNLOCK(buf->mutex);
 }
 
 /* Reset the buffer state: this can by called ONLY when the buffer is stopped
@@ -425,20 +389,18 @@ void out_buf_reset(struct out_buf *buf)
 {
   logit("resetting the buffer");
 
-  LOCK(buf->mutex);
+  std::lock_guard<std::mutex> lock(buf->mutex);
   fifo_buf_clear(buf->buf);
   buf->stop = 0;
   buf->pause = 0;
   buf->reset_dev = 0;
   buf->hardware_buf_fill = 0;
-  UNLOCK(buf->mutex);
 }
 
 void out_buf_time_set(struct out_buf *buf, const float time)
 {
-  LOCK(buf->mutex);
+  std::lock_guard<std::mutex> lock(buf->mutex);
   buf->time = time;
-  UNLOCK(buf->mutex);
 }
 
 /* Return the time in the audio which the user is currently hearing.
@@ -451,9 +413,8 @@ int out_buf_time_get(struct out_buf *buf)
   float time_f;
   int bps = audio_get_bps();
 
-  LOCK(buf->mutex);
+  std::lock_guard<std::mutex> lock(buf->mutex);
   time_f = buf->time - (bps ? buf->hardware_buf_fill / (float)bps : 0);
-  UNLOCK(buf->mutex);
 
   return (int)roundf(time_f);
 }
@@ -463,9 +424,8 @@ void out_buf_set_free_callback(struct out_buf *buf,
 {
   assert(buf != NULL);
 
-  LOCK(buf->mutex);
+  std::lock_guard<std::mutex> lock(buf->mutex);
   buf->free_callback = callback;
-  UNLOCK(buf->mutex);
 }
 
 int out_buf_get_free(struct out_buf *buf)
@@ -474,9 +434,8 @@ int out_buf_get_free(struct out_buf *buf)
 
   assert(buf != NULL);
 
-  LOCK(buf->mutex);
+  std::lock_guard<std::mutex> lock(buf->mutex);
   space = fifo_buf_get_space(buf->buf);
-  UNLOCK(buf->mutex);
 
   return space;
 }
@@ -487,9 +446,8 @@ int out_buf_get_fill(struct out_buf *buf)
 
   assert(buf != NULL);
 
-  LOCK(buf->mutex);
+  std::lock_guard<std::mutex> lock(buf->mutex);
   fill = fifo_buf_get_fill(buf->buf);
-  UNLOCK(buf->mutex);
 
   return fill;
 }
@@ -503,13 +461,12 @@ void out_buf_wait(struct out_buf *buf)
 
   logit("Waiting for read thread to suspend...");
 
-  LOCK(buf->mutex);
+  std::unique_lock<std::mutex> lock(buf->mutex);
   while (!buf->read_thread_waiting)
   {
     debug("waiting....");
-    pthread_cond_wait(&buf->ready_cond, &buf->mutex);
+    buf->ready_cond.wait(lock);
   }
-  UNLOCK(buf->mutex);
 
   logit("done");
 }
