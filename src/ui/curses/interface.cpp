@@ -2584,7 +2584,7 @@ static struct file_tags *get_tags(const char *file)
 
   if (file_type(file) == F_SOUND)
   {
-    return tags_dup(plist->items[item_num].tags);
+    return tags_dup(plist->items[item_num].tags.get());
   }
 
   return tags_new();

@@ -194,11 +194,11 @@ void plist_item_copy(struct plist_item *dst, const struct plist_item *src)
 
   if (src->tags)
   {
-    dst->tags = tags_dup(src->tags);
+    dst->tags.reset(tags_dup(src->tags.get()));
   }
   else
   {
-    dst->tags = nullptr;
+    dst->tags.reset();
   }
 
   dst->deleted = src->deleted;
@@ -266,8 +266,7 @@ void plist_free_item_fields(struct plist_item *item)
   item->title_file.clear();
   if (item->tags)
   {
-    tags_free(item->tags);
-    item->tags = nullptr;
+    item->tags.reset();
   }
 }
 
@@ -275,15 +274,6 @@ void plist_free_item_fields(struct plist_item *item)
 void plist_clear(struct plist *plist)
 {
   assert(plist != NULL);
-
-  for (int i = 0; i < plist->num; i++)
-  {
-    if (plist->items[i].tags)
-    {
-      tags_free(plist->items[i].tags);
-      plist->items[i].tags = nullptr;
-    }
-  }
 
   plist->items.clear();
   plist->num = 0;
@@ -710,7 +700,7 @@ void plist_set_item_time(struct plist *plist, const int num, const int time)
 
   if (!plist->items[num].tags)
   {
-    plist->items[num].tags = tags_new();
+    plist->items[num].tags.reset(tags_new());
     old_time = -1;
   }
   else if (plist->items[num].tags->time != -1)
@@ -871,8 +861,7 @@ void plist_discard_tags(struct plist *plist)
   {
     if (!plist_deleted(plist, i) && plist->items[i].tags)
     {
-      tags_free(plist->items[i].tags);
-      plist->items[i].tags = NULL;
+      plist->items[i].tags.reset();
     }
   }
 
@@ -898,11 +887,7 @@ void plist_set_tags(struct plist *plist, const int num,
     old_time = -1;
   }
 
-  if (plist->items[num].tags)
-  {
-    tags_free(plist->items[num].tags);
-  }
-  plist->items[num].tags = tags_dup(tags);
+  plist->items[num].tags.reset(tags_dup(tags));
 
   if (old_time != -1)
   {
@@ -924,7 +909,7 @@ struct file_tags *plist_get_tags(const struct plist *plist, const int num)
 
   if (plist->items[num].tags)
   {
-    return tags_dup(plist->items[num].tags);
+    return tags_dup(plist->items[num].tags.get());
   }
 
   return NULL;

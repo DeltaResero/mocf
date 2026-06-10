@@ -15,7 +15,7 @@
 #include <cstring>
 #include <vector>
 #include <sys/types.h>
-
+#include <memory>
 #include <map>
 
   /* Flags for the info decoder function. */
@@ -50,7 +50,7 @@
     enum file_type type;    /* type of the file (F_OTHER if not read yet) */
     std::string title_file; /* title based on the file name */
     std::string title_tags; /* title based on the tags */
-    struct file_tags *tags;
+    std::unique_ptr<struct file_tags> tags;
     short deleted;
     time_t mtime;  /* modification time */
     int queue_pos; /* position in the queue */

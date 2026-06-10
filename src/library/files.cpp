@@ -218,7 +218,7 @@ void make_tags_title(struct plist *plist, const int num)
 
   if (!plist->items[num].tags->title.empty())
   {
-    title = build_title(plist->items[num].tags);
+    title = build_title(plist->items[num].tags.get());
     plist_set_title_tags(plist, num, title);
     free(title);
     return;
