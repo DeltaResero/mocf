@@ -355,7 +355,7 @@ char *create_file_name(const char *file)
 {
   int rc;
   static char fname[PATH_MAX];
-  char *moc_dir = options_get_str("MOCDir");
+  const char *moc_dir = options_get_str("MOCDir");
 
   rc = snprintf(fname, sizeof(fname), "%s/%s", moc_dir, file);
 

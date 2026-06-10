@@ -56,7 +56,7 @@ static void init_database()
     if (cancel)
         return;
 
-    char *dbfile = options_get_str(OPT_DATABASE);
+    const char *dbfile = options_get_str(OPT_DATABASE);
     if (dbfile == NULL || dbfile[0] == '\0')
         return;
 

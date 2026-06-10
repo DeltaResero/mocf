@@ -3148,7 +3148,8 @@ static void info_win_set_block_title(struct info_win *w)
   else
   {
     int start_pos, end_pos;
-    char *new_title, *decorators;
+    char *new_title;
+    const char *decorators;
 
     start_pos = w->block_start * w->time_bar.width / w->total_time;
     if (w->block_end < w->total_time)
@@ -3373,7 +3374,8 @@ static void info_win_display_msg(struct info_win *w)
     if (msg_changed && w->current_message->msg &&
         options_get_bool("PrefixQueuedMessages"))
     {
-      char *msg, *decorator;
+      char *msg;
+      const char *decorator;
       int len;
 
       msg = w->current_message->msg;

@@ -25,6 +25,10 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <regex.h>
+#include <unordered_map>
+#include <variant>
+#include <optional>
+#include <vector>
 
 #include "core/common.h"
 #include "library/files.h"
@@ -32,386 +36,224 @@
 #include "core/options.h"
 #include "utils/lists.h"
 
-#define OPTIONS_MAX 181
-#define OPTION_NAME_MAX 32
+using OptionValue = std::variant<int, bool, std::optional<std::string>, lists_t_strs*>;
 
-typedef int options_t_check(int, ...);
+struct Option;
+using CheckFunc = bool(*)(const Option&, int, const std::string&);
 
-union option_value
-{
-  char *str;
-  int num;
-  bool boolean;
-  lists_t_strs *list;
+struct Option {
+    std::string name;
+    option_type type;
+    OptionValue value;
+    bool ignore_in_config = false;
+    bool set_in_config = false;
+
+    std::vector<int> int_constraints;
+    std::vector<std::string> str_constraints;
+
+    CheckFunc check = nullptr;
 };
 
-struct option
-{
-  char name[OPTION_NAME_MAX];
-  enum option_type type;
-  union option_value value;
-  int ignore_in_config;
-  int set_in_config;
-  unsigned int hash;
-  options_t_check *check;
-  int count;
-  void *constraints;
-};
+static std::unordered_map<std::string, Option> options_map;
 
-static struct option options[OPTIONS_MAX];
-static int options_num = 0;
-
-
-
-/* Returns the str's hash using djb2 algorithm. */
-static unsigned int hash(const char *str)
-{
-  unsigned int hash = 5381;
-
-  while (*str)
-  {
-    hash = ((hash << 5) + hash) + tolower(*(str++));
-  }
-  return hash;
+static std::string to_lower(const std::string& s) {
+    std::string res = s;
+    for (char& c : res) c = std::tolower(c);
+    return res;
 }
 
-/* Return an index to an option in the options hashtable.
- * If there is no such option return -1. */
-static int find_option(const char *name, enum option_type type)
-{
-  unsigned int h = hash(name), i, init_pos = h % OPTIONS_MAX;
-
-  for (i = init_pos; i < OPTIONS_MAX; i += 1)
-  {
-    if (options[i].type == OPTION_FREE)
-    {
-      return -1;
+static Option* find_option(const std::string& name, int type_mask) {
+    auto it = options_map.find(to_lower(name));
+    if (it != options_map.end()) {
+        if (type_mask == OPTION_ANY || (it->second.type & type_mask)) {
+            return &it->second;
+        }
     }
-
-    if (h == options[i].hash && type & options[i].type)
-    {
-      if (!strcasecmp(name, options[i].name))
-      {
-        return i;
-      }
-    }
-  }
-
-  for (i = 0; i < init_pos; i += 1)
-  {
-    if (options[i].type == OPTION_FREE)
-    {
-      return -1;
-    }
-
-    if (h == options[i].hash && type & options[i].type)
-    {
-      if (!strcasecmp(name, options[i].name))
-      {
-        return i;
-      }
-    }
-  }
-
-  return -1;
-}
-
-/* Return an index of a free slot in the options hashtable.
- * If there is no such slot return -1. */
-static int find_free(unsigned int h)
-{
-  unsigned int i;
-
-  assert(options_num < OPTIONS_MAX);
-  h %= OPTIONS_MAX;
-
-  for (i = h; i < OPTIONS_MAX; i += 1)
-  {
-    if (options[i].type == OPTION_FREE)
-    {
-      return i;
-    }
-  }
-
-  for (i = 0; i < h; i += 1)
-  {
-    if (options[i].type == OPTION_FREE)
-    {
-      return i;
-    }
-  }
-
-  return -1;
+    return nullptr;
 }
 
 /* Check that a value falls within the specified range(s). */
-static int check_range(int opt, ...)
-{
-  int rc, ix, int_val;
-  char *str_val;
-  va_list va;
-
-  assert(opt != -1);
-  assert(options[opt].count % 2 == 0);
-  assert(options[opt].type &
-         (OPTION_INT | OPTION_STR | OPTION_PATH | OPTION_LIST));
-
-  rc = 0;
-  va_start(va, opt);
-  switch (options[opt].type)
-  {
-    case OPTION_INT:
-      int_val = va_arg(va, int);
-      for (ix = 0; ix < options[opt].count; ix += 2)
-      {
-        if (int_val >= ((int *)options[opt].constraints)[ix] &&
-            int_val <= ((int *)options[opt].constraints)[ix + 1])
-        {
-          rc = 1;
-          break;
+static bool check_range(const Option& opt, int int_val, const std::string& str_val) {
+    if (opt.type == OPTION_INT) {
+        for (size_t i = 0; i + 1 < opt.int_constraints.size(); i += 2) {
+            if (int_val >= opt.int_constraints[i] && int_val <= opt.int_constraints[i+1]) return true;
         }
-      }
-      break;
-
-    case OPTION_STR:
-    case OPTION_PATH:
-    case OPTION_LIST:
-      str_val = va_arg(va, char *);
-      for (ix = 0; ix < options[opt].count; ix += 2)
-      {
-        if (strcasecmp(str_val, (((char **)options[opt].constraints)[ix])) >=
-                0 &&
-            strcasecmp(str_val,
-                       (((char **)options[opt].constraints)[ix + 1])) <= 0)
-        {
-          rc = 1;
-          break;
+    } else {
+        for (size_t i = 0; i + 1 < opt.str_constraints.size(); i += 2) {
+            if (strcasecmp(str_val.c_str(), opt.str_constraints[i].c_str()) >= 0 &&
+                strcasecmp(str_val.c_str(), opt.str_constraints[i+1].c_str()) <= 0) return true;
         }
-      }
-      break;
-
-    case OPTION_BOOL:
-    case OPTION_SYMB:
-    case OPTION_ANY:
-    case OPTION_FREE:
-      break;
-  }
-  va_end(va);
-
-  return rc;
+    }
+    return false;
 }
 
 /* Check that a value is one of the specified values. */
-static int check_discrete(int opt, ...)
-{
-  int rc, ix, int_val;
-  char *str_val;
-  va_list va;
-
-  assert(opt != -1);
-  assert(options[opt].type & (OPTION_INT | OPTION_SYMB | OPTION_LIST));
-
-  rc = 0;
-  va_start(va, opt);
-  switch (options[opt].type)
-  {
-    case OPTION_INT:
-      int_val = va_arg(va, int);
-      for (ix = 0; ix < options[opt].count; ix += 1)
-      {
-        if (int_val == ((int *)options[opt].constraints)[ix])
-        {
-          rc = 1;
-          break;
+static bool check_discrete(const Option& opt, int int_val, const std::string& str_val) {
+    if (opt.type == OPTION_INT) {
+        for (int c : opt.int_constraints) {
+            if (int_val == c) return true;
         }
-      }
-      break;
-
-    case OPTION_SYMB:
-    case OPTION_LIST:
-      str_val = va_arg(va, char *);
-      for (ix = 0; ix < options[opt].count; ix += 1)
-      {
-        if (!strcasecmp(str_val, (((char **)options[opt].constraints)[ix])))
-        {
-          rc = 1;
-          break;
+    } else {
+        for (const std::string& c : opt.str_constraints) {
+            if (strcasecmp(str_val.c_str(), c.c_str()) == 0) return true;
         }
-      }
-      break;
-
-    case OPTION_BOOL:
-    case OPTION_STR:
-    case OPTION_PATH:
-    case OPTION_ANY:
-    case OPTION_FREE:
-      break;
-  }
-  va_end(va);
-
-  return rc;
+    }
+    return false;
 }
 
 /* Check that a string length falls within the specified range(s). */
-static int check_length(int opt, ...)
-{
-  int rc, ix, str_len;
-  va_list va;
-
-  assert(opt != -1);
-  assert(options[opt].count % 2 == 0);
-  assert(options[opt].type & (OPTION_STR | OPTION_PATH | OPTION_LIST));
-
-  rc = 0;
-  va_start(va, opt);
-  str_len = strlen(va_arg(va, char *));
-  for (ix = 0; ix < options[opt].count; ix += 2)
-  {
-    if (str_len >= ((int *)options[opt].constraints)[ix] &&
-        str_len <= ((int *)options[opt].constraints)[ix + 1])
-    {
-      rc = 1;
-      break;
+static bool check_length(const Option& opt, int int_val, const std::string& str_val) {
+    int len = str_val.length();
+    for (size_t i = 0; i + 1 < opt.int_constraints.size(); i += 2) {
+        if (len >= opt.int_constraints[i] && len <= opt.int_constraints[i+1]) return true;
     }
-  }
-  va_end(va);
-
-  return rc;
+    return false;
 }
 
 /* Check that a string has a function-like syntax. */
-static int check_function(int opt, ...)
-{
-  int rc;
-  const char *str;
-  const char regex[] = "^[a-z0-9/-]+\\([^,) ]*(,[^,) ]*)*\\)$";
-  static regex_t *preg = NULL;
-  va_list va;
-
-  assert(opt != -1);
-  assert(options[opt].count == 0);
-  assert(options[opt].type & (OPTION_STR | OPTION_PATH | OPTION_LIST));
-
-  if (preg == NULL)
-  {
-    preg = new regex_t;
-    rc = regcomp(preg, regex, REG_EXTENDED | REG_ICASE | REG_NOSUB);
-    assert(rc == 0);
-  }
-
-  va_start(va, opt);
-  str = va_arg(va, const char *);
-  rc = regexec(preg, str, 0, NULL, 0);
-  va_end(va);
-
-  return (rc == 0) ? 1 : 0;
+static bool check_function(const Option& opt, int int_val, const std::string& str_val) {
+    static regex_t preg;
+    static bool initialized = false;
+    if (!initialized) {
+        regcomp(&preg, "^[a-z0-9/-]+\\([^,) ]*(,[^,) ]*)*\\)$", REG_EXTENDED | REG_ICASE | REG_NOSUB);
+        initialized = true;
+    }
+    return regexec(&preg, str_val.c_str(), 0, NULL, 0) == 0;
 }
 
 /* Always pass a value as valid. */
-static int check_true(int unused ATTR_UNUSED, ...) { return 1; }
-
-/* Initializes a position on the options table. This is intended to be used at
- * initialization to make a table of valid options and its default values. */
-static int init_option(const char *name, enum option_type type)
-{
-  unsigned int h = hash(name);
-  int pos = find_free(h);
-
-  assert(is_valid_symbol(name));
-  assert(pos >= 0);
-
-  strncpy(options[pos].name, name, OPTION_NAME_MAX - 1);
-  options[pos].name[OPTION_NAME_MAX - 1] = '\0';
-  options[pos].hash = h;
-  options[pos].type = type;
-  options[pos].ignore_in_config = 0;
-  options[pos].set_in_config = 0;
-  options[pos].check = check_true;
-  options[pos].count = 0;
-  options[pos].constraints = NULL;
-
-  options_num++;
-  return pos;
+static bool check_true(const Option& opt, int int_val, const std::string& str_val) {
+    return true;
 }
 
-/* Add an integer option to the options table. This is intended to be used at
- * initialization to make a table of valid options and their default values. */
-static void add_int(const char *name, const int value, options_t_check *check,
-                    const int count, ...)
-{
-  int ix, pos;
-  va_list va;
+static void add_int(const std::string& name, int value, CheckFunc check, const std::vector<int>& constraints = {}) {
+    Option opt;
+    opt.name = name;
+    opt.type = OPTION_INT;
+    opt.value = value;
+    opt.check = check;
+    opt.int_constraints = constraints;
+    options_map[to_lower(name)] = opt;
+}
 
-  pos = init_option(name, OPTION_INT);
-  options[pos].value.num = value;
-  options[pos].check = check;
-  options[pos].count = count;
-  if (count > 0)
-  {
-    options[pos].constraints = xcalloc(count, sizeof(int));
-    va_start(va, count);
-    for (ix = 0; ix < count; ix += 1)
-    {
-      ((int *)options[pos].constraints)[ix] = va_arg(va, int);
+static void add_bool(const std::string& name, bool value) {
+    Option opt;
+    opt.name = name;
+    opt.type = OPTION_BOOL;
+    opt.value = value;
+    opt.check = check_true;
+    options_map[to_lower(name)] = opt;
+}
+
+static void add_str(const std::string& name, const char* value, CheckFunc check, const std::vector<std::string>& s_constraints = {}, const std::vector<int>& i_constraints = {}) {
+    Option opt;
+    opt.name = name;
+    opt.type = OPTION_STR;
+    if (value) opt.value = std::optional<std::string>(value);
+    else opt.value = std::optional<std::string>(std::nullopt);
+    opt.check = check;
+    opt.str_constraints = s_constraints;
+    opt.int_constraints = i_constraints;
+    options_map[to_lower(name)] = opt;
+}
+
+static void add_path(const std::string& name, const char* value, CheckFunc check, const std::vector<std::string>& s_constraints = {}, const std::vector<int>& i_constraints = {}) {
+    Option opt;
+    opt.name = name;
+    opt.type = OPTION_PATH;
+    if (value && value[0] == '~') {
+        std::string path = std::string(get_home()) + "/" + ((value[1] == '/') ? value + 2 : value + 1);
+        if (path.size() >= PATH_MAX) fatal("Path too long!");
+        opt.value = std::optional<std::string>(path);
+    } else {
+        if (value) opt.value = std::optional<std::string>(value);
+        else opt.value = std::optional<std::string>(std::nullopt);
     }
-    va_end(va);
-  }
+    opt.check = check;
+    opt.str_constraints = s_constraints;
+    opt.int_constraints = i_constraints;
+    options_map[to_lower(name)] = opt;
 }
 
-/* Add a boolean option to the options table. This is intended to be used at
- * initialization to make a table of valid options and their default values. */
-static void add_bool(const char *name, const bool value)
-{
-  int pos;
+static void add_symb(const std::string& name, const char* value, const std::vector<std::string>& constraints) {
+    Option opt;
+    opt.name = name;
+    opt.type = OPTION_SYMB;
+    opt.check = check_discrete;
+    opt.str_constraints = constraints;
 
-  pos = init_option(name, OPTION_BOOL);
-  options[pos].value.boolean = value;
+    bool found = false;
+    for (const auto& c : constraints) {
+        if (!is_valid_symbol(c.c_str())) fatal("Invalid symbol in '%s' constraint list!", name.c_str());
+        if (strcasecmp(c.c_str(), value) == 0) {
+            opt.value = std::optional<std::string>(c);
+            found = true;
+            break;
+        }
+    }
+    if (!found) fatal("Invalid default value symbol in '%s'!", name.c_str());
+    options_map[to_lower(name)] = opt;
 }
 
-/* Add a string option to the options table. This is intended to be used at
- * initialization to make a table of valid options and their default values. */
-static void add_str(const char *name, const char *value, options_t_check *check,
-                    const int count, ...)
-{
-  int ix, pos;
-  va_list va;
+static void add_list(const std::string& name, const char* value, CheckFunc check, const std::vector<std::string>& s_constraints = {}, const std::vector<int>& i_constraints = {}) {
+    Option opt;
+    opt.name = name;
+    opt.type = OPTION_LIST;
+    lists_t_strs* list = lists_strs_new(8);
+    if (value) lists_strs_split(list, value, ":");
+    opt.value = list;
+    opt.check = check;
+    opt.str_constraints = s_constraints;
+    opt.int_constraints = i_constraints;
+    options_map[to_lower(name)] = opt;
+}
 
-  pos = init_option(name, OPTION_STR);
-  options[pos].value.str = xstrdup(value);
-  options[pos].check = check;
-  options[pos].count = count;
-  if (count > 0)
-  {
-    va_start(va, count);
-    if (check == check_length)
-    {
-      options[pos].constraints = xcalloc(count, sizeof(int));
-      for (ix = 0; ix < count; ix += 1)
-      {
-        ((int *)options[pos].constraints)[ix] = va_arg(va, int);
+/* Set an integer option to the value. */
+void options_set_int(const char *name, const int value)
+{
+  Option* opt = find_option(name, OPTION_INT);
+  if (!opt) fatal("Tried to set wrong option '%s'!", name);
+  opt->value = value;
+}
+
+/* Set a boolean option to the value. */
+void options_set_bool(const char *name, const bool value)
+{
+  Option* opt = find_option(name, OPTION_BOOL);
+  if (!opt) fatal("Tried to set wrong option '%s'!", name);
+  opt->value = value;
+}
+
+/* Set a symbol option to the value. */
+void options_set_symb(const char *name, const char *value)
+{
+  Option* opt = find_option(name, OPTION_SYMB);
+  if (!opt) fatal("Tried to set wrong option '%s'!", name);
+
+  bool found = false;
+  for (const auto& c : opt->str_constraints) {
+      if (strcasecmp(c.c_str(), value) == 0) {
+          opt->value = std::optional<std::string>(c);
+          found = true;
+          break;
       }
-    }
-    else
-    {
-      options[pos].constraints = xcalloc(count, sizeof(char *));
-      for (ix = 0; ix < count; ix += 1)
-      {
-        ((char **)options[pos].constraints)[ix] = xstrdup(va_arg(va, char *));
-      }
-    }
-    va_end(va);
   }
+  if (!found) fatal("Tried to set '%s' to unknown symbol '%s'!", name, value);
 }
 
-/* Add a path option to the options table. It differs from add_str only in that
- * respect that it parses initial ~ in path. */
-static void add_path(const char *name, const char *value,
-                     options_t_check *check, const int count, ...)
+/* Set a string option to the value. The string is duplicated. */
+void options_set_str(const char *name, const char *value)
 {
-  int ix, pos;
-  va_list va;
+  Option* opt = find_option(name, OPTION_STR);
+  if (!opt) fatal("Tried to set wrong option '%s'!", name);
+  opt->value = value ? std::optional<std::string>(value) : std::nullopt;
+}
 
-  pos = init_option(name, OPTION_PATH);
+/* Set a path option to the value. The string is duplicated. */
+void options_set_path(const char *name, const char *value)
+{
+  Option* opt = find_option(name, OPTION_PATH);
+  if (!opt) fatal("Tried to set wrong option '%s'!", name);
 
   if (value && value[0] == '~')
   {
@@ -421,227 +263,28 @@ static void add_path(const char *name, const char *value,
     {
       fatal("Path too long!");
     }
-    options[pos].value.str = xstrdup(path.c_str());
+    opt->value = std::optional<std::string>(path);
   }
   else
   {
-    options[pos].value.str = xstrdup(value);
-  }
-
-  options[pos].check = check;
-  options[pos].count = count;
-  if (count > 0)
-  {
-    va_start(va, count);
-    if (check == check_length)
-    {
-      options[pos].constraints = xcalloc(count, sizeof(int));
-      for (ix = 0; ix < count; ix += 1)
-      {
-        ((int *)options[pos].constraints)[ix] = va_arg(va, int);
-      }
-    }
-    else
-    {
-      options[pos].constraints = xcalloc(count, sizeof(char *));
-      for (ix = 0; ix < count; ix += 1)
-      {
-        ((char **)options[pos].constraints)[ix] = xstrdup(va_arg(va, char *));
-      }
-    }
-    va_end(va);
-  }
-}
-
-/* Add a symbol option to the options table. This is intended to be used at
- * initialization to make a table of valid options and their default values. */
-static void add_symb(const char *name, const char *value, const int count, ...)
-{
-  int ix, pos;
-  va_list va;
-
-  assert(name != NULL);
-  assert(value != NULL);
-  assert(count > 0);
-
-  pos = init_option(name, OPTION_SYMB);
-  options[pos].value.str = NULL;
-  options[pos].check = check_discrete;
-  options[pos].count = count;
-  va_start(va, count);
-  options[pos].constraints = xcalloc(count, sizeof(char *));
-  for (ix = 0; ix < count; ix += 1)
-  {
-    char *val = va_arg(va, char *);
-    if (!is_valid_symbol(val))
-    {
-      fatal("Invalid symbol in '%s' constraint list!", name);
-    }
-    ((char **)options[pos].constraints)[ix] = xstrdup(val);
-    if (!strcasecmp(val, value))
-    {
-      options[pos].value.str = ((char **)options[pos].constraints)[ix];
-    }
-  }
-  if (!options[pos].value.str)
-  {
-    fatal("Invalid default value symbol in '%s'!", name);
-  }
-  va_end(va);
-}
-
-/* Add a list option to the options table. This is intended to be used at
- * initialization to make a table of valid options and their default values. */
-static void add_list(const char *name, const char *value,
-                     options_t_check *check, const int count, ...)
-{
-  int ix, pos;
-  va_list va;
-
-  pos = init_option(name, OPTION_LIST);
-  options[pos].value.list = lists_strs_new(8);
-  if (value)
-  {
-    lists_strs_split(options[pos].value.list, value, ":");
-  }
-  options[pos].check = check;
-  options[pos].count = count;
-  if (count > 0)
-  {
-    va_start(va, count);
-    if (check == check_length)
-    {
-      options[pos].constraints = xcalloc(count, sizeof(int));
-      for (ix = 0; ix < count; ix += 1)
-      {
-        ((int *)options[pos].constraints)[ix] = va_arg(va, int);
-      }
-    }
-    else
-    {
-      options[pos].constraints = xcalloc(count, sizeof(char *));
-      for (ix = 0; ix < count; ix += 1)
-      {
-        ((char **)options[pos].constraints)[ix] = xstrdup(va_arg(va, char *));
-      }
-    }
-    va_end(va);
-  }
-}
-
-/* Set an integer option to the value. */
-void options_set_int(const char *name, const int value)
-{
-  int i = find_option(name, OPTION_INT);
-
-  if (i == -1)
-  {
-    fatal("Tried to set wrong option '%s'!", name);
-  }
-  options[i].value.num = value;
-}
-
-/* Set a boolean option to the value. */
-void options_set_bool(const char *name, const bool value)
-{
-  int i = find_option(name, OPTION_BOOL);
-
-  if (i == -1)
-  {
-    fatal("Tried to set wrong option '%s'!", name);
-  }
-  options[i].value.boolean = value;
-}
-
-/* Set a symbol option to the value. */
-void options_set_symb(const char *name, const char *value)
-{
-  int opt, ix;
-
-  opt = find_option(name, OPTION_SYMB);
-  if (opt == -1)
-  {
-    fatal("Tried to set wrong option '%s'!", name);
-  }
-
-  options[opt].value.str = NULL;
-  for (ix = 0; ix < options[opt].count; ix += 1)
-  {
-    if (!strcasecmp(value, (((char **)options[opt].constraints)[ix])))
-    {
-      options[opt].value.str = ((char **)options[opt].constraints)[ix];
-    }
-  }
-  if (!options[opt].value.str)
-  {
-    fatal("Tried to set '%s' to unknown symbol '%s'!", name, value);
-  }
-}
-
-/* Set a string option to the value. The string is duplicated. */
-void options_set_str(const char *name, const char *value)
-{
-  int opt = find_option(name, OPTION_STR);
-
-  if (opt == -1)
-  {
-    fatal("Tried to set wrong option '%s'!", name);
-  }
-
-  if (options[opt].value.str)
-  {
-    free(options[opt].value.str);
-  }
-  options[opt].value.str = xstrdup(value);
-}
-
-/* Set a path option to the value. The string is duplicated. */
-void options_set_path(const char *name, const char *value)
-{
-  int opt = find_option(name, OPTION_PATH);
-
-  if (opt == -1)
-  {
-    fatal("Tried to set wrong option '%s'!", name);
-  }
-
-  if (options[opt].value.str)
-  {
-    free(options[opt].value.str);
-  }
-
-  if (value[0] == '~')
-  {
-    std::string path = std::string(get_home()) + "/" +
-                       ((value[1] == '/') ? value + 2 : value + 1);
-    if (path.size() >= PATH_MAX)
-    {
-      fatal("Path too long!");
-    }
-    options[opt].value.str = xstrdup(path.c_str());
-  }
-  else
-  {
-    options[opt].value.str = xstrdup(value);
+    opt->value = value ? std::optional<std::string>(value) : std::nullopt;
   }
 }
 
 /* Set list option values to the colon separated value. */
 void options_set_list(const char *name, const char *value, bool append)
 {
-  int opt;
+  Option* opt = find_option(name, OPTION_LIST);
+  if (!opt) fatal("Tried to set wrong option '%s'!", name);
 
-  opt = find_option(name, OPTION_LIST);
-  if (opt == -1)
+  lists_t_strs* list = std::get<lists_t_strs*>(opt->value);
+  if (!append && !lists_strs_empty(list))
   {
-    fatal("Tried to set wrong option '%s'!", name);
+    lists_strs_clear(list);
   }
-
-  if (!append && !lists_strs_empty(options[opt].value.list))
-  {
-    lists_strs_clear(options[opt].value.list);
+  if (value) {
+    lists_strs_split(list, value, ":");
   }
-  lists_strs_split(options[opt].value.list, value, ":");
 }
 
 /* Given a type, a name and a value, set that option's value.
@@ -725,67 +368,50 @@ bool options_set_pair(const char *name, const char *value, bool append)
 
 void options_ignore_config(const char *name)
 {
-  int opt = find_option(name, OPTION_ANY);
-
-  if (opt == -1)
-  {
-    fatal("Tried to set wrong option '%s'!", name);
-  }
-
-  options[opt].ignore_in_config = 1;
+  Option* opt = find_option(name, OPTION_ANY);
+  if (!opt) fatal("Tried to set wrong option '%s'!", name);
+  opt->ignore_in_config = true;
 }
-
-#define CHECK_DISCRETE(c) check_discrete, (c)
-#define CHECK_RANGE(c) check_range, (2 * (c))
-#define CHECK_LENGTH(c) check_length, (2 * (c))
-#define CHECK_SYMBOL(c) (c)
-#define CHECK_FUNCTION check_function, 0
-#define CHECK_NONE check_true, 0
 
 /* Make a table of options and its default values. */
 void options_init()
 {
-  memset(options, 0, sizeof(options));
+  options_map.clear();
 
   add_bool("ReadTags", true);
-  add_path("MusicDir", NULL, CHECK_NONE);
+  add_path("MusicDir", NULL, check_true);
   add_bool("StartInMusicDir", false);
-  add_int("CircularLogSize", 0, CHECK_RANGE(1), 0, INT_MAX);
-  add_symb("Sort", "FileName", CHECK_SYMBOL(1), "FileName");
+  add_int("CircularLogSize", 0, check_range, {0, INT_MAX});
+  add_symb("Sort", "FileName", {"FileName"});
   add_bool("ShowStreamErrors", false);
   add_bool("MP3IgnoreCRCErrors", true);
   add_bool("Repeat", false);
   add_bool("Shuffle", false);
   add_bool("ForceShufflePlaylistOnly", false);
   add_bool("AutoNext", true);
-  add_str("FormatString", "%(n:%n :)%(a:%a - :)%(t:%t:)%(A: \\(%A\\):)",
-          CHECK_NONE);
-  add_int("InputBuffer", 512, CHECK_RANGE(1), 32, INT_MAX);
-  add_int("OutputBuffer", 128, CHECK_RANGE(1), 128, INT_MAX);
+  add_str("FormatString", "%(n:%n :)%(a:%a - :)%(t:%t:)%(A: \\(%A\\):)", check_true);
+  add_int("InputBuffer", 512, check_range, {32, INT_MAX});
+  add_int("OutputBuffer", 128, check_range, {128, INT_MAX});
 
 #ifdef OPENBSD
-  add_list("SoundDriver", "SNDIO:JACK:OSS", CHECK_DISCRETE(6), "SNDIO",
-           "PulseAudio", "Jack", "ALSA", "OSS", "null");
+  add_list("SoundDriver", "SNDIO:JACK:OSS", check_discrete, {"SNDIO", "PulseAudio", "Jack", "ALSA", "OSS", "null"});
 #else
-  add_list("SoundDriver", "PulseAudio:Jack:ALSA:OSS", CHECK_DISCRETE(6),
-           "SNDIO", "PulseAudio", "Jack", "ALSA", "OSS", "null");
+  add_list("SoundDriver", "PulseAudio:Jack:ALSA:OSS", check_discrete, {"SNDIO", "PulseAudio", "Jack", "ALSA", "OSS", "null"});
 #endif
 
-  add_str("JackClientName", "mocf", CHECK_NONE);
+  add_str("JackClientName", "mocf", check_true);
   add_bool("JackStartServer", false);
-  add_str("JackOutLeft", "system:playback_1", CHECK_NONE);
-  add_str("JackOutRight", "system:playback_2", CHECK_NONE);
+  add_str("JackOutLeft", "system:playback_1", check_true);
+  add_str("JackOutRight", "system:playback_2", check_true);
 
-  add_str("OSSDevice", "/dev/dsp", CHECK_NONE);
-  add_str("OSSMixerDevice", "/dev/mixer", CHECK_NONE);
-  add_symb("OSSMixerChannel1", "pcm", CHECK_SYMBOL(3), "pcm", "master",
-           "speaker");
-  add_symb("OSSMixerChannel2", "master", CHECK_SYMBOL(3), "pcm", "master",
-           "speaker");
+  add_str("OSSDevice", "/dev/dsp", check_true);
+  add_str("OSSMixerDevice", "/dev/mixer", check_true);
+  add_symb("OSSMixerChannel1", "pcm", {"pcm", "master", "speaker"});
+  add_symb("OSSMixerChannel2", "master", {"pcm", "master", "speaker"});
 
-  add_str("ALSADevice", "default", CHECK_NONE);
-  add_str("ALSAMixer1", "PCM", CHECK_NONE);
-  add_str("ALSAMixer2", "Master", CHECK_NONE);
+  add_str("ALSADevice", "default", check_true);
+  add_str("ALSAMixer1", "PCM", check_true);
+  add_str("ALSAMixer2", "Master", check_true);
 
   add_bool("Softmixer_SaveState", true);
   add_bool("Equalizer_SaveState", true);
@@ -793,11 +419,10 @@ void options_init()
   add_bool("ShowHiddenFiles", false);
   add_bool("HideFileExtension", false);
   add_bool("ShowFormat", true);
-  add_symb("ShowTime", "IfAvailable", CHECK_SYMBOL(3), "yes", "no",
-           "IfAvailable");
+  add_symb("ShowTime", "IfAvailable", {"yes", "no", "IfAvailable"});
   add_bool("ShowTimePercent", false);
 
-  add_list("ScreenTerms", "screen:screen-w:vt100", CHECK_NONE);
+  add_list("ScreenTerms", "screen:screen-w:vt100", check_true);
 
   add_list("XTerms",
            "xterm:"
@@ -806,15 +431,15 @@ void options_init()
            "rxvt:rxvt-unicode:"
            "rxvt-unicode-256colour:rxvt-unicode-256color:"
            "eterm",
-           CHECK_NONE);
+           check_true);
 
-  add_str("Theme", NULL, CHECK_NONE);
-  add_str("XTermTheme", NULL, CHECK_NONE);
-  add_str("ForceTheme", NULL, CHECK_NONE); /* Used when -T is set */
-  add_path("MOCDir", "~/.mocf", CHECK_NONE);
+  add_str("Theme", NULL, check_true);
+  add_str("XTermTheme", NULL, check_true);
+  add_str("ForceTheme", NULL, check_true);
+  add_path("MOCDir", "~/.mocf", check_true);
   add_bool("UseMMap", false);
   add_bool("UseMimeMagic", false);
-  add_str("ID3v1TagsEncoding", "WINDOWS-1250", CHECK_NONE);
+  add_str("ID3v1TagsEncoding", "WINDOWS-1250", check_true);
   add_bool("EnforceTagsEncoding", false);
   add_bool("FileNamesIconv", false);
   add_bool("NonUTFXterm", false);
@@ -822,22 +447,22 @@ void options_init()
   add_bool("SavePlaylist", true);
 
   add_bool("SavePlaylistTags", false);
-  add_str("Keymap", NULL, CHECK_NONE);
+  add_str("Keymap", NULL, check_true);
   add_bool("ASCIILines", false);
 
-  add_path("FastDir1", NULL, CHECK_NONE);
-  add_path("FastDir2", NULL, CHECK_NONE);
-  add_path("FastDir3", NULL, CHECK_NONE);
-  add_path("FastDir4", NULL, CHECK_NONE);
-  add_path("FastDir5", NULL, CHECK_NONE);
-  add_path("FastDir6", NULL, CHECK_NONE);
-  add_path("FastDir7", NULL, CHECK_NONE);
-  add_path("FastDir8", NULL, CHECK_NONE);
-  add_path("FastDir9", NULL, CHECK_NONE);
-  add_path("FastDir10", NULL, CHECK_NONE);
+  add_path("FastDir1", NULL, check_true);
+  add_path("FastDir2", NULL, check_true);
+  add_path("FastDir3", NULL, check_true);
+  add_path("FastDir4", NULL, check_true);
+  add_path("FastDir5", NULL, check_true);
+  add_path("FastDir6", NULL, check_true);
+  add_path("FastDir7", NULL, check_true);
+  add_path("FastDir8", NULL, check_true);
+  add_path("FastDir9", NULL, check_true);
+  add_path("FastDir10", NULL, check_true);
 
-  add_int("SeekTime", 1, CHECK_RANGE(1), 1, INT_MAX);
-  add_int("SilentSeekTime", 5, CHECK_RANGE(1), 1, INT_MAX);
+  add_int("SeekTime", 1, check_range, {1, INT_MAX});
+  add_int("SilentSeekTime", 5, check_range, {1, INT_MAX});
 
   add_list("PreferredDecoders",
            "aac(aac,ffmpeg):m4a(ffmpeg):"
@@ -852,24 +477,21 @@ void options_init()
            "flac(flac,*,ffmpeg):"
            "opus(opus,ffmpeg):"
            "spx(speex)",
-           CHECK_FUNCTION);
+           check_function);
 
-  add_symb("ResampleMethod", "Linear", CHECK_SYMBOL(5), "SincBestQuality",
-           "SincMediumQuality", "SincFastest", "ZeroOrderHold", "Linear");
-  add_int("EnableResample", 1, CHECK_RANGE(1), 0, 2);
-  add_int("MaxSamplerate", 0, CHECK_RANGE(1), 0, 500000);
-  add_int("MaxChannels", 0, CHECK_RANGE(1), 0, 500000);
-  add_list("MaskOutputFormats", "", CHECK_NONE);
-  add_int("MixerBarWidth", 30, CHECK_RANGE(1), 10, INT_MAX);
+  add_symb("ResampleMethod", "Linear", {"SincBestQuality", "SincMediumQuality", "SincFastest", "ZeroOrderHold", "Linear"});
+  add_int("EnableResample", 1, check_range, {0, 2});
+  add_int("MaxSamplerate", 0, check_range, {0, 500000});
+  add_int("MaxChannels", 0, check_range, {0, 500000});
+  add_list("MaskOutputFormats", "", check_true);
+  add_int("MixerBarWidth", 30, check_range, {10, INT_MAX});
   add_bool("UseRealtimePriority", false);
-  add_int("TagsCacheSize", 256, CHECK_RANGE(1), 0, INT_MAX);
+  add_int("TagsCacheSize", 256, check_range, {0, INT_MAX});
   add_bool("PlaylistNumbering", true);
 
-  add_list("Layout1", "directory(0,0,50%,100%):playlist(50%,0,FILL,100%)",
-           CHECK_FUNCTION);
-  add_list("Layout2", "directory(0,0,100%,100%):playlist(0,0,100%,100%)",
-           CHECK_FUNCTION);
-  add_list("Layout3", NULL, CHECK_FUNCTION);
+  add_list("Layout1", "directory(0,0,50%,100%):playlist(50%,0,FILL,100%)", check_function);
+  add_list("Layout2", "directory(0,0,100%,100%):playlist(0,0,100%,100%)", check_function);
+  add_list("Layout3", NULL, check_function);
 
   add_bool("FollowPlayedFile", true);
 
@@ -879,45 +501,42 @@ void options_init()
   add_bool("PlaylistFullPaths", true);
   add_bool("SaveRelativePlaylists", true);
 
-  add_str("BlockDecorators", "`\"'", CHECK_LENGTH(1), 3, 3);
-  add_int("MessageLingerTime", 3, CHECK_RANGE(1), 0, INT_MAX);
+  add_str("BlockDecorators", "`\"'", check_length, {}, {3, 3});
+  add_int("MessageLingerTime", 3, check_range, {0, INT_MAX});
   add_bool("PrefixQueuedMessages", true);
-  add_str("ErrorMessagesQueued", "!", CHECK_NONE);
+  add_str("ErrorMessagesQueued", "!", check_true);
 
   add_bool("ModPlug_Oversampling", true);
   add_bool("ModPlug_NoiseReduction", true);
   add_bool("ModPlug_Reverb", false);
   add_bool("ModPlug_MegaBass", false);
   add_bool("ModPlug_Surround", false);
-  add_symb("ModPlug_ResamplingMode", "FIR", CHECK_SYMBOL(4), "FIR", "SPLINE",
-           "LINEAR", "NEAREST");
-  add_int("ModPlug_Channels", 2, CHECK_DISCRETE(2), 1, 2);
-  add_int("ModPlug_Bits", 16, CHECK_DISCRETE(3), 8, 16, 32);
-  add_int("ModPlug_Frequency", 48000, CHECK_DISCRETE(4), 11025, 22050, 44100,
-          48000);
-  add_int("ModPlug_ReverbDepth", 0, CHECK_RANGE(1), 0, 100);
-  add_int("ModPlug_ReverbDelay", 0, CHECK_RANGE(1), 0, INT_MAX);
-  add_int("ModPlug_BassAmount", 0, CHECK_RANGE(1), 0, 100);
-  add_int("ModPlug_BassRange", 10, CHECK_RANGE(1), 10, 100);
-  add_int("ModPlug_SurroundDepth", 0, CHECK_RANGE(1), 0, 100);
-  add_int("ModPlug_SurroundDelay", 0, CHECK_RANGE(1), 0, INT_MAX);
-  add_int("ModPlug_LoopCount", 0, CHECK_RANGE(1), -1, INT_MAX);
-  add_int("ModPlug_MaxFileSize", 32 * 1024 * 1024, CHECK_RANGE(1), 1, INT_MAX);
+  add_symb("ModPlug_ResamplingMode", "FIR", {"FIR", "SPLINE", "LINEAR", "NEAREST"});
+  add_int("ModPlug_Channels", 2, check_discrete, {1, 2});
+  add_int("ModPlug_Bits", 16, check_discrete, {8, 16, 32});
+  add_int("ModPlug_Frequency", 48000, check_discrete, {11025, 22050, 44100, 48000});
+  add_int("ModPlug_ReverbDepth", 0, check_range, {0, 100});
+  add_int("ModPlug_ReverbDelay", 0, check_range, {0, INT_MAX});
+  add_int("ModPlug_BassAmount", 0, check_range, {0, 100});
+  add_int("ModPlug_BassRange", 10, check_range, {10, 100});
+  add_int("ModPlug_SurroundDepth", 0, check_range, {0, 100});
+  add_int("ModPlug_SurroundDelay", 0, check_range, {0, INT_MAX});
+  add_int("ModPlug_LoopCount", 0, check_range, {-1, INT_MAX});
+  add_int("ModPlug_MaxFileSize", 32 * 1024 * 1024, check_range, {1, INT_MAX});
 
-
-  add_int("SidPlayFP_DefaultSongLength", 180, CHECK_RANGE(1), 0, INT_MAX);
-  add_int("SidPlayFP_MinimumSongLength", 0, CHECK_RANGE(1), 0, INT_MAX);
-  add_str("SidPlayFP_Database", NULL, CHECK_NONE);
-  add_int("SidPlayFP_Frequency", 48000, CHECK_RANGE(1), 4000, 48000);
+  add_int("SidPlayFP_DefaultSongLength", 180, check_range, {0, INT_MAX});
+  add_int("SidPlayFP_MinimumSongLength", 0, check_range, {0, INT_MAX});
+  add_str("SidPlayFP_Database", NULL, check_true);
+  add_int("SidPlayFP_Frequency", 48000, check_range, {4000, 48000});
   add_bool("SidPlayFP_StartAtStart", true);
   add_bool("SidPlayFP_PlaySubTunes", true);
-  add_int("SidPlayFP_SIDModel", 0, CHECK_RANGE(1), 0, 2);
+  add_int("SidPlayFP_SIDModel", 0, check_range, {0, 2});
 
   add_bool("AAC_HEAACUpsampling", true);
 
-  add_path("OnEngineStart", NULL, CHECK_NONE);
-  add_path("OnEngineStop", NULL, CHECK_NONE);
-  add_path("OnStop", NULL, CHECK_NONE);
+  add_path("OnEngineStart", NULL, check_true);
+  add_path("OnEngineStop", NULL, check_true);
+  add_path("OnStop", NULL, check_true);
 
   add_bool("QueueNextSongReturn", false);
 }
@@ -925,14 +544,9 @@ void options_init()
 /* Return 1 if a parameter to an integer option is valid. */
 int options_check_int(const char *name, const int val)
 {
-  int opt;
-
-  opt = find_option(name, OPTION_INT);
-  if (opt == -1)
-  {
-    return 0;
-  }
-  return options[opt].check(opt, val);
+  Option* opt = find_option(name, OPTION_INT);
+  if (!opt) return 0;
+  return opt->check(*opt, val, "") ? 1 : 0;
 }
 
 /* Return 1 if a parameter to a boolean option is valid.  This may seem
@@ -941,101 +555,52 @@ int options_check_int(const char *name, const int val)
  * other types. */
 int options_check_bool(const char *name, const bool val)
 {
-  int opt, result = 0;
-
-  opt = find_option(name, OPTION_BOOL);
-  if (opt == -1)
-  {
-    return 0;
-  }
-  if (val == true || val == false)
-  {
-    result = 1;
-  }
-  return result;
+  Option* opt = find_option(name, OPTION_BOOL);
+  if (!opt) return 0;
+  return 1;
 }
 
 /* Return 1 if a parameter to a string option is valid. */
 int options_check_str(const char *name, const char *val)
 {
-  int opt;
-
-  opt = find_option(name, OPTION_STR);
-  if (opt == -1)
-  {
-    opt = find_option(name, OPTION_PATH);
-  }
-  if (opt == -1)
-  {
-    return 0;
-  }
-  return options[opt].check(opt, val);
+  Option* opt = find_option(name, OPTION_STR | OPTION_PATH);
+  if (!opt) return 0;
+  return opt->check(*opt, 0, val ? val : "") ? 1 : 0;
 }
 
 /* Return 1 if a parameter to a symbol option is valid. */
 int options_check_symb(const char *name, const char *val)
 {
-  int opt;
-
-  opt = find_option(name, OPTION_SYMB);
-  if (opt == -1)
-  {
-    return 0;
-  }
-  return check_discrete(opt, val);
+  Option* opt = find_option(name, OPTION_SYMB);
+  if (!opt) return 0;
+  return check_discrete(*opt, 0, val ? val : "") ? 1 : 0;
 }
 
 /* Return 1 if a parameter to a list option is valid. */
 int options_check_list(const char *name, const char *val)
 {
-  int opt, size, ix, result;
-  lists_t_strs *list;
+  Option* opt = find_option(name, OPTION_LIST);
+  if (!opt) return 0;
 
-  assert(name);
-  assert(val);
-
-  opt = find_option(name, OPTION_LIST);
-  if (opt == -1)
-  {
-    return 0;
+  lists_t_strs* list = lists_strs_new(8);
+  int size = lists_strs_split(list, val, ":");
+  int result = 1;
+  for (int ix = 0; ix < size; ix += 1) {
+      if (!opt->check(*opt, 0, lists_strs_at(list, ix))) {
+          result = 0;
+          break;
+      }
   }
-
-  list = lists_strs_new(8);
-  size = lists_strs_split(list, val, ":");
-  result = 1;
-  for (ix = 0; ix < size; ix += 1)
-  {
-    if (!options[opt].check(opt, lists_strs_at(list, ix).c_str()))
-    {
-      result = 0;
-      break;
-    }
-  }
-
   lists_strs_free(list);
-
   return result;
 }
 
 /* Return 1 if the named option was defaulted. */
 int options_was_defaulted(const char *name)
 {
-  int opt, result = 0;
-
-  assert(name);
-
-  opt = find_option(name, OPTION_ANY);
-  if (opt == -1)
-  {
-    return 0;
-  }
-
-  if (!options[opt].set_in_config && !options[opt].ignore_in_config)
-  {
-    result = 1;
-  }
-
-  return result;
+  Option* opt = find_option(name, OPTION_ANY);
+  if (!opt) return 0;
+  return (!opt->set_in_config && !opt->ignore_in_config) ? 1 : 0;
 }
 
 /* Find and substitute variables enclosed by '${...}'.  Variables are
@@ -1116,7 +681,7 @@ static char *substitute_variable(const char *name_in, const char *value_in)
 
     /* Fetch environment variable or configuration option value. */
     value = xstrdup(getenv(name));
-    if (value == NULL && find_option(name, OPTION_ANY) != -1)
+    if (value == NULL && find_option(name, OPTION_ANY) != nullptr)
     {
       char buf[16];
       lists_t_strs *list;
@@ -1187,29 +752,25 @@ static char *substitute_variable(const char *name_in, const char *value_in)
 /* Set an option read from the configuration file. Return false on error. */
 static bool set_option(const char *name, const char *value_in, bool append)
 {
-  int i;
-  char *value;
-
-  i = find_option(name, OPTION_ANY);
-  if (i == -1)
-  {
-    fprintf(stderr, "Wrong option name: '%s'.", name);
-    return false;
+  Option* opt = find_option(name, OPTION_ANY);
+  if (!opt) {
+      fprintf(stderr, "Wrong option name: '%s'.", name);
+      return false;
   }
 
-  if (options[i].ignore_in_config)
+  if (opt->ignore_in_config)
   {
     return true;
   }
 
-  if (append && options[i].type != OPTION_LIST)
+  if (append && opt->type != OPTION_LIST)
   {
     fprintf(stderr, "Only list valued options can be appended to ('%s').",
             name);
     return false;
   }
 
-  if (!append && options[i].set_in_config)
+  if (!append && opt->set_in_config)
   {
     fprintf(stderr,
             "Tried to set an option that has been already "
@@ -1218,13 +779,14 @@ static bool set_option(const char *name, const char *value_in, bool append)
     return false;
   }
 
-  options[i].set_in_config = 1;
+  opt->set_in_config = true;
 
   /* Substitute environmental variables. */
-  value = substitute_variable(name, value_in);
+  char *value = substitute_variable(name, value_in);
 
   if (!options_set_pair(name, value, append))
   {
+    free(value);
     return false;
   }
 
@@ -1428,122 +990,56 @@ void options_parse(const char *config_file)
 
 void options_free()
 {
-  int i, ix;
-
-  for (i = 0; i < options_num; i++)
-  {
-    if (options[i].type & (OPTION_STR | OPTION_PATH) && options[i].value.str)
-    {
-      free(options[i].value.str);
-      options[i].value.str = NULL;
-    }
-    else if (options[i].type == OPTION_LIST)
-    {
-      lists_strs_free(options[i].value.list);
-      options[i].value.list = NULL;
-      for (ix = 0; ix < options[i].count; ix += 1)
-      {
-        free(((char **)options[i].constraints)[ix]);
+  for (auto& [key, opt] : options_map) {
+      if (opt.type == OPTION_LIST) {
+          lists_strs_free(std::get<lists_t_strs*>(opt.value));
       }
-    }
-    else if (options[i].type == OPTION_SYMB)
-    {
-      options[i].value.str = NULL;
-    }
-    if (options[i].type & (OPTION_STR | OPTION_PATH | OPTION_SYMB))
-    {
-      if (options[i].check != check_length)
-      {
-        for (ix = 0; ix < options[i].count; ix += 1)
-        {
-          free(((char **)options[i].constraints)[ix]);
-        }
-      }
-    }
-    options[i].check = check_true;
-    options[i].count = 0;
-    if (options[i].constraints)
-    {
-      free(options[i].constraints);
-    }
-    options[i].constraints = NULL;
   }
+  options_map.clear();
 }
 
 int options_get_int(const char *name)
 {
-  int i = find_option(name, OPTION_INT);
-
-  if (i == -1)
-  {
-    fatal("Tried to get wrong option '%s'!", name);
-  }
-
-  return options[i].value.num;
+  Option* opt = find_option(name, OPTION_INT);
+  if (!opt) fatal("Tried to get wrong option '%s'!", name);
+  return std::get<int>(opt->value);
 }
 
 bool options_get_bool(const char *name)
 {
-  int i = find_option(name, OPTION_BOOL);
-
-  if (i == -1)
-  {
-    fatal("Tried to get wrong option '%s'!", name);
-  }
-
-  return options[i].value.boolean;
+  Option* opt = find_option(name, OPTION_BOOL);
+  if (!opt) fatal("Tried to get wrong option '%s'!", name);
+  return std::get<bool>(opt->value);
 }
 
-char *options_get_str(const char *name)
+const char *options_get_str(const char *name)
 {
-  int i = find_option(name, OPTION_STR);
-
-  if (i == -1)
-  {
-    i = find_option(name, OPTION_PATH);
-  }
-  if (i == -1)
-  {
-    fatal("Tried to get wrong option '%s'!", name);
-  }
-
-  return options[i].value.str;
+  Option* opt = find_option(name, OPTION_STR | OPTION_PATH);
+  if (!opt) fatal("Tried to get wrong option '%s'!", name);
+  auto& val = std::get<std::optional<std::string>>(opt->value);
+  return val ? val.value().c_str() : nullptr;
 }
 
-char *options_get_symb(const char *name)
+const char *options_get_symb(const char *name)
 {
-  int i = find_option(name, OPTION_SYMB);
-
-  if (i == -1)
-  {
-    fatal("Tried to get wrong option '%s'!", name);
-  }
-
-  return options[i].value.str;
+  Option* opt = find_option(name, OPTION_SYMB);
+  if (!opt) fatal("Tried to get wrong option '%s'!", name);
+  auto& val = std::get<std::optional<std::string>>(opt->value);
+  return val ? val.value().c_str() : nullptr;
 }
 
 lists_t_strs *options_get_list(const char *name)
 {
-  int i = find_option(name, OPTION_LIST);
-
-  if (i == -1)
-  {
-    fatal("Tried to get wrong option '%s'!", name);
-  }
-
-  return options[i].value.list;
+  Option* opt = find_option(name, OPTION_LIST);
+  if (!opt) fatal("Tried to get wrong option '%s'!", name);
+  return std::get<lists_t_strs*>(opt->value);
 }
 
 enum option_type options_get_type(const char *name)
 {
-  int i = find_option(name, OPTION_ANY);
-
-  if (i == -1)
-  {
-    return OPTION_FREE;
-  }
-
-  return options[i].type;
+  Option* opt = find_option(name, OPTION_ANY);
+  if (!opt) return OPTION_FREE;
+  return opt->type;
 }
 
 // EOF

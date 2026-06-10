@@ -597,7 +597,7 @@ enum key_cmd get_key_cmd(const enum key_context context,
 /* Return the path to the keymap file or NULL if none was specified. */
 static char *find_keymap_file()
 {
-  char *file;
+  const char *file;
   static char path[PATH_MAX];
 
   if ((file = options_get_str("Keymap")))

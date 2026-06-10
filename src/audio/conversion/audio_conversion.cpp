@@ -812,7 +812,7 @@ int audio_conv_new(struct audio_conversion *conv,
 #ifdef HAVE_SAMPLERATE
     int err;
     int resample_type = -1;
-    char *method = options_get_symb("ResampleMethod");
+    const char *method = options_get_symb("ResampleMethod");
 
     if (!strcasecmp(method, "SincBestQuality"))
     {
