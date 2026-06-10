@@ -24,7 +24,8 @@
 #endif
 
 #include "library/files.h"
-#include "utils/rbtree.h"
+#include <map>
+#include <string>
 
 #ifdef __cplusplus
 extern "C"
@@ -102,7 +103,7 @@ extern "C"
     int info_attr_sel_marked;
     int number_items; /* display item number (position) */
 
-    struct rb_tree *search_tree; /* RB tree for searching by file name */
+    std::map<std::string, struct menu_item*> search_tree; /* Map for searching by file name */
   };
 
   /* Menu state: relative (to the first item) positions of the top and selected

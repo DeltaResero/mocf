@@ -20,7 +20,7 @@
 
 #include "core/common.h"
 #include "ui/curses/menu.h"
-#include "utils/rbtree.h"
+
 #include "utils/utf8.h"
 
 /* Draw menu item on a given position from the top of the menu. */
@@ -223,23 +223,7 @@ void menu_set_cursor(const struct menu *m)
   }
 }
 
-static int rb_compare(const void *a, const void *b,
-                      const void *unused ATTR_UNUSED)
-{
-  struct menu_item *mia = (struct menu_item *)a;
-  struct menu_item *mib = (struct menu_item *)b;
 
-  return strcmp(mia->file, mib->file);
-}
-
-static int rb_fname_compare(const void *key, const void *data,
-                            const void *unused ATTR_UNUSED)
-{
-  const char *fname = (const char *)key;
-  const struct menu_item *mi = (const struct menu_item *)data;
-
-  return strcmp(fname, mi->file);
-}
 
 /* menu_items must be malloc()ed memory! */
 struct menu *menu_new(WINDOW *win, const int posx, const int posy,
@@ -274,7 +258,6 @@ struct menu *menu_new(WINDOW *win, const int posx, const int posy,
   menu->info_attr_sel_marked = A_NORMAL;
   menu->number_items = 0;
 
-  menu->search_tree = rb_tree_new(rb_compare, rb_fname_compare, NULL);
 
   return menu;
 }
@@ -326,7 +309,7 @@ struct menu_item *menu_add(struct menu *menu, const char *title,
 
   if (file)
   {
-    rb_insert(menu->search_tree, (void *)mi);
+    menu->search_tree[file] = mi;
   }
 
   menu->last = mi;
@@ -435,7 +418,7 @@ void menu_free(struct menu *menu)
     mi = next;
   }
 
-  rb_tree_free(menu->search_tree);
+  menu->search_tree.clear();
 
   delete menu;
 }
@@ -787,18 +770,16 @@ int menu_nitems(const struct menu *menu)
 
 struct menu_item *menu_find(struct menu *menu, const char *fname)
 {
-  struct rb_node *x;
-
   assert(menu != NULL);
   assert(fname != NULL);
 
-  x = rb_search(menu->search_tree, fname);
-  if (rb_is_null(x))
+  auto it = menu->search_tree.find(fname);
+  if (it == menu->search_tree.end())
   {
     return NULL;
   }
 
-  return (struct menu_item *)rb_get_data(x);
+  return it->second;
 }
 
 void menu_mark_item(struct menu *menu, const char *file)
@@ -868,7 +849,7 @@ static void menu_delete(struct menu *menu, struct menu_item *mi)
 
   if (mi->file)
   {
-    rb_delete(menu->search_tree, mi->file);
+    menu->search_tree.erase(mi->file);
   }
 
   menu->nitems--;
