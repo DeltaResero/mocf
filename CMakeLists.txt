@@ -337,7 +337,7 @@ set(MOCF_SOURCES
     src/io/io.cpp
     src/core/compat.cpp
     src/audio/conversion/audio_conversion.cpp
-    src/utils/rbtree.cpp
+
     src/library/tags_cache.cpp
     src/utils/utf8.cpp
     src/audio/processing/softmixer.cpp

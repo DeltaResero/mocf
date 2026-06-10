@@ -785,11 +785,11 @@ void plist_shuffle(struct plist *plist)
     plist_swap(plist, i, rand() % (i + 1));
   }
 
-  rb_tree_clear(plist->search_tree);
+  plist->search_tree.clear();
 
   for (i = 0; i < plist->num; i++)
   {
-    rb_insert(plist->search_tree, (void *)(intptr_t)i);
+    plist->search_tree[plist->items[i].file] = i;
   }
 }
 
@@ -805,11 +805,11 @@ void plist_swap_first_fname(struct plist *plist, const char *fname)
 
   if (i != -1 && i != 0)
   {
-    rb_delete(plist->search_tree, fname);
-    rb_delete(plist->search_tree, plist->items[0].file.c_str());
+    plist->search_tree.erase(fname);
+    plist->search_tree.erase(plist->items[0].file);
     plist_swap(plist, 0, i);
-    rb_insert(plist->search_tree, NULL);
-    rb_insert(plist->search_tree, (void *)(intptr_t)i);
+    plist->search_tree[plist->items[0].file] = 0;
+    plist->search_tree[plist->items[i].file] = i;
   }
 }
 
@@ -933,24 +933,16 @@ struct file_tags *plist_get_tags(const struct plist *plist, const int num)
 /* Swap two files on the playlist. */
 void plist_swap_files(struct plist *plist, const char *file1, const char *file2)
 {
-  struct rb_node *x1, *x2;
+  auto it1 = plist->search_tree.find(file1);
+  auto it2 = plist->search_tree.find(file2);
 
-  assert(plist != NULL);
-  assert(file1 != NULL);
-  assert(file2 != NULL);
-
-  x1 = rb_search(plist->search_tree, file1);
-  x2 = rb_search(plist->search_tree, file2);
-
-  if (!rb_is_null(x1) && !rb_is_null(x2))
+  if (it1 != plist->search_tree.end() && it2 != plist->search_tree.end())
   {
-    const void *t;
+    plist_swap(plist, it1->second, it2->second);
 
-    plist_swap(plist, (intptr_t)rb_get_data(x1), (intptr_t)rb_get_data(x2));
-
-    t = rb_get_data(x1);
-    rb_set_data(x1, rb_get_data(x2));
-    rb_set_data(x2, t);
+    int t = it1->second;
+    it1->second = it2->second;
+    it2->second = t;
   }
 }
 

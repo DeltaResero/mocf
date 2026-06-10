@@ -43,7 +43,7 @@ typedef unsigned long int u_long;
 #include "core/common.h"
 #include "core/server.h"
 #include "library/playlist.h"
-#include "utils/rbtree.h"
+
 #include "library/files.h"
 #include "library/tags_cache.h"
 #include "core/log.h"
