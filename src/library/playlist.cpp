@@ -31,7 +31,7 @@
 #include "core/log.h"
 #include "core/options.h"
 #include "library/files.h"
-#include "utils/rbtree.h"
+
 #include "utils/utf8.h"
 
 /* Initial size of the table */
@@ -121,25 +121,7 @@ struct file_tags *tags_dup(const struct file_tags *tags)
   return dtags;
 }
 
-static int rb_compare(const void *a, const void *b, const void *adata)
-{
-  struct plist *plist = (struct plist *)adata;
-  int pos_a = (intptr_t)a;
-  int pos_b = (intptr_t)b;
 
-  return strcoll(plist->items[pos_a].file.c_str(),
-                 plist->items[pos_b].file.c_str());
-}
-
-static int rb_fname_compare(const void *key, const void *data,
-                            const void *adata)
-{
-  struct plist *plist = (struct plist *)adata;
-  const char *fname = (const char *)key;
-  const int pos = (intptr_t)data;
-
-  return strcoll(fname, plist->items[pos].file.c_str());
-}
 
 /* Return 1 if an item has 'deleted' flag. */
 inline int plist_deleted(const struct plist *plist, const int num)
@@ -155,7 +137,6 @@ void plist_init(struct plist *plist)
   plist->num = 0;
   plist->not_deleted = 0;
   plist->items.reserve(INIT_SIZE);
-  plist->search_tree = rb_tree_new(rb_compare, rb_fname_compare, plist);
   plist->total_time = 0;
   plist->items_with_time = 0;
 }
@@ -193,8 +174,7 @@ int plist_add(struct plist *plist, const char *file_name)
 
   if (file_name)
   {
-    rb_delete(plist->search_tree, file_name);
-    rb_insert(plist->search_tree, (void *)(intptr_t)new_idx);
+    plist->search_tree[file_name] = new_idx;
   }
 
   plist->not_deleted++;
@@ -308,7 +288,7 @@ void plist_clear(struct plist *plist)
   plist->items.clear();
   plist->num = 0;
   plist->not_deleted = 0;
-  rb_tree_clear(plist->search_tree);
+  plist->search_tree.clear();
   plist->total_time = 0;
   plist->items_with_time = 0;
 }
@@ -320,13 +300,12 @@ void plist_free(struct plist *plist)
 
   plist_clear(plist);
   plist->items.shrink_to_fit();
-  rb_tree_free(plist->search_tree);
+  plist->search_tree.clear();
 }
 
 /* Sort the playlist by file names. */
 void plist_sort_fname(struct plist *plist)
 {
-  struct rb_node *x;
   int n;
 
   if (plist_count(plist) == 0)
@@ -337,30 +316,20 @@ void plist_sort_fname(struct plist *plist)
   std::vector<plist_item> sorted;
   sorted.reserve(plist_count(plist));
 
-  x = rb_min(plist->search_tree);
-  assert(!rb_is_null(x));
-
-  while (plist_deleted(plist, (intptr_t)rb_get_data(x)))
+  for (const auto& pair : plist->search_tree)
   {
-    x = rb_next(x);
-  }
-
-  sorted.push_back(std::move(plist->items[(intptr_t)rb_get_data(x)]));
-  rb_set_data(x, nullptr); /* index 0 stored as NULL */
-
-  while (!rb_is_null(x = rb_next(x)))
-  {
-    if (!plist_deleted(plist, (intptr_t)rb_get_data(x)))
+    if (!plist_deleted(plist, pair.second))
     {
-      sorted.push_back(std::move(plist->items[(intptr_t)rb_get_data(x)]));
-      rb_set_data(x, (void *)(intptr_t)(sorted.size() - 1));
+      sorted.push_back(std::move(plist->items[pair.second]));
     }
   }
 
   n = (int)sorted.size();
+  plist->search_tree.clear();
   for (int i = 0; i < n; i++)
   {
     plist->items[i] = std::move(sorted[i]);
+    plist->search_tree[plist->items[i].file] = i;
   }
   plist->items.resize(n);
 
@@ -371,21 +340,17 @@ void plist_sort_fname(struct plist *plist)
 /* Find an item in the list.  Return the index or -1 if not found. */
 int plist_find_fname(struct plist *plist, const char *file)
 {
-  struct rb_node *x;
-
   assert(plist != NULL);
   assert(file != NULL);
 
-  x = rb_search(plist->search_tree, file);
+  auto it = plist->search_tree.find(file);
 
-  if (rb_is_null(x))
+  if (it == plist->search_tree.end())
   {
     return -1;
   }
 
-  return !plist_deleted(plist, (intptr_t)rb_get_data(x))
-             ? (intptr_t)rb_get_data(x)
-             : -1;
+  return !plist_deleted(plist, it->second) ? it->second : -1;
 }
 
 /* Find an item in the list; also find deleted items.  If there is more than
@@ -702,13 +667,13 @@ void plist_set_file(struct plist *plist, const int num, const char *file)
 
   if (!plist->items[num].file.empty())
   {
-    rb_delete(plist->search_tree, file);
+    plist->search_tree.erase(plist->items[num].file);
   }
 
   plist->items[num].file = file;
   plist->items[num].type = file_type(file);
   plist->items[num].mtime = get_mtime(file);
-  rb_insert(plist->search_tree, (void *)(intptr_t)num);
+  plist->search_tree[file] = num;
 }
 
 /* Add the content of playlist b to a by copying items. */

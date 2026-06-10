@@ -12,10 +12,11 @@
 #define PLAYLIST_H
 
 #include <string>
+#include <cstring>
 #include <vector>
 #include <sys/types.h>
 
-#include "utils/rbtree.h"
+#include <map>
 
   /* Flags for the info decoder function. */
   enum tags_select
@@ -63,7 +64,12 @@
     int total_time;      /* Total time for files on the playlist */
     int items_with_time; /* Number of items for which the time is set. */
 
-    struct rb_tree *search_tree;
+    struct StrCollCompare {
+      bool operator()(const std::string& a, const std::string& b) const {
+        return strcoll(a.c_str(), b.c_str()) < 0;
+      }
+    };
+    std::map<std::string, int, StrCollCompare> search_tree;
   };
 
   void plist_init(struct plist *plist);
