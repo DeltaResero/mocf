@@ -19,8 +19,11 @@
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
-#include <pthread.h>
 #include <vector>
+#include <string>
+#include <thread>
+#include <mutex>
+#include <atomic>
 
 #define DEBUG
 
@@ -62,19 +65,19 @@
 #include "io/io.h"
 #include "audio/conversion/audio_conversion.h"
 
-static pthread_t playing_thread = 0; /* tid of play thread */
-static int play_thread_running = 0;
+static std::thread playing_thread;
+static std::atomic<bool> play_thread_running{false};
 
 /* currently played file */
 static int curr_playing = -1;
 /* file we played before playing songs from queue */
-static char *before_queue_fname = NULL;
-static char *curr_playing_fname = NULL;
+static std::string before_queue_fname;
+static std::string curr_playing_fname;
 /* This flag is set 1 if audio_play() was called with nonempty queue,
  * so we know that when the queue is empty, we should play the regular
  * playlist from the beginning. */
-static int started_playing_in_queue = 0;
-static pthread_mutex_t curr_playing_mtx = PTHREAD_MUTEX_INITIALIZER;
+static bool started_playing_in_queue = false;
+static std::mutex curr_playing_mtx;
 
 static struct out_buf *out_buf;
 static struct hw_funcs hw;
@@ -82,24 +85,24 @@ static struct output_driver_caps hw_caps; /* capabilities of the output
                driver */
 
 /* Player state. */
-static int state = STATE_STOP;
-static int prev_state = STATE_STOP;
+static std::atomic<int> state{STATE_STOP};
+static std::atomic<int> prev_state{STATE_STOP};
 
 /* requests for playing thread */
-static int stop_playing = 0;
-static int play_next = 0;
-static int play_prev = 0;
-static pthread_mutex_t request_mtx = PTHREAD_MUTEX_INITIALIZER;
+static std::atomic<bool> stop_playing{false};
+static std::atomic<bool> play_next{false};
+static std::atomic<bool> play_prev{false};
+static std::mutex request_mtx;
 
 /* Playlists. */
 static struct plist playlist;
 static struct plist shuffled_plist;
 static struct plist queue;
 static struct plist *curr_plist; /* currently used playlist */
-static pthread_mutex_t plist_mtx = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex plist_mtx;
 
 /* Is the audio device opened? */
-static int audio_opened = 0;
+static bool audio_opened = false;
 
 /* Current sound parameters (with which the device is opened). */
 static struct sound_params driver_sound_params = {0, 0, 0};
@@ -108,7 +111,7 @@ static struct sound_params driver_sound_params = {0, 0, 0};
 static struct sound_params req_sound_params = {0, 0, 0};
 
 static struct audio_conversion sound_conv;
-static int need_audio_conversion = 0;
+static bool need_audio_conversion = false;
 
 static int current_mixer = 0;
 
@@ -577,10 +580,9 @@ static void go_to_another_file()
   bool shuffle = options_get_bool("Shuffle");
   bool go_next = (play_next || options_get_bool("AutoNext"));
   int curr_playing_curr_pos;
-  /* XXX: Shouldn't play_next be protected by mutex? */
 
-  LOCK(curr_playing_mtx);
-  LOCK(plist_mtx);
+  std::lock_guard<std::mutex> lock1(curr_playing_mtx);
+  std::lock_guard<std::mutex> lock2(plist_mtx);
 
   /* If we move forward in the playlist and there are some songs in
    * the queue, then play them. */
@@ -588,9 +590,9 @@ static void go_to_another_file()
   {
     logit("Playing file from queue");
 
-    if (!before_queue_fname && curr_playing_fname)
+    if (before_queue_fname.empty() && !curr_playing_fname.empty())
     {
-      before_queue_fname = xstrdup(curr_playing_fname);
+      before_queue_fname = curr_playing_fname;
     }
 
     curr_plist = &queue;
@@ -604,11 +606,10 @@ static void go_to_another_file()
     /* If we just finished playing files from the queue and the
      * appropriate option is set, continue with the file played
      * before playing the queue. */
-    if (before_queue_fname && options_get_bool("QueueNextSongReturn"))
+    if (!before_queue_fname.empty() && options_get_bool("QueueNextSongReturn"))
     {
-      free(curr_playing_fname);
       curr_playing_fname = before_queue_fname;
-      before_queue_fname = NULL;
+      before_queue_fname.clear();
     }
 
     if (shuffle)
@@ -620,9 +621,9 @@ static void go_to_another_file()
         plist_cat(&shuffled_plist, &playlist);
         plist_shuffle(&shuffled_plist);
 
-        if (curr_playing_fname)
+        if (!curr_playing_fname.empty())
         {
-          plist_swap_first_fname(&shuffled_plist, curr_playing_fname);
+          plist_swap_first_fname(&shuffled_plist, curr_playing_fname.c_str());
         }
       }
     }
@@ -631,14 +632,14 @@ static void go_to_another_file()
       curr_plist = &playlist;
     }
 
-    curr_playing_curr_pos = plist_find_fname(curr_plist, curr_playing_fname);
+    curr_playing_curr_pos = plist_find_fname(curr_plist, curr_playing_fname.c_str());
 
     /* If we came from the queue and the last file in
      * queue wasn't in the playlist, we try to revert to
      * the QueueNextSongReturn == true behaviour. */
-    if (curr_playing_curr_pos == -1 && before_queue_fname)
+    if (curr_playing_curr_pos == -1 && !before_queue_fname.empty())
     {
-      curr_playing_curr_pos = plist_find_fname(curr_plist, before_queue_fname);
+      curr_playing_curr_pos = plist_find_fname(curr_plist, before_queue_fname.c_str());
     }
 
     if (play_prev && plist_count(curr_plist))
@@ -648,7 +649,7 @@ static void go_to_another_file()
       if (curr_playing_curr_pos == -1 || started_playing_in_queue)
       {
         curr_playing = plist_prev(curr_plist, -1);
-        started_playing_in_queue = 0;
+        started_playing_in_queue = false;
       }
       else
       {
@@ -675,7 +676,7 @@ static void go_to_another_file()
       if (curr_playing_curr_pos == -1 || started_playing_in_queue)
       {
         curr_playing = plist_next(curr_plist, -1);
-        started_playing_in_queue = 0;
+        started_playing_in_queue = false;
       }
       else
       {
@@ -711,18 +712,11 @@ static void go_to_another_file()
       debug("Repeating file");
     }
 
-    if (before_queue_fname)
-    {
-      free(before_queue_fname);
-    }
-    before_queue_fname = NULL;
+    before_queue_fname.clear();
   }
-
-  UNLOCK(plist_mtx);
-  UNLOCK(curr_playing_mtx);
 }
 
-static void *play_thread(void *unused ATTR_UNUSED)
+static void play_thread_func()
 {
   logit("Entering playing thread");
 
@@ -730,34 +724,31 @@ static void *play_thread(void *unused ATTR_UNUSED)
   {
     char *file;
 
-    LOCK(plist_mtx);
-    file = plist_get_file(curr_plist, curr_playing);
-    UNLOCK(plist_mtx);
+    {
+        std::lock_guard<std::mutex> lock(plist_mtx);
+        file = plist_get_file(curr_plist, curr_playing);
+    }
 
-    play_next = 0;
-    play_prev = 0;
+    play_next = false;
+    play_prev = false;
 
     if (file)
     {
       int next;
       char *next_file;
 
-      LOCK(curr_playing_mtx);
-      LOCK(plist_mtx);
-      logit("Playing item %d: %s", curr_playing, file);
-
-      if (curr_playing_fname)
       {
-        free(curr_playing_fname);
+          std::lock_guard<std::mutex> lock1(curr_playing_mtx);
+          std::lock_guard<std::mutex> lock2(plist_mtx);
+          logit("Playing item %d: %s", curr_playing, file);
+
+          curr_playing_fname = file;
+
+          out_buf_time_set(out_buf, 0.0);
+
+          next = plist_next(curr_plist, curr_playing);
+          next_file = next != -1 ? plist_get_file(curr_plist, next) : NULL;
       }
-      curr_playing_fname = xstrdup(file);
-
-      out_buf_time_set(out_buf, 0.0);
-
-      next = plist_next(curr_plist, curr_playing);
-      next_file = next != -1 ? plist_get_file(curr_plist, next) : NULL;
-      UNLOCK(plist_mtx);
-      UNLOCK(curr_playing_mtx);
 
       player(file, next_file, out_buf);
       if (next_file)
@@ -774,9 +765,8 @@ static void *play_thread(void *unused ATTR_UNUSED)
 
     if (stop_playing)
     {
-      LOCK(curr_playing_mtx);
+      std::lock_guard<std::mutex> lock(curr_playing_mtx);
       curr_playing = -1;
-      UNLOCK(curr_playing_mtx);
       logit("stopped");
     }
     else
@@ -785,20 +775,14 @@ static void *play_thread(void *unused ATTR_UNUSED)
     }
   }
 
-  prev_state = state;
+  prev_state = state.load();
   state = STATE_STOP;
   state_change();
 
-  if (curr_playing_fname)
-  {
-    free(curr_playing_fname);
-    curr_playing_fname = NULL;
-  }
+  curr_playing_fname.clear();
 
   audio_close();
   logit("Exiting");
-
-  return NULL;
 }
 
 void audio_reset()
@@ -811,36 +795,28 @@ void audio_reset()
 
 void audio_stop()
 {
-  int rc;
-
   if (play_thread_running)
   {
     logit("audio_stop()");
-    LOCK(request_mtx);
-    stop_playing = 1;
-    UNLOCK(request_mtx);
-    player_stop();
-    logit("pthread_join (playing_thread, NULL)");
-    rc = pthread_join(playing_thread, NULL);
-    if (rc != 0)
     {
-      log_errno("pthread_join() failed", rc);
+        std::lock_guard<std::mutex> lock(request_mtx);
+        stop_playing = true;
     }
-    playing_thread = 0;
-    play_thread_running = 0;
-    stop_playing = 0;
+    player_stop();
+    logit("joining playing_thread");
+    if (playing_thread.joinable()) {
+        playing_thread.join();
+    }
+    play_thread_running = false;
+    stop_playing = false;
     logit("done stopping");
   }
   else if (state == STATE_PAUSE)
   {
     /* Paused internet stream - we are in fact stopped already. */
-    if (curr_playing_fname)
-    {
-      free(curr_playing_fname);
-      curr_playing_fname = NULL;
-    }
+    curr_playing_fname.clear();
 
-    prev_state = state;
+    prev_state = state.load();
     state = STATE_STOP;
     state_change();
   }
@@ -850,83 +826,76 @@ void audio_stop()
  * start playing from the first file on the list. */
 void audio_play(const char *fname)
 {
-  int rc;
-
   audio_stop();
   player_reset();
 
-  LOCK(curr_playing_mtx);
-  LOCK(plist_mtx);
-
-  /* If we have songs in the queue and fname is empty string, start
-   * playing file from the queue. */
-  if (plist_count(&queue) && !(*fname))
   {
-    curr_plist = &queue;
-    curr_playing = plist_next(&queue, -1);
+      std::lock_guard<std::mutex> lock1(curr_playing_mtx);
+      std::lock_guard<std::mutex> lock2(plist_mtx);
 
-    /* remove the file from queue */
-    server_queue_pop(queue.items[curr_playing].file.c_str());
-    plist_delete(curr_plist, curr_playing);
+      /* If we have songs in the queue and fname is empty string, start
+       * playing file from the queue. */
+      if (plist_count(&queue) && !(*fname))
+      {
+        curr_plist = &queue;
+        curr_playing = plist_next(&queue, -1);
 
-    started_playing_in_queue = 1;
+        /* remove the file from queue */
+        server_queue_pop(queue.items[curr_playing].file.c_str());
+        plist_delete(curr_plist, curr_playing);
+
+        started_playing_in_queue = true;
+      }
+      else if (options_get_bool("Shuffle"))
+      {
+        plist_clear(&shuffled_plist);
+        plist_cat(&shuffled_plist, &playlist);
+        plist_shuffle(&shuffled_plist);
+        plist_swap_first_fname(&shuffled_plist, fname);
+
+        curr_plist = &shuffled_plist;
+
+        if (*fname)
+        {
+          curr_playing = plist_find_fname(curr_plist, fname);
+        }
+        else if (plist_count(curr_plist))
+        {
+          curr_playing = plist_next(curr_plist, -1);
+        }
+        else
+        {
+          curr_playing = -1;
+        }
+      }
+      else
+      {
+        curr_plist = &playlist;
+
+        if (*fname)
+        {
+          curr_playing = plist_find_fname(curr_plist, fname);
+        }
+        else if (plist_count(curr_plist))
+        {
+          curr_playing = plist_next(curr_plist, -1);
+        }
+        else
+        {
+          curr_playing = -1;
+        }
+      }
   }
-  else if (options_get_bool("Shuffle"))
-  {
-    plist_clear(&shuffled_plist);
-    plist_cat(&shuffled_plist, &playlist);
-    plist_shuffle(&shuffled_plist);
-    plist_swap_first_fname(&shuffled_plist, fname);
 
-    curr_plist = &shuffled_plist;
-
-    if (*fname)
-    {
-      curr_playing = plist_find_fname(curr_plist, fname);
-    }
-    else if (plist_count(curr_plist))
-    {
-      curr_playing = plist_next(curr_plist, -1);
-    }
-    else
-    {
-      curr_playing = -1;
-    }
-  }
-  else
-  {
-    curr_plist = &playlist;
-
-    if (*fname)
-    {
-      curr_playing = plist_find_fname(curr_plist, fname);
-    }
-    else if (plist_count(curr_plist))
-    {
-      curr_playing = plist_next(curr_plist, -1);
-    }
-    else
-    {
-      curr_playing = -1;
-    }
-  }
-
-  rc = pthread_create(&playing_thread, NULL, play_thread, NULL);
-  if (rc != 0)
-  {
-    error_errno("Can't create thread", rc);
-  }
-  play_thread_running = 1;
-
-  UNLOCK(plist_mtx);
-  UNLOCK(curr_playing_mtx);
+  play_thread_running = true;
+  playing_thread = std::thread(play_thread_func);
 }
 
 void audio_next()
 {
   if (play_thread_running)
   {
-    play_next = 1;
+    play_next = true;
     player_stop();
   }
 }
@@ -935,43 +904,35 @@ void audio_prev()
 {
   if (play_thread_running)
   {
-    play_prev = 1;
+    play_prev = true;
     player_stop();
   }
 }
 
 void audio_pause()
 {
-  LOCK(curr_playing_mtx);
-  LOCK(plist_mtx);
+  std::lock_guard<std::mutex> lock1(curr_playing_mtx);
+  std::lock_guard<std::mutex> lock2(plist_mtx);
 
   if (curr_playing != -1)
   {
     out_buf_pause(out_buf);
 
-    prev_state = state;
+    prev_state = state.load();
     state = STATE_PAUSE;
     state_change();
   }
-
-  UNLOCK(plist_mtx);
-  UNLOCK(curr_playing_mtx);
 }
 
 void audio_unpause()
 {
-  LOCK(curr_playing_mtx);
+  std::lock_guard<std::mutex> lock(curr_playing_mtx);
   if (curr_playing != -1)
   {
     out_buf_unpause(out_buf);
-    prev_state = state;
+    prev_state = state.load();
     state = STATE_PLAY;
-    UNLOCK(curr_playing_mtx);
     state_change();
-  }
-  else
-  {
-    UNLOCK(curr_playing_mtx);
   }
 }
 
@@ -1101,9 +1062,9 @@ int audio_open(struct sound_params *sound_params)
         reset_sound_params(&req_sound_params);
         return 0;
       }
-      need_audio_conversion = 1;
+      need_audio_conversion = true;
     }
-    audio_opened = 1;
+    audio_opened = true;
 
     logit("Requested sound parameters: %s, %d channels, %dHz",
           sfmt_str(req_sound_params.fmt, fmt_name, sizeof(fmt_name)),
@@ -1208,7 +1169,7 @@ int audio_send_pcm(const char *buf, const size_t size)
 /* Get current time of the song in seconds. */
 int audio_get_time()
 {
-  return state != STATE_STOP ? out_buf_time_get(out_buf) : 0;
+  return state.load() != STATE_STOP ? out_buf_time_get(out_buf) : 0;
 }
 
 void audio_close()
@@ -1221,9 +1182,9 @@ void audio_close()
     if (need_audio_conversion)
     {
       audio_conv_destroy(&sound_conv);
-      need_audio_conversion = 0;
+      need_audio_conversion = false;
     }
-    audio_opened = 0;
+    audio_opened = false;
   }
 }
 
@@ -1442,8 +1403,6 @@ void audio_initialize()
 
 void audio_exit()
 {
-  int rc;
-
   audio_stop();
   if (hw.shutdown)
   {
@@ -1455,21 +1414,6 @@ void audio_exit()
   plist_free(&shuffled_plist);
   plist_free(&queue);
   player_cleanup();
-  rc = pthread_mutex_destroy(&curr_playing_mtx);
-  if (rc != 0)
-  {
-    log_errno("Can't destroy curr_playing_mtx", rc);
-  }
-  rc = pthread_mutex_destroy(&plist_mtx);
-  if (rc != 0)
-  {
-    log_errno("Can't destroy plist_mtx", rc);
-  }
-  rc = pthread_mutex_destroy(&request_mtx);
-  if (rc != 0)
-  {
-    log_errno("Can't destroy request_mtx", rc);
-  }
 
   softmixer_shutdown();
   equalizer_shutdown();
@@ -1479,11 +1423,12 @@ void audio_seek(const int sec)
 {
   int playing;
 
-  LOCK(curr_playing_mtx);
-  playing = curr_playing;
-  UNLOCK(curr_playing_mtx);
+  {
+      std::lock_guard<std::mutex> lock(curr_playing_mtx);
+      playing = curr_playing;
+  }
 
-  if (playing != -1 && state == STATE_PLAY)
+  if (playing != -1 && state.load() == STATE_PLAY)
   {
     player_seek(sec);
   }
@@ -1497,11 +1442,12 @@ void audio_jump_to(const float sec)
 {
   int playing;
 
-  LOCK(curr_playing_mtx);
-  playing = curr_playing;
-  UNLOCK(curr_playing_mtx);
+  {
+      std::lock_guard<std::mutex> lock(curr_playing_mtx);
+      playing = curr_playing;
+  }
 
-  if (playing != -1 && state == STATE_PLAY)
+  if (playing != -1 && state.load() == STATE_PLAY)
   {
     player_jump_to(sec);
   }
@@ -1511,13 +1457,13 @@ void audio_jump_to(const float sec)
   }
 }
 
-int audio_get_state() { return state; }
+int audio_get_state() { return state.load(); }
 
-int audio_get_prev_state() { return prev_state; }
+int audio_get_prev_state() { return prev_state.load(); }
 
 void audio_plist_add(const char *file)
 {
-  LOCK(plist_mtx);
+  std::lock_guard<std::mutex> lock(plist_mtx);
   plist_clear(&shuffled_plist);
   if (plist_find_fname(&playlist, file) == -1)
   {
@@ -1527,12 +1473,11 @@ void audio_plist_add(const char *file)
   {
     logit("Wanted to add a file already present: %s", file);
   }
-  UNLOCK(plist_mtx);
 }
 
 void audio_queue_add(const char *file)
 {
-  LOCK(plist_mtx);
+  std::lock_guard<std::mutex> lock(plist_mtx);
   if (plist_find_fname(&queue, file) == -1)
   {
     plist_add(&queue, file);
@@ -1541,34 +1486,26 @@ void audio_queue_add(const char *file)
   {
     logit("Wanted to add a file already present: %s", file);
   }
-  UNLOCK(plist_mtx);
 }
 
 void audio_plist_clear()
 {
-  LOCK(plist_mtx);
+  std::lock_guard<std::mutex> lock(plist_mtx);
   plist_clear(&shuffled_plist);
   plist_clear(&playlist);
-  UNLOCK(plist_mtx);
 }
 
 void audio_queue_clear()
 {
-  LOCK(plist_mtx);
+  std::lock_guard<std::mutex> lock(plist_mtx);
   plist_clear(&queue);
-  UNLOCK(plist_mtx);
 }
 
 /* Returned memory is malloc()ed. */
 char *audio_get_sname()
 {
-  char *sname;
-
-  LOCK(curr_playing_mtx);
-  sname = xstrdup(curr_playing_fname);
-  UNLOCK(curr_playing_mtx);
-
-  return sname;
+  std::lock_guard<std::mutex> lock(curr_playing_mtx);
+  return curr_playing_fname.empty() ? nullptr : xstrdup(curr_playing_fname.c_str());
 }
 
 int audio_get_mixer()
@@ -1603,7 +1540,7 @@ void audio_plist_delete(const char *file)
 {
   int num;
 
-  LOCK(plist_mtx);
+  std::lock_guard<std::mutex> lock(plist_mtx);
   num = plist_find_fname(&playlist, file);
   if (num != -1)
   {
@@ -1615,20 +1552,18 @@ void audio_plist_delete(const char *file)
   {
     plist_delete(&shuffled_plist, num);
   }
-  UNLOCK(plist_mtx);
 }
 
 void audio_queue_delete(const char *file)
 {
   int num;
 
-  LOCK(plist_mtx);
+  std::lock_guard<std::mutex> lock(plist_mtx);
   num = plist_find_fname(&queue, file);
   if (num != -1)
   {
     plist_delete(&queue, num);
   }
-  UNLOCK(plist_mtx);
 }
 
 /* Get the time of a file if the file is on the playlist and
@@ -1641,7 +1576,7 @@ int audio_get_ftime(const char *file)
 
   mtime = get_mtime(file);
 
-  LOCK(plist_mtx);
+  std::lock_guard<std::mutex> lock(plist_mtx);
   i = plist_find_fname(&playlist, file);
   if (i != -1)
   {
@@ -1651,13 +1586,11 @@ int audio_get_ftime(const char *file)
       if (playlist.items[i].mtime == mtime)
       {
         debug("Found time for %s", file);
-        UNLOCK(plist_mtx);
         return time;
       }
       logit("mtime for %s has changed", file);
     }
   }
-  UNLOCK(plist_mtx);
 
   return -1;
 }
@@ -1667,7 +1600,7 @@ void audio_plist_set_time(const char *file, const int time)
 {
   int i;
 
-  LOCK(plist_mtx);
+  std::lock_guard<std::mutex> lock(plist_mtx);
   if ((i = plist_find_fname(&playlist, file)) != -1)
   {
     plist_set_item_time(&playlist, i, time);
@@ -1679,13 +1612,12 @@ void audio_plist_set_time(const char *file, const int time)
     logit("Request for updating time for a file not present on the"
           " playlist!");
   }
-  UNLOCK(plist_mtx);
 }
 
 /* Notify that the state was changed (used by the player). */
 void audio_state_started_playing()
 {
-  prev_state = state;
+  prev_state = state.load();
   state = STATE_PLAY;
   state_change();
 }
@@ -1693,9 +1625,8 @@ void audio_state_started_playing()
 /* Swap 2 files on the playlist. */
 void audio_plist_move(const char *file1, const char *file2)
 {
-  LOCK(plist_mtx);
+  std::lock_guard<std::mutex> lock(plist_mtx);
   plist_swap_files(&playlist, file1, file2);
-  UNLOCK(plist_mtx);
 }
 
 /* Return a copy of the song queue.  We cannot just return constant
@@ -1706,9 +1637,8 @@ struct plist *audio_queue_get_contents()
   struct plist *ret = new plist;
   plist_init(ret);
 
-  LOCK(plist_mtx);
+  std::lock_guard<std::mutex> lock(plist_mtx);
   plist_cat(ret, &queue);
-  UNLOCK(plist_mtx);
 
   return ret;
 }
