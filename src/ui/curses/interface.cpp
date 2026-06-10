@@ -474,17 +474,16 @@ static void update_item_tags(struct plist *plist, const int num,
 
   plist_set_tags(plist, num, tags);
 
-  if (plist->items[num].title_tags)
+  if (!plist->items[num].title_tags.empty())
   {
-    free(plist->items[num].title_tags);
-    plist->items[num].title_tags = NULL;
+    plist->items[num].title_tags.clear();
   }
 
   make_tags_title(plist, num);
 
-  if (options_get_bool("ReadTags") && !plist->items[num].title_tags)
+  if (options_get_bool("ReadTags") && plist->items[num].title_tags.empty())
   {
-    if (!plist->items[num].title_file)
+    if (plist->items[num].title_file.empty())
     {
       make_file_title(plist, num, options_get_bool("HideFileExtension"));
     }
@@ -723,12 +722,12 @@ static void update_state()
 /* Handle EV_QUEUE_ADD. */
 static void event_queue_add(const struct plist_item *item)
 {
-  if (plist_find_fname(queue, item->file) == -1)
+  if (plist_find_fname(queue, item->file.c_str()) == -1)
   {
     plist_add_from_item(queue, item);
     iface_set_files_in_queue(plist_count(queue));
     iface_update_queue_position_last(queue, playlist, dir_plist);
-    logit("Adding %s to queue", item->file);
+    logit("Adding %s to queue", item->file.c_str());
   }
   else
   {
@@ -1401,7 +1400,7 @@ static void send_playlist(struct plist *plist, const int clear)
   {
     if (!plist_deleted(plist, i))
     {
-      audio_plist_add(plist->items[i].file);
+      audio_plist_add(plist->items[i].file.c_str());
     }
   }
 }
@@ -2612,9 +2611,10 @@ static char *get_title(const char *file)
     return NULL;
   }
 
-  return xstrdup(plist->items[item_num].title_tags
-                     ? plist->items[item_num].title_tags
-                     : plist->items[item_num].title_file);
+  const std::string &title = plist->items[item_num].title_tags.empty()
+      ? plist->items[item_num].title_file
+      : plist->items[item_num].title_tags;
+  return xstrdup(title.c_str());
 }
 
 

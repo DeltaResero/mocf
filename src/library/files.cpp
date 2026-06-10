@@ -175,7 +175,7 @@ void make_file_title(struct plist *plist, const int num,
   assert(LIMIT(num, plist->num));
   assert(!plist_deleted(plist, num));
 
-  char *file = xstrdup(plist->items[num].file);
+  char *file = xstrdup(plist->items[num].file.c_str());
 
   if (hide_extension)
   {
@@ -209,12 +209,12 @@ void make_tags_title(struct plist *plist, const int num)
   assert(LIMIT(num, plist->num));
   assert(!plist_deleted(plist, num));
 
-  if (plist->items[num].title_tags)
+  if (!plist->items[num].title_tags.empty())
   {
     return;
   }
 
-  assert(plist->items[num].file != NULL);
+  assert(!plist->items[num].file.empty());
 
   if (!plist->items[num].tags->title.empty())
   {
@@ -243,12 +243,12 @@ void switch_titles_file(struct plist *plist)
       continue;
     }
 
-    if (!plist->items[i].title_file)
+    if (plist->items[i].title_file.empty())
     {
       make_file_title(plist, i, hide_extn);
     }
 
-    assert(plist->items[i].title_file != NULL);
+    assert(!plist->items[i].title_file.empty());
   }
 }
 
@@ -267,7 +267,7 @@ void switch_titles_tags(struct plist *plist)
       continue;
     }
 
-    if (!plist->items[i].title_tags && !plist->items[i].title_file)
+    if (plist->items[i].title_tags.empty() && plist->items[i].title_file.empty())
     {
       make_file_title(plist, i, hide_extn);
     }

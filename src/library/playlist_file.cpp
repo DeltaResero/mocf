@@ -497,15 +497,17 @@ static int plist_save_m3u(struct plist *plist, const char *fname,
       {
         if (plist->items[i].tags)
         {
-          ret =
-              fprintf(file, "#EXTINF:%d,%s\r\n", plist->items[i].tags->time,
-                      plist->items[i].title_tags ? plist->items[i].title_tags
-                                                 : plist->items[i].title_file);
+          ret = fprintf(
+              file, "#EXTINF:%d,%s\r\n", plist->items[i].tags->time,
+              (plist->items[i].title_tags.empty()
+                   ? plist->items[i].title_file
+                   : plist->items[i].title_tags)
+                  .c_str());
         }
         else
         {
-          ret =
-              fprintf(file, "#EXTINF:%d,%s\r\n", 0, plist->items[i].title_file);
+          ret = fprintf(file, "#EXTINF:%d,%s\r\n", 0,
+                        plist->items[i].title_file.c_str());
         }
       }
       else
@@ -516,7 +518,7 @@ static int plist_save_m3u(struct plist *plist, const char *fname,
       /* file */
       if (ret >= 0)
       {
-        ret = fprintf(file, "%s\r\n", plist->items[i].file + strip_path);
+        ret = fprintf(file, "%s\r\n", plist->items[i].file.c_str() + strip_path);
       }
 
       if (ret < 0)
@@ -569,11 +571,11 @@ int plist_save(struct plist *plist, const char *file, const bool save_tags)
     for (i = 0; i < plist->num; i++)
     {
       if (!plist_deleted(plist, i) &&
-          (strstr(plist->items[i].file, dir) != plist->items[i].file))
+          (strstr(plist->items[i].file.c_str(), dir) != plist->items[i].file.c_str()))
       {
         debug("TG: relative paths in playlist disabled due to entry %d, file = "
               "%s",
-              i, plist->items[i].file);
+              i, plist->items[i].file.c_str());
         offset = 0;
         break;
       }

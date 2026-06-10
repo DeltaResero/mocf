@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <cstring>
 #include <utility>
+#include <vector>
 
 #define DEBUG
 
@@ -126,7 +127,8 @@ static int rb_compare(const void *a, const void *b, const void *adata)
   int pos_a = (intptr_t)a;
   int pos_b = (intptr_t)b;
 
-  return strcoll(plist->items[pos_a].file, plist->items[pos_b].file);
+  return strcoll(plist->items[pos_a].file.c_str(),
+                 plist->items[pos_b].file.c_str());
 }
 
 static int rb_fname_compare(const void *key, const void *data,
@@ -136,7 +138,7 @@ static int rb_fname_compare(const void *key, const void *data,
   const char *fname = (const char *)key;
   const int pos = (intptr_t)data;
 
-  return strcoll(fname, plist->items[pos].file);
+  return strcoll(fname, plist->items[pos].file.c_str());
 }
 
 /* Return 1 if an item has 'deleted' flag. */
@@ -151,10 +153,8 @@ inline int plist_deleted(const struct plist *plist, const int num)
 void plist_init(struct plist *plist)
 {
   plist->num = 0;
-  plist->allocated = INIT_SIZE;
   plist->not_deleted = 0;
-  plist->items =
-      (struct plist_item *)xmalloc(sizeof(struct plist_item) * INIT_SIZE);
+  plist->items.reserve(INIT_SIZE);
   plist->search_tree = rb_tree_new(rb_compare, rb_fname_compare, plist);
   plist->total_time = 0;
   plist->items_with_time = 0;
@@ -163,15 +163,12 @@ void plist_init(struct plist *plist)
 /* Create a new playlist item with empty fields. */
 struct plist_item *plist_new_item()
 {
-  auto *item      = new plist_item;
-  item->file       = nullptr;
-  item->type       = F_OTHER;
-  item->deleted    = 0;
-  item->title_file = nullptr;
-  item->title_tags = nullptr;
-  item->tags       = nullptr;
-  item->mtime      = (time_t)-1;
-  item->queue_pos  = 0;
+  auto *item     = new plist_item;
+  item->type     = F_OTHER;
+  item->deleted  = 0;
+  item->tags     = nullptr;
+  item->mtime    = (time_t)-1;
+  item->queue_pos = 0;
   return item;
 }
 
@@ -179,50 +176,41 @@ struct plist_item *plist_new_item()
 int plist_add(struct plist *plist, const char *file_name)
 {
   assert(plist != NULL);
-  assert(plist->items != NULL);
 
-  if (plist->allocated == plist->num)
-  {
-    plist->allocated *= 2;
-    plist->items = (struct plist_item *)xrealloc(
-        plist->items, sizeof(struct plist_item) * plist->allocated);
-  }
+  int new_idx = plist->num;
 
-  plist->items[plist->num].file = xstrdup(file_name);
-  plist->items[plist->num].type = file_name ? file_type(file_name) : F_OTHER;
-  plist->items[plist->num].deleted = 0;
-  plist->items[plist->num].title_file = NULL;
-  plist->items[plist->num].title_tags = NULL;
-  plist->items[plist->num].tags = NULL;
-  plist->items[plist->num].mtime =
-      (file_name ? get_mtime(file_name) : (time_t)-1);
-  plist->items[plist->num].queue_pos = 0;
+  plist->items.emplace_back();
+  plist_item &item = plist->items.back();
+
+  item.file      = file_name ? file_name : "";
+  item.type      = file_name ? file_type(file_name) : F_OTHER;
+  item.deleted   = 0;
+  item.tags      = nullptr;
+  item.mtime     = file_name ? get_mtime(file_name) : (time_t)-1;
+  item.queue_pos = 0;
+
+  plist->num++;
 
   if (file_name)
   {
     rb_delete(plist->search_tree, file_name);
-    rb_insert(plist->search_tree, (void *)(intptr_t)plist->num);
+    rb_insert(plist->search_tree, (void *)(intptr_t)new_idx);
   }
 
-  plist->num++;
   plist->not_deleted++;
 
-  return plist->num - 1;
+  return new_idx;
 }
 
 /* Copy all fields of item src to dst. */
 void plist_item_copy(struct plist_item *dst, const struct plist_item *src)
 {
-  if (dst->file)
-  {
-    free(dst->file);
-  }
-  dst->file = xstrdup(src->file);
-  dst->type = src->type;
-  dst->title_file = xstrdup(src->title_file);
-  dst->title_tags = xstrdup(src->title_tags);
-  dst->mtime = src->mtime;
-  dst->queue_pos = src->queue_pos;
+  dst->file       = src->file;
+  dst->type       = src->type;
+  dst->title_file = src->title_file;
+  dst->title_tags = src->title_tags;
+  dst->mtime      = src->mtime;
+  dst->queue_pos  = src->queue_pos;
 
   if (src->tags)
   {
@@ -230,7 +218,7 @@ void plist_item_copy(struct plist_item *dst, const struct plist_item *src)
   }
   else
   {
-    dst->tags = NULL;
+    dst->tags = nullptr;
   }
 
   dst->deleted = src->deleted;
@@ -242,17 +230,15 @@ void plist_item_copy(struct plist_item *dst, const struct plist_item *src)
  */
 char *plist_get_file(const struct plist *plist, int i)
 {
-  char *file = NULL;
-
   assert(i >= 0);
   assert(plist != NULL);
 
   if (i < plist->num)
   {
-    file = xstrdup(plist->items[i].file);
+    return xstrdup(plist->items[i].file.c_str());
   }
 
-  return file;
+  return NULL;
 }
 
 /* Get the number of the next item on the list (skipping deleted items).
@@ -295,43 +281,31 @@ int plist_prev(struct plist *plist, int num)
 
 void plist_free_item_fields(struct plist_item *item)
 {
-  if (item->file)
-  {
-    free(item->file);
-    item->file = NULL;
-  }
-  if (item->title_tags)
-  {
-    free(item->title_tags);
-    item->title_tags = NULL;
-  }
-  if (item->title_file)
-  {
-    free(item->title_file);
-    item->title_file = NULL;
-  }
+  item->file.clear();
+  item->title_tags.clear();
+  item->title_file.clear();
   if (item->tags)
   {
     tags_free(item->tags);
-    item->tags = NULL;
+    item->tags = nullptr;
   }
 }
 
 /* Clear the list. */
 void plist_clear(struct plist *plist)
 {
-  int i;
-
   assert(plist != NULL);
 
-  for (i = 0; i < plist->num; i++)
+  for (int i = 0; i < plist->num; i++)
   {
-    plist_free_item_fields(&plist->items[i]);
+    if (plist->items[i].tags)
+    {
+      tags_free(plist->items[i].tags);
+      plist->items[i].tags = nullptr;
+    }
   }
 
-  plist->items = (struct plist_item *)xrealloc(
-      plist->items, sizeof(struct plist_item) * INIT_SIZE);
-  plist->allocated = INIT_SIZE;
+  plist->items.clear();
   plist->num = 0;
   plist->not_deleted = 0;
   rb_tree_clear(plist->search_tree);
@@ -345,16 +319,13 @@ void plist_free(struct plist *plist)
   assert(plist != NULL);
 
   plist_clear(plist);
-  free(plist->items);
-  plist->allocated = 0;
-  plist->items = NULL;
+  plist->items.shrink_to_fit();
   rb_tree_free(plist->search_tree);
 }
 
 /* Sort the playlist by file names. */
 void plist_sort_fname(struct plist *plist)
 {
-  struct plist_item *sorted;
   struct rb_node *x;
   int n;
 
@@ -363,7 +334,8 @@ void plist_sort_fname(struct plist *plist)
     return;
   }
 
-  sorted = new plist_item[plist_count(plist)];
+  std::vector<plist_item> sorted;
+  sorted.reserve(plist_count(plist));
 
   x = rb_min(plist->search_tree);
   assert(!rb_is_null(x));
@@ -373,24 +345,27 @@ void plist_sort_fname(struct plist *plist)
     x = rb_next(x);
   }
 
-  sorted[0] = plist->items[(intptr_t)rb_get_data(x)];
-  rb_set_data(x, NULL);
+  sorted.push_back(std::move(plist->items[(intptr_t)rb_get_data(x)]));
+  rb_set_data(x, nullptr); /* index 0 stored as NULL */
 
-  n = 1;
   while (!rb_is_null(x = rb_next(x)))
   {
     if (!plist_deleted(plist, (intptr_t)rb_get_data(x)))
     {
-      sorted[n] = plist->items[(intptr_t)rb_get_data(x)];
-      rb_set_data(x, (void *)(intptr_t)n++);
+      sorted.push_back(std::move(plist->items[(intptr_t)rb_get_data(x)]));
+      rb_set_data(x, (void *)(intptr_t)(sorted.size() - 1));
     }
   }
 
+  n = (int)sorted.size();
+  for (int i = 0; i < n; i++)
+  {
+    plist->items[i] = std::move(sorted[i]);
+  }
+  plist->items.resize(n);
+
   plist->num = n;
   plist->not_deleted = n;
-
-  memcpy(plist->items, sorted, sizeof(struct plist_item) * n);
-  delete[] sorted;
 }
 
 /* Find an item in the list.  Return the index or -1 if not found. */
@@ -425,7 +400,7 @@ int plist_find_del_fname(const struct plist *plist, const char *file)
 
   for (i = 0; i < plist->num; i++)
   {
-    if (plist->items[i].file && !strcmp(plist->items[i].file, file))
+    if (!plist->items[i].file.empty() && plist->items[i].file == file)
     {
       if (item == -1 || plist_deleted(plist, item))
       {
@@ -452,11 +427,11 @@ const char *plist_get_next_dead_entry(const struct plist *plist,
 
   for (i = *last_index; i < plist->num; i++)
   {
-    if (plist->items[i].file && !plist_deleted(plist, i) &&
-        !can_read_file(plist->items[i].file))
+    if (!plist->items[i].file.empty() && !plist_deleted(plist, i) &&
+        !can_read_file(plist->items[i].file.c_str()))
     {
       *last_index = i + 1;
-      return plist->items[i].file;
+      return plist->items[i].file.c_str();
     }
   }
 
@@ -656,7 +631,7 @@ char *build_title(const struct file_tags *tags)
 /* Copy the item to the playlist. Return the index of the added item. */
 int plist_add_from_item(struct plist *plist, const struct plist_item *item)
 {
-  int pos = plist_add(plist, item->file);
+  int pos = plist_add(plist, item->file.c_str());
 
   plist_item_copy(&plist->items[pos], item);
 
@@ -677,11 +652,8 @@ void plist_delete(struct plist *plist, const int num)
 
   if (num < plist->num)
   {
-    /* Free every field except the file, it is needed in deleted
-     * items. */
-    char *file = plist->items[num].file;
-
-    plist->items[num].file = NULL;
+    /* Free every field except the file, it is needed in deleted items. */
+    std::string file = std::move(plist->items[num].file);
 
     if (plist->items[num].tags && plist->items[num].tags->time != -1)
     {
@@ -690,7 +662,7 @@ void plist_delete(struct plist *plist, const int num)
     }
 
     plist_free_item_fields(&plist->items[num]);
-    plist->items[num].file = file;
+    plist->items[num].file = std::move(file);
 
     plist->items[num].deleted = 1;
 
@@ -711,11 +683,7 @@ void plist_set_title_tags(struct plist *plist, const int num, const char *title)
 {
   assert(LIMIT(num, plist->num));
 
-  if (plist->items[num].title_tags)
-  {
-    free(plist->items[num].title_tags);
-  }
-  plist->items[num].title_tags = xstrdup(title);
+  plist->items[num].title_tags = title ? title : "";
 }
 
 /* Set file title of an item. */
@@ -723,13 +691,7 @@ void plist_set_title_file(struct plist *plist, const int num, const char *title)
 {
   assert(LIMIT(num, plist->num));
 
-  if (plist->items[num].title_file)
-  {
-    free(plist->items[num].title_file);
-  }
-
-
-  plist->items[num].title_file = xstrdup(title);
+  plist->items[num].title_file = title ? title : "";
 }
 
 /* Set file for an item. */
@@ -738,13 +700,12 @@ void plist_set_file(struct plist *plist, const int num, const char *file)
   assert(LIMIT(num, plist->num));
   assert(file != NULL);
 
-  if (plist->items[num].file)
+  if (!plist->items[num].file.empty())
   {
     rb_delete(plist->search_tree, file);
-    free(plist->items[num].file);
   }
 
-  plist->items[num].file = xstrdup(file);
+  plist->items[num].file = file;
   plist->items[num].type = file_type(file);
   plist->items[num].mtime = get_mtime(file);
   rb_insert(plist->search_tree, (void *)(intptr_t)num);
@@ -765,9 +726,9 @@ void plist_cat(struct plist *a, struct plist *b)
       continue;
     }
 
-    assert(b->items[i].file != NULL);
+    assert(!b->items[i].file.empty());
 
-    if (plist_find_fname(a, b->items[i].file) == -1)
+    if (plist_find_fname(a, b->items[i].file.c_str()) == -1)
     {
       plist_add_from_item(a, &b->items[i]);
     }
@@ -845,11 +806,7 @@ static void plist_swap(struct plist *plist, const int a, const int b)
 
   if (a != b)
   {
-    struct plist_item t;
-
-    t = plist->items[a];
-    plist->items[a] = plist->items[b];
-    plist->items[b] = t;
+    std::swap(plist->items[a], plist->items[b]);
   }
 }
 
@@ -884,7 +841,7 @@ void plist_swap_first_fname(struct plist *plist, const char *fname)
   if (i != -1 && i != 0)
   {
     rb_delete(plist->search_tree, fname);
-    rb_delete(plist->search_tree, plist->items[0].file);
+    rb_delete(plist->search_tree, plist->items[0].file.c_str());
     plist_swap(plist, 0, i);
     rb_insert(plist->search_tree, NULL);
     rb_insert(plist->search_tree, (void *)(intptr_t)i);
@@ -930,9 +887,9 @@ void plist_remove_common_items(struct plist *a, struct plist *b)
       continue;
     }
 
-    assert(a->items[i].file != NULL);
+    assert(!a->items[i].file.empty());
 
-    if (plist_find_fname(b, a->items[i].file) != -1)
+    if (plist_find_fname(b, a->items[i].file.c_str()) != -1)
     {
       plist_delete(a, i);
     }

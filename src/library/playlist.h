@@ -12,6 +12,7 @@
 #define PLAYLIST_H
 
 #include <string>
+#include <vector>
 #include <sys/types.h>
 
 #include "utils/rbtree.h"
@@ -44,10 +45,10 @@
 
   struct plist_item
   {
-    char *file;
-    enum file_type type; /* type of the file (F_OTHER if not read yet) */
-    char *title_file;    /* title based on the file name */
-    char *title_tags;    /* title based on the tags */
+    std::string file;
+    enum file_type type;    /* type of the file (F_OTHER if not read yet) */
+    std::string title_file; /* title based on the file name */
+    std::string title_tags; /* title based on the tags */
     struct file_tags *tags;
     short deleted;
     time_t mtime;  /* modification time */
@@ -57,9 +58,8 @@
   struct plist
   {
     int num;         /* Number of elements on the list */
-    int allocated;   /* Number of allocated elements */
     int not_deleted; /* Number of non-deleted items */
-    struct plist_item *items;
+    std::vector<plist_item> items;
     int total_time;      /* Total time for files on the playlist */
     int items_with_time; /* Number of items for which the time is set. */
 

@@ -1124,17 +1124,17 @@ static int add_to_menu(struct menu *menu, const struct plist *plist,
   char *title;
   const char *type_name;
 
-  made_from_tags = (options_get_bool("ReadTags") && item->title_tags);
+  made_from_tags = (options_get_bool("ReadTags") && !item->title_tags.empty());
 
   if (made_from_tags)
   {
-    title = make_menu_title(item->title_tags, 1, 0);
+    title = make_menu_title(item->title_tags.c_str(), 1, 0);
   }
   else
   {
-    title = make_menu_title(item->title_file, 0, full_paths);
+    title = make_menu_title(item->title_file.c_str(), 0, full_paths);
   }
-  added = menu_add(menu, title, plist_file_type(plist, num), item->file);
+  added = menu_add(menu, title, plist_file_type(plist, num), item->file.c_str());
   free(title);
 
   if (item->tags && item->tags->time != -1)
@@ -1151,7 +1151,7 @@ static int add_to_menu(struct menu *menu, const struct plist *plist,
   menu_item_set_attr_sel_marked(added,
                                 get_color(CLR_MENU_ITEM_FILE_MARKED_SELECTED));
 
-  if (!(type_name = file_type_name(item->file)))
+  if (!(type_name = file_type_name(item->file.c_str())))
   {
     type_name = "";
   }
@@ -1524,15 +1524,15 @@ static void update_menu_item(struct menu_item *mi, const struct plist *plist,
     menu_item_set_time(mi, "");
   }
 
-  made_from_tags = (options_get_bool("ReadTags") && item->title_tags);
+  made_from_tags = (options_get_bool("ReadTags") && !item->title_tags.empty());
 
   if (made_from_tags)
   {
-    title = make_menu_title(item->title_tags, 1, 0);
+    title = make_menu_title(item->title_tags.c_str(), 1, 0);
   }
   else
   {
-    title = make_menu_title(item->title_file, 0, full_path);
+    title = make_menu_title(item->title_file.c_str(), 0, full_path);
   }
 
   menu_item_set_title(mi, title);
@@ -4717,7 +4717,7 @@ void iface_update_queue_positions(const struct plist *queue,
   {
     if (!plist_deleted(queue, i))
     {
-      update_queue_position(playlist, dir_list, queue->items[i].file, pos);
+      update_queue_position(playlist, dir_list, queue->items[i].file.c_str(), pos);
       pos++;
     }
   }
@@ -4745,7 +4745,7 @@ void iface_clear_queue_positions(const struct plist *queue,
   {
     if (!plist_deleted(queue, i))
     {
-      update_queue_position(playlist, dir_list, queue->items[i].file, 0);
+      update_queue_position(playlist, dir_list, queue->items[i].file.c_str(), 0);
     }
   }
 
@@ -4763,7 +4763,7 @@ void iface_update_queue_position_last(const struct plist *queue,
 
   i = plist_last(queue);
   pos = plist_get_position(queue, i);
-  update_queue_position(playlist, dir_list, queue->items[i].file, pos);
+  update_queue_position(playlist, dir_list, queue->items[i].file.c_str(), pos);
   iface_refresh_screen();
 }
 

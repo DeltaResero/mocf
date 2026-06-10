@@ -596,7 +596,7 @@ static void go_to_another_file()
     curr_plist = &queue;
     curr_playing = plist_next(&queue, -1);
 
-    server_queue_pop(queue.items[curr_playing].file);
+    server_queue_pop(queue.items[curr_playing].file.c_str());
     plist_delete(&queue, curr_playing);
   }
   else
@@ -866,7 +866,7 @@ void audio_play(const char *fname)
     curr_playing = plist_next(&queue, -1);
 
     /* remove the file from queue */
-    server_queue_pop(queue.items[curr_playing].file);
+    server_queue_pop(queue.items[curr_playing].file.c_str());
     plist_delete(curr_plist, curr_playing);
 
     started_playing_in_queue = 1;
