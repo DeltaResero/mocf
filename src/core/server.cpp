@@ -27,6 +27,10 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
+#include <chrono>
 
 #define DEBUG
 
@@ -50,7 +54,7 @@
 struct engine_event_queue
 {
   struct event_queue q;
-  pthread_mutex_t    mtx;
+  std::mutex         mtx;
   int                pipe_fd[2]; /* [0] = read (UI), [1] = write (engine) */
 };
 
@@ -58,20 +62,19 @@ struct engine_event_queue *engine_event_queue_new(void)
 {
   auto *eq = new engine_event_queue;
   event_queue_init(&eq->q);
-  pthread_mutex_init(&eq->mtx, NULL);
 
   if (pipe(eq->pipe_fd) < 0)
-    fatal("pipe() failed for engine event queue: %s", xstrerror(errno));
+    fatal("pipe() failed for engine event queue: %s", xstrerror(errno).c_str());
 
   /* Make the write end non-blocking so audio callbacks never block. */
   int flags = fcntl(eq->pipe_fd[1], F_GETFL);
   if (flags == -1 || fcntl(eq->pipe_fd[1], F_SETFL, flags | O_NONBLOCK) == -1)
-    fatal("fcntl() on event pipe failed: %s", xstrerror(errno));
+    fatal("fcntl() on event pipe failed: %s", xstrerror(errno).c_str());
 
   /* Make the read end non-blocking so drain loops never block. */
   flags = fcntl(eq->pipe_fd[0], F_GETFL);
   if (flags == -1 || fcntl(eq->pipe_fd[0], F_SETFL, flags | O_NONBLOCK) == -1)
-    fatal("fcntl() on event pipe failed: %s", xstrerror(errno));
+    fatal("fcntl() on event pipe failed: %s", xstrerror(errno).c_str());
 
   return eq;
 }
@@ -79,10 +82,10 @@ struct engine_event_queue *engine_event_queue_new(void)
 void engine_event_queue_free(struct engine_event_queue *eq)
 {
   if (!eq) return;
-  LOCK(eq->mtx);
-  event_queue_free(&eq->q);
-  UNLOCK(eq->mtx);
-  pthread_mutex_destroy(&eq->mtx);
+  {
+    std::lock_guard<std::mutex> lock(eq->mtx);
+    event_queue_free(&eq->q);
+  }
   close(eq->pipe_fd[0]);
   close(eq->pipe_fd[1]);
   delete eq;
@@ -97,12 +100,13 @@ int engine_event_queue_fd(const struct engine_event_queue *eq)
 static void eq_push(struct engine_event_queue *eq, int type, void *data)
 {
   char w = 1;
-  LOCK(eq->mtx);
-  event_push(&eq->q, type, data);
-  UNLOCK(eq->mtx);
+  {
+    std::lock_guard<std::mutex> lock(eq->mtx);
+    event_push(&eq->q, type, data);
+  }
   /* Best-effort wakeup; non-blocking pipe so this never stalls. */
   if (write(eq->pipe_fd[1], &w, 1) < 0 && errno != EAGAIN)
-    logit("Can't write to engine event pipe: %s", xstrerror(errno));
+    logit("Can't write to engine event pipe: %s", xstrerror(errno).c_str());
 }
 
 /* Drain all pending events + consume wakeup bytes.  Non-blocking. */
@@ -115,7 +119,7 @@ void engine_event_queue_flush(struct engine_event_queue *eq,
     ;
 
   /* Splice the shared queue onto the tail of dest. */
-  LOCK(eq->mtx);
+  std::lock_guard<std::mutex> lock(eq->mtx);
   if (!event_queue_empty(&eq->q))
   {
     if (event_queue_empty(dest))
@@ -129,7 +133,6 @@ void engine_event_queue_flush(struct engine_event_queue *eq,
     }
     event_queue_init(&eq->q);
   }
-  UNLOCK(eq->mtx);
 }
 
 /* Blocking variant: wait until at least one event arrives, then drain. */
@@ -158,36 +161,31 @@ void engine_event_queue_wait_flush(struct engine_event_queue *eq,
  * Engine lifecycle — ready condvar + quit condvar
  * ----------------------------------------------------------------------- */
 
-static pthread_mutex_t ready_mtx  = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t  ready_cond = PTHREAD_COND_INITIALIZER;
-static int             engine_ready_flag = 0;
+static std::mutex ready_mtx;
+static std::condition_variable ready_cond;
+static bool engine_ready_flag = false;
 
-static pthread_mutex_t quit_mtx  = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t  quit_cond = PTHREAD_COND_INITIALIZER;
-static volatile int    server_quit = 0;
+static std::mutex quit_mtx;
+static std::condition_variable quit_cond;
+static std::atomic<bool> server_quit{false};
 
 void engine_signal_ready(void)
 {
-  pthread_mutex_lock(&ready_mtx);
-  engine_ready_flag = 1;
-  pthread_cond_signal(&ready_cond);
-  pthread_mutex_unlock(&ready_mtx);
+  std::lock_guard<std::mutex> lock(ready_mtx);
+  engine_ready_flag = true;
+  ready_cond.notify_all();
 }
 
 void engine_wait_ready(void)
 {
-  pthread_mutex_lock(&ready_mtx);
-  while (!engine_ready_flag)
-    pthread_cond_wait(&ready_cond, &ready_mtx);
-  pthread_mutex_unlock(&ready_mtx);
+  std::unique_lock<std::mutex> lock(ready_mtx);
+  ready_cond.wait(lock, []{ return engine_ready_flag; });
 }
 
 void engine_quit(void)
 {
-  pthread_mutex_lock(&quit_mtx);
-  server_quit = 1;
-  pthread_cond_signal(&quit_cond);
-  pthread_mutex_unlock(&quit_mtx);
+  server_quit = true;
+  quit_cond.notify_all();
 }
 
 /* -----------------------------------------------------------------------
@@ -233,7 +231,8 @@ static void sig_chld(int sig LOGIT_ONLY)
 static void sig_exit(int sig)
 {
   log_signal(sig);
-  server_quit = 1;
+  server_quit = true;
+  quit_cond.notify_all();
 
   /* pthread_*() is not async-signal-safe, but we only call it when the
    * signal is received in a thread other than the server thread. */
@@ -257,7 +256,7 @@ static void redirect_output(FILE *stream)
     rc = freopen("/dev/null", "w", stream);
 
   if (!rc)
-    fatal("Can't open /dev/null: %s", xstrerror(errno));
+    fatal("Can't open /dev/null: %s", xstrerror(errno).c_str());
 }
 
 static void log_process_stack_size()
@@ -432,15 +431,12 @@ void server_loop(void)
 
   log_circular_start();
 
-  pthread_mutex_lock(&quit_mtx);
-  while (!server_quit)
+  std::unique_lock<std::mutex> lock(quit_mtx);
+  while (!server_quit.load())
   {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec += 1;
-    pthread_cond_timedwait(&quit_cond, &quit_mtx, &ts);
+    quit_cond.wait_for(lock, std::chrono::seconds(1));
   }
-  pthread_mutex_unlock(&quit_mtx);
+  lock.unlock();
 
   log_circular_log();
   log_circular_stop();
