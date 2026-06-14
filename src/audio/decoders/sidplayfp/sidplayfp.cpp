@@ -1,4 +1,4 @@
-// src/audio/decoders/sidplayfp/sidplayfp.cc
+// src/audio/decoders/sidplayfp/sidplayfp.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer

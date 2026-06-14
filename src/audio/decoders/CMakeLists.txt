@@ -282,7 +282,7 @@ if(WITH_SIDPLAYFP)
     add_decoder_plugin(
       sidplayfp
       SOURCES
-      sidplayfp/sidplayfp.cc
+      sidplayfp/sidplayfp.cpp
       sidplayfp/sidplayfp.h
       LIBRARIES
       ${SIDPLAYFP_LIBRARIES}

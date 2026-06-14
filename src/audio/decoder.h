@@ -43,11 +43,6 @@ struct decoder_error
   std::string err;              /*!< Error string. */
 };
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
 class AudioDecoder;
 
   /** @class AudioPlugin
@@ -174,6 +169,11 @@ class AudioDecoder;
    * type. The function must return a pointer to the plugin's AudioPlugin
    * instance.
    */
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
   typedef AudioPlugin *plugin_init_func();
 
   int is_sound_file(const char *name);
