@@ -20,6 +20,7 @@
 #include <string.h>
 #include <strings.h>
 #include <algorithm>
+#include <memory>
 
 #include "core/common.h"
 #include "audio/decoders/sidplayfp/sidplayfp.h"
@@ -431,30 +432,62 @@ static void destroy()
     database = NULL;
 }
 
-static struct decoder sidplayfp_decoder = {
-    DECODER_API_VERSION,
-    init,
-    destroy,
-    sidplayfp_open,
-    sidplayfp_close,
-    sidplayfp_decode,
-    sidplayfp_seek,
-    sidplayfp_info,
-    sidplayfp_get_bitrate,
-    sidplayfp_get_duration,
-    sidplayfp_get_error,
-    sidplayfp_our_format_ext,
-    NULL, // our_format_mime
-    NULL, // get_name
-    NULL, // current_tags
-    NULL, // get_stream
-    NULL  // get_avg_bitrate
+class SidplayfpDecoder : public AudioDecoder {
+public:
+    void *data;
+    SidplayfpDecoder(void *d) : data(d) {}
+    ~SidplayfpDecoder() override { sidplayfp_close(data); }
+    
+    int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
+        return sidplayfp_decode(data, buf, buf_len, sound_params);
+    }
+
+    int seek(int sec) override {
+        return sidplayfp_seek(data, sec);
+    }
+
+    int get_bitrate() override {
+        return sidplayfp_get_bitrate(data);
+    }
+
+    int get_duration() override {
+        return sidplayfp_get_duration(data);
+    }
+
+    void get_error(struct decoder_error *error) override {
+        sidplayfp_get_error(data, error);
+    }
 };
 
-extern "C" struct decoder *sidplayfp_plugin_init()
-{
+class SidplayfpPlugin : public AudioPlugin {
+public:
+    void init() override {
+        ::init();
+    }
+
+    void destroy() override {
+        ::destroy();
+    }
+
+    std::unique_ptr<AudioDecoder> open(const char *file) override {
+        void *d = sidplayfp_open(file);
+        if (!d) return nullptr;
+        return std::make_unique<SidplayfpDecoder>(d);
+    }
+
+    void info(const char *file_name, struct file_tags *info, const int tags_sel) override {
+        sidplayfp_info(file_name, info, tags_sel);
+    }
+
+    int our_format_ext(const char *ext) override {
+        return sidplayfp_our_format_ext(ext);
+    }
+};
+
+extern "C" class AudioPlugin *sidplayfp_plugin_init() {
     pthread_mutex_init(&db_mtx, NULL);
-    return &sidplayfp_decoder;
+    static SidplayfpPlugin plugin;
+    return &plugin;
 }
 
 // EOF

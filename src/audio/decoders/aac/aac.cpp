@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <string>
 
 #include <neaacdec.h>
@@ -672,24 +673,70 @@ static int aac_our_mime(const char *mime)
          !strncasecmp(mime, "audio/aacp;", 11);
 }
 
-static struct decoder aac_decoder = {DECODER_API_VERSION,
-                                     NULL,
-                                     NULL,
-                                     aac_open,
-                                     aac_close,
-                                     aac_decode,
-                                     aac_seek,
-                                     aac_info,
-                                     aac_get_bitrate,
-                                     aac_get_duration,
-                                     aac_get_error,
-                                     aac_our_format_ext,
-                                     aac_our_mime,
-                                     aac_get_name,
-                                     NULL,
-                                     NULL,
-                                     aac_get_avg_bitrate};
 
-extern "C" struct decoder *aac_plugin_init() { return &aac_decoder; }
+class AacDecoder : public AudioDecoder {
+public:
+    void *data;
+    AacDecoder(void *d) : data(d) {}
+    ~AacDecoder() override { aac_close(data); }
+    
+    int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
+        return aac_decode(data, buf, buf_len, sound_params);
+    }
+
+    int seek(int sec) override {
+        return aac_seek(data, sec);
+    }
+
+    int get_bitrate() override {
+        return aac_get_bitrate(data);
+    }
+
+    int get_duration() override {
+        return aac_get_duration(data);
+    }
+
+    void get_error(struct decoder_error *error) override {
+        aac_get_error(data, error);
+    }
+
+    int get_avg_bitrate() override {
+        return aac_get_avg_bitrate(data);
+    }
+};
+
+class AacPlugin : public AudioPlugin {
+public:
+
+    std::unique_ptr<AudioDecoder> open(const char *file) override {
+        void *d = aac_open(file);
+        if (!d) return nullptr;
+        return std::make_unique<AacDecoder>(d);
+    }
+
+    void info(const char *file_name, struct file_tags *info, const int tags_sel) override {
+        aac_info(file_name, info, tags_sel);
+    }
+
+    int our_format_ext(const char *ext) override {
+        return aac_our_format_ext(ext);
+    }
+
+    int our_format_mime(const char *mime) override {
+        return aac_our_mime(mime);
+    }
+
+    void get_name(const char *file, char buf[4]) override {
+        aac_get_name(file, buf);
+    }
+};
+
+extern "C" class AudioPlugin *aac_plugin_init() {
+    static AacPlugin plugin;
+    return &plugin;
+}
+
+
+
 
 // EOF

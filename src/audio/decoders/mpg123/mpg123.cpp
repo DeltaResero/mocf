@@ -19,6 +19,7 @@
 #include <climits>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <mpg123.h>
 
@@ -546,24 +547,78 @@ static int mpg123_our_mime(const char *mime)
          !strncasecmp(mime, "audio/mpeg;", 11);
 }
 
-static struct decoder mpg123_decoderX = {DECODER_API_VERSION,
-                                         NULL,
-                                         NULL,
-                                         mpg123_openX,
-                                         mpg123_closeX,
-                                         mpg123_decodeX,
-                                         mpg123_seekX,
-                                         mpg123_tags,
-                                         mpg123_get_bitrate,
-                                         mpg123_get_duration,
-                                         mpg123_get_error,
-                                         mpg123_our_format_ext,
-                                         mpg123_our_mime,
-                                         mpg123_get_name,
-                                         mpg123_current_tags,
-                                         mpg123_get_stream,
-                                         mpg123_get_avg_bitrate};
 
-extern "C" struct decoder *mpg123_plugin_init() { return &mpg123_decoderX; }
+class Mpg123Decoder : public AudioDecoder {
+public:
+    void *data;
+    Mpg123Decoder(void *d) : data(d) {}
+    ~Mpg123Decoder() override { mpg123_closeX(data); }
+    
+    int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
+        return mpg123_decodeX(data, buf, buf_len, sound_params);
+    }
+
+    int seek(int sec) override {
+        return mpg123_seekX(data, sec);
+    }
+
+    int get_bitrate() override {
+        return mpg123_get_bitrate(data);
+    }
+
+    int get_duration() override {
+        return mpg123_get_duration(data);
+    }
+
+    void get_error(struct decoder_error *error) override {
+        mpg123_get_error(data, error);
+    }
+
+    int current_tags(struct file_tags *tags) override {
+        return mpg123_current_tags(data, tags);
+    }
+
+    struct io_stream *get_stream() override {
+        return mpg123_get_stream(data);
+    }
+
+    int get_avg_bitrate() override {
+        return mpg123_get_avg_bitrate(data);
+    }
+};
+
+class Mpg123Plugin : public AudioPlugin {
+public:
+
+    std::unique_ptr<AudioDecoder> open(const char *file) override {
+        void *d = mpg123_openX(file);
+        if (!d) return nullptr;
+        return std::make_unique<Mpg123Decoder>(d);
+    }
+
+    void info(const char *file_name, struct file_tags *info, const int tags_sel) override {
+        mpg123_tags(file_name, info, tags_sel);
+    }
+
+    int our_format_ext(const char *ext) override {
+        return mpg123_our_format_ext(ext);
+    }
+
+    int our_format_mime(const char *mime) override {
+        return mpg123_our_mime(mime);
+    }
+
+    void get_name(const char *file, char buf[4]) override {
+        mpg123_get_name(file, buf);
+    }
+};
+
+extern "C" class AudioPlugin *mpg123_plugin_init() {
+    static Mpg123Plugin plugin;
+    return &plugin;
+}
+
+
+
 
 // EOF

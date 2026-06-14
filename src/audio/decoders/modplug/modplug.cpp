@@ -23,6 +23,7 @@
 #include <cassert>
 #include <climits>
 #include <cstring>
+#include <memory>
 #include <vector>
 #include <libmodplug/modplug.h>
 
@@ -268,68 +269,87 @@ static void modplug_get_error(void *prv_data, struct decoder_error *error)
   decoder_error_copy(error, &data->error);
 }
 
-static struct decoder modplug_decoder = {DECODER_API_VERSION,
-                                         NULL,
-                                         NULL,
-                                         modplug_open,
-                                         modplug_close,
-                                         modplug_decode,
-                                         modplug_seek,
-                                         modplug_info,
-                                         modplug_get_bitrate,
-                                         modplug_get_duration,
-                                         modplug_get_error,
-                                         modplug_our_format_ext,
-                                         NULL,
-                                         NULL,
-                                         NULL,
-                                         NULL,
-                                         NULL};
+class ModplugDecoder : public AudioDecoder {
+public:
+    void *data;
+    ModplugDecoder(void *d) : data(d) {}
+    ~ModplugDecoder() override { modplug_close(data); }
+    
+    int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
+        return modplug_decode(data, buf, buf_len, sound_params);
+    }
 
-extern "C" struct decoder *modplug_plugin_init()
-{
-  ModPlug_GetSettings(&settings);
-  settings.mFlags = 0;
-  settings.mFlags |= options_get_bool("ModPlug_Oversampling")
-                         ? MODPLUG_ENABLE_OVERSAMPLING
-                         : 0;
-  settings.mFlags |= options_get_bool("ModPlug_NoiseReduction")
-                         ? MODPLUG_ENABLE_NOISE_REDUCTION
-                         : 0;
-  settings.mFlags |=
-      options_get_bool("ModPlug_Reverb") ? MODPLUG_ENABLE_REVERB : 0;
-  settings.mFlags |=
-      options_get_bool("ModPlug_MegaBass") ? MODPLUG_ENABLE_MEGABASS : 0;
-  settings.mFlags |=
-      options_get_bool("ModPlug_Surround") ? MODPLUG_ENABLE_SURROUND : 0;
-  if (!strcasecmp(options_get_symb("ModPlug_ResamplingMode"), "FIR"))
-  {
-    settings.mResamplingMode = MODPLUG_RESAMPLE_FIR;
-  }
-  if (!strcasecmp(options_get_symb("ModPlug_ResamplingMode"), "SPLINE"))
-  {
-    settings.mResamplingMode = MODPLUG_RESAMPLE_SPLINE;
-  }
-  if (!strcasecmp(options_get_symb("ModPlug_ResamplingMode"), "LINEAR"))
-  {
-    settings.mResamplingMode = MODPLUG_RESAMPLE_LINEAR;
-  }
-  if (!strcasecmp(options_get_symb("ModPlug_ResamplingMode"), "NEAREST"))
-  {
-    settings.mResamplingMode = MODPLUG_RESAMPLE_NEAREST;
-  }
-  settings.mChannels = options_get_int("ModPlug_Channels");
-  settings.mBits = options_get_int("ModPlug_Bits");
-  settings.mFrequency = options_get_int("ModPlug_Frequency");
-  settings.mReverbDepth = options_get_int("ModPlug_ReverbDepth");
-  settings.mReverbDelay = options_get_int("ModPlug_ReverbDelay");
-  settings.mBassAmount = options_get_int("ModPlug_BassAmount");
-  settings.mBassRange = options_get_int("ModPlug_BassRange");
-  settings.mSurroundDepth = options_get_int("ModPlug_SurroundDepth");
-  settings.mSurroundDelay = options_get_int("ModPlug_SurroundDelay");
-  settings.mLoopCount = options_get_int("ModPlug_LoopCount");
-  ModPlug_SetSettings(&settings);
-  return &modplug_decoder;
+    int seek(int sec) override {
+        return modplug_seek(data, sec);
+    }
+
+    int get_bitrate() override {
+        return modplug_get_bitrate(data);
+    }
+
+    int get_duration() override {
+        return modplug_get_duration(data);
+    }
+
+    void get_error(struct decoder_error *error) override {
+        modplug_get_error(data, error);
+    }
+};
+
+class ModplugPlugin : public AudioPlugin {
+public:
+
+    void init() override {
+        ModPlug_GetSettings(&settings);
+        settings.mFlags = 0;
+        settings.mFlags |= options_get_bool("ModPlug_Oversampling") ? MODPLUG_ENABLE_OVERSAMPLING : 0;
+        settings.mFlags |= options_get_bool("ModPlug_NoiseReduction") ? MODPLUG_ENABLE_NOISE_REDUCTION : 0;
+        settings.mFlags |= options_get_bool("ModPlug_Reverb") ? MODPLUG_ENABLE_REVERB : 0;
+        settings.mFlags |= options_get_bool("ModPlug_MegaBass") ? MODPLUG_ENABLE_MEGABASS : 0;
+        settings.mFlags |= options_get_bool("ModPlug_Surround") ? MODPLUG_ENABLE_SURROUND : 0;
+        if (!strcasecmp(options_get_symb("ModPlug_ResamplingMode"), "FIR")) {
+            settings.mResamplingMode = MODPLUG_RESAMPLE_FIR;
+        }
+        if (!strcasecmp(options_get_symb("ModPlug_ResamplingMode"), "SPLINE")) {
+            settings.mResamplingMode = MODPLUG_RESAMPLE_SPLINE;
+        }
+        if (!strcasecmp(options_get_symb("ModPlug_ResamplingMode"), "LINEAR")) {
+            settings.mResamplingMode = MODPLUG_RESAMPLE_LINEAR;
+        }
+        if (!strcasecmp(options_get_symb("ModPlug_ResamplingMode"), "NEAREST")) {
+            settings.mResamplingMode = MODPLUG_RESAMPLE_NEAREST;
+        }
+        settings.mChannels = options_get_int("ModPlug_Channels");
+        settings.mBits = options_get_int("ModPlug_Bits");
+        settings.mFrequency = options_get_int("ModPlug_Frequency");
+        settings.mReverbDepth = options_get_int("ModPlug_ReverbDepth");
+        settings.mReverbDelay = options_get_int("ModPlug_ReverbDelay");
+        settings.mBassAmount = options_get_int("ModPlug_BassAmount");
+        settings.mBassRange = options_get_int("ModPlug_BassRange");
+        settings.mSurroundDepth = options_get_int("ModPlug_SurroundDepth");
+        settings.mSurroundDelay = options_get_int("ModPlug_SurroundDelay");
+        settings.mLoopCount = options_get_int("ModPlug_LoopCount");
+        ModPlug_SetSettings(&settings);
+    }
+
+    std::unique_ptr<AudioDecoder> open(const char *file) override {
+        void *d = modplug_open(file);
+        if (!d) return nullptr;
+        return std::make_unique<ModplugDecoder>(d);
+    }
+
+    void info(const char *file_name, struct file_tags *info, const int tags_sel) override {
+        modplug_info(file_name, info, tags_sel);
+    }
+
+    int our_format_ext(const char *ext) override {
+        return modplug_our_format_ext(ext);
+    }
+};
+
+extern "C" class AudioPlugin *modplug_plugin_init() {
+    static ModplugPlugin plugin;
+    return &plugin;
 }
 
 // EOF

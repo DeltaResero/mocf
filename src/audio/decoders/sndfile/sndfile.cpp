@@ -17,6 +17,7 @@
 #include <cerrno>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -415,24 +416,70 @@ static void sndfile_get_error(void *prv_data, struct decoder_error *error)
   decoder_error_copy(error, &data->error);
 }
 
-static struct decoder sndfile_decoder = {DECODER_API_VERSION,
-                                         sndfile_init,
-                                         sndfile_destroy,
-                                         sndfile_open,
-                                         sndfile_close,
-                                         sndfile_decode,
-                                         sndfile_seek,
-                                         sndfile_info,
-                                         sndfile_get_bitrate,
-                                         sndfile_get_duration,
-                                         sndfile_get_error,
-                                         sndfile_our_format_ext,
-                                         NULL,
-                                         sndfile_get_name,
-                                         NULL,
-                                         NULL,
-                                         NULL};
 
-extern "C" struct decoder *sndfile_plugin_init() { return &sndfile_decoder; }
+class SndfileDecoder : public AudioDecoder {
+public:
+    void *data;
+    SndfileDecoder(void *d) : data(d) {}
+    ~SndfileDecoder() override { sndfile_close(data); }
+    
+    int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
+        return sndfile_decode(data, buf, buf_len, sound_params);
+    }
+
+    int seek(int sec) override {
+        return sndfile_seek(data, sec);
+    }
+
+    int get_bitrate() override {
+        return sndfile_get_bitrate(data);
+    }
+
+    int get_duration() override {
+        return sndfile_get_duration(data);
+    }
+
+    void get_error(struct decoder_error *error) override {
+        sndfile_get_error(data, error);
+    }
+};
+
+class SndfilePlugin : public AudioPlugin {
+public:
+
+    void init() override {
+        sndfile_init();
+    }
+
+    void destroy() override {
+        sndfile_destroy();
+    }
+
+    std::unique_ptr<AudioDecoder> open(const char *file) override {
+        void *d = sndfile_open(file);
+        if (!d) return nullptr;
+        return std::make_unique<SndfileDecoder>(d);
+    }
+
+    void info(const char *file_name, struct file_tags *info, const int tags_sel) override {
+        sndfile_info(file_name, info, tags_sel);
+    }
+
+    int our_format_ext(const char *ext) override {
+        return sndfile_our_format_ext(ext);
+    }
+
+    void get_name(const char *file, char buf[4]) override {
+        sndfile_get_name(file, buf);
+    }
+};
+
+extern "C" class AudioPlugin *sndfile_plugin_init() {
+    static SndfilePlugin plugin;
+    return &plugin;
+}
+
+
+
 
 // EOF

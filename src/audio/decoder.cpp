@@ -35,7 +35,7 @@
 static const struct
 {
   const char *name;
-  struct decoder *(*init)(void);
+  AudioPlugin *(*init)(void);
 } decoder_table[] = {
 #include "decoders/decoder_list.h"
 };
@@ -45,7 +45,7 @@ static const struct
 static struct plugin
 {
   const char *name;
-  struct decoder *decoder;
+  AudioPlugin *decoder;
 } plugins[PLUGINS_NUM > 0 ? PLUGINS_NUM : 1];
 
 static int plugins_num = 0;
@@ -159,8 +159,7 @@ static int find_extn_decoder(int *decoder_list, int count, const char *extn)
 
   for (ix = 0; ix < count; ix += 1)
   {
-    if (plugins[decoder_list[ix]].decoder->our_format_ext &&
-        plugins[decoder_list[ix]].decoder->our_format_ext(extn))
+    if (plugins[decoder_list[ix]].decoder->our_format_ext(extn))
     {
       return decoder_list[ix];
     }
@@ -181,8 +180,7 @@ static int find_mime_decoder(int *decoder_list, int count, const char *mime)
 
   for (ix = 0; ix < count; ix += 1)
   {
-    if (plugins[decoder_list[ix]].decoder->our_format_mime &&
-        plugins[decoder_list[ix]].decoder->our_format_mime(mime))
+    if (plugins[decoder_list[ix]].decoder->our_format_mime(mime))
     {
       return decoder_list[ix];
     }
@@ -258,10 +256,7 @@ char *file_type_name(const char *file)
   }
 
   memset(buf, 0, sizeof(buf));
-  if (plugins[i].decoder->get_name)
-  {
-    plugins[i].decoder->get_name(file, buf);
-  }
+  plugins[i].decoder->get_name(file, buf);
 
   /* Attempt a default name if we have nothing else. */
   if (!buf[0])
@@ -294,7 +289,7 @@ char *file_type_name(const char *file)
   return buf;
 }
 
-struct decoder *get_decoder(const char *file)
+AudioPlugin *get_decoder(const char *file)
 {
   int i;
 
@@ -308,7 +303,7 @@ struct decoder *get_decoder(const char *file)
 }
 
 /* Given a decoder pointer, return its name. */
-const char *get_decoder_name(const struct decoder *decoder)
+const char *get_decoder_name(const AudioPlugin *decoder)
 {
   int ix;
   const char *result = NULL;
@@ -592,10 +587,7 @@ static void load_plugins(int debug_info)
     }
     plugins[ix].name = decoder_table[ix].name;
     debug("Registered %s decoder", plugins[ix].name);
-    if (plugins[ix].decoder->init)
-    {
-      plugins[ix].decoder->init();
-    }
+    plugins[ix].decoder->init();
     plugins_num += 1;
   }
 
@@ -630,10 +622,7 @@ static void cleanup_decoders()
 
   for (ix = 0; ix < plugins_num; ix++)
   {
-    if (plugins[ix].decoder->destroy)
-    {
-      plugins[ix].decoder->destroy();
-    }
+    plugins[ix].decoder->destroy();
     /* plugins[ix].name points into decoder_table — not malloc'd. */
   }
 }

@@ -81,7 +81,7 @@ int    sidplayfp_decode         (void *void_data, char *buf, int buf_len,
 int    sidplayfp_get_bitrate    (void *void_data);
 int    sidplayfp_get_duration   (void *void_data);
 int    sidplayfp_our_format_ext (const char *ext);
-struct decoder *sidplayfp_plugin_init (void);
+class AudioPlugin *sidplayfp_plugin_init (void);
 
 #ifdef __cplusplus
 }

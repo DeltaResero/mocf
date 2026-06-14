@@ -21,6 +21,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 #include <wavpack/wavpack.h>
@@ -298,24 +299,70 @@ static int wav_our_format_ext(const char *ext)
   return !strcasecmp(ext, "WV");
 }
 
-static struct decoder wv_decoder = {DECODER_API_VERSION,
-                                    NULL, // wav_init
-                                    NULL, // wav_destroy
-                                    wav_open,
-                                    wav_close,
-                                    wav_decode,
-                                    wav_seek,
-                                    wav_info,
-                                    wav_get_bitrate,
-                                    wav_get_duration,
-                                    wav_get_error,
-                                    wav_our_format_ext,
-                                    wav_our_mime,
-                                    wav_get_name,
-                                    NULL, // wav_current_tags,
-                                    NULL, // wav_get_stream
-                                    wav_get_avg_bitrate};
 
-extern "C" struct decoder *wavpack_plugin_init() { return &wv_decoder; }
+class WavpackDecoder : public AudioDecoder {
+public:
+    void *data;
+    WavpackDecoder(void *d) : data(d) {}
+    ~WavpackDecoder() override { wav_close(data); }
+    
+    int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
+        return wav_decode(data, buf, buf_len, sound_params);
+    }
+
+    int seek(int sec) override {
+        return wav_seek(data, sec);
+    }
+
+    int get_bitrate() override {
+        return wav_get_bitrate(data);
+    }
+
+    int get_duration() override {
+        return wav_get_duration(data);
+    }
+
+    void get_error(struct decoder_error *error) override {
+        wav_get_error(data, error);
+    }
+
+    int get_avg_bitrate() override {
+        return wav_get_avg_bitrate(data);
+    }
+};
+
+class WavpackPlugin : public AudioPlugin {
+public:
+
+    std::unique_ptr<AudioDecoder> open(const char *file) override {
+        void *d = wav_open(file);
+        if (!d) return nullptr;
+        return std::make_unique<WavpackDecoder>(d);
+    }
+
+    void info(const char *file_name, struct file_tags *info, const int tags_sel) override {
+        wav_info(file_name, info, tags_sel);
+    }
+
+    int our_format_ext(const char *ext) override {
+        return wav_our_format_ext(ext);
+    }
+
+    int our_format_mime(const char *mime) override {
+        return wav_our_mime(mime);
+    }
+
+    void get_name(const char *file, char buf[4]) override {
+        wav_get_name(file, buf);
+    }
+};
+
+extern "C" class AudioPlugin *wavpack_plugin_init() {
+    static WavpackPlugin plugin;
+    return &plugin;
+}
+
+
+
 
 // EOF

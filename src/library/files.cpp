@@ -356,7 +356,7 @@ void resolve_path(char *buf, size_t size, const char *file)
 struct file_tags *read_file_tags(const char *file, struct file_tags *tags,
                                  const int tags_sel)
 {
-  struct decoder *df;
+  AudioPlugin *df;
   int needed_tags;
 
   assert(file != NULL);

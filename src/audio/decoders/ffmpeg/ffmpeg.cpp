@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <pthread.h>
 #include <vector>
 
@@ -1537,24 +1538,78 @@ static void ffmpeg_get_error(void *prv_data, struct decoder_error *error)
   decoder_error_copy(error, &data->error);
 }
 
-static struct decoder ffmpeg_decoder = {DECODER_API_VERSION,
-                                        ffmpeg_init,
-                                        ffmpeg_destroy,
-                                        ffmpeg_open,
-                                        ffmpeg_close,
-                                        ffmpeg_decode,
-                                        ffmpeg_seek,
-                                        ffmpeg_info,
-                                        ffmpeg_get_bitrate,
-                                        ffmpeg_get_duration,
-                                        ffmpeg_get_error,
-                                        ffmpeg_our_format_ext,
-                                        ffmpeg_our_format_mime,
-                                        NULL,
-                                        NULL,
-                                        ffmpeg_get_iostream,
-                                        ffmpeg_get_avg_bitrate};
 
-extern "C" struct decoder *ffmpeg_plugin_init() { return &ffmpeg_decoder; }
+class FfmpegDecoder : public AudioDecoder {
+public:
+    void *data;
+    FfmpegDecoder(void *d) : data(d) {}
+    ~FfmpegDecoder() override { ffmpeg_close(data); }
+    
+    int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
+        return ffmpeg_decode(data, buf, buf_len, sound_params);
+    }
+
+    int seek(int sec) override {
+        return ffmpeg_seek(data, sec);
+    }
+
+    int get_bitrate() override {
+        return ffmpeg_get_bitrate(data);
+    }
+
+    int get_duration() override {
+        return ffmpeg_get_duration(data);
+    }
+
+    void get_error(struct decoder_error *error) override {
+        ffmpeg_get_error(data, error);
+    }
+
+    struct io_stream *get_stream() override {
+        return ffmpeg_get_iostream(data);
+    }
+
+    int get_avg_bitrate() override {
+        return ffmpeg_get_avg_bitrate(data);
+    }
+};
+
+class FfmpegPlugin : public AudioPlugin {
+public:
+
+    void init() override {
+        ffmpeg_init();
+    }
+
+    void destroy() override {
+        ffmpeg_destroy();
+    }
+
+    std::unique_ptr<AudioDecoder> open(const char *file) override {
+        void *d = ffmpeg_open(file);
+        if (!d) return nullptr;
+        return std::make_unique<FfmpegDecoder>(d);
+    }
+
+    void info(const char *file_name, struct file_tags *info, const int tags_sel) override {
+        ffmpeg_info(file_name, info, tags_sel);
+    }
+
+    int our_format_ext(const char *ext) override {
+        return ffmpeg_our_format_ext(ext);
+    }
+
+    int our_format_mime(const char *mime) override {
+        return ffmpeg_our_format_mime(mime);
+    }
+};
+
+extern "C" class AudioPlugin *ffmpeg_plugin_init() {
+    static FfmpegPlugin plugin;
+    return &plugin;
+}
+
+
+
 
 // EOF

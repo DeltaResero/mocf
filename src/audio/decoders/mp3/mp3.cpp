@@ -24,6 +24,7 @@
 #include <cinttypes>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <unistd.h>
 #include <mad.h>
@@ -797,24 +798,82 @@ static void mp3_destroy()
   }
 }
 
-static struct decoder mp3_decoder = {DECODER_API_VERSION,
-                                     mp3_init,
-                                     mp3_destroy,
-                                     mp3_open,
-                                     mp3_close,
-                                     mp3_decode,
-                                     mp3_seek,
-                                     mp3_info,
-                                     mp3_get_bitrate,
-                                     mp3_get_duration,
-                                     mp3_get_error,
-                                     mp3_our_format_ext,
-                                     mp3_our_mime,
-                                     mp3_get_name,
-                                     NULL,
-                                     mp3_get_stream,
-                                     mp3_get_avg_bitrate};
 
-extern "C" struct decoder *mp3_plugin_init() { return &mp3_decoder; }
+class Mp3Decoder : public AudioDecoder {
+public:
+    void *data;
+    Mp3Decoder(void *d) : data(d) {}
+    ~Mp3Decoder() override { mp3_close(data); }
+    
+    int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
+        return mp3_decode(data, buf, buf_len, sound_params);
+    }
+
+    int seek(int sec) override {
+        return mp3_seek(data, sec);
+    }
+
+    int get_bitrate() override {
+        return mp3_get_bitrate(data);
+    }
+
+    int get_duration() override {
+        return mp3_get_duration(data);
+    }
+
+    void get_error(struct decoder_error *error) override {
+        mp3_get_error(data, error);
+    }
+
+    struct io_stream *get_stream() override {
+        return mp3_get_stream(data);
+    }
+
+    int get_avg_bitrate() override {
+        return mp3_get_avg_bitrate(data);
+    }
+};
+
+class Mp3Plugin : public AudioPlugin {
+public:
+
+    void init() override {
+        mp3_init();
+    }
+
+    void destroy() override {
+        mp3_destroy();
+    }
+
+    std::unique_ptr<AudioDecoder> open(const char *file) override {
+        void *d = mp3_open(file);
+        if (!d) return nullptr;
+        return std::make_unique<Mp3Decoder>(d);
+    }
+
+    void info(const char *file_name, struct file_tags *info, const int tags_sel) override {
+        mp3_info(file_name, info, tags_sel);
+    }
+
+    int our_format_ext(const char *ext) override {
+        return mp3_our_format_ext(ext);
+    }
+
+    int our_format_mime(const char *mime) override {
+        return mp3_our_mime(mime);
+    }
+
+    void get_name(const char *file, char buf[4]) override {
+        mp3_get_name(file, buf);
+    }
+};
+
+extern "C" class AudioPlugin *mp3_plugin_init() {
+    static Mp3Plugin plugin;
+    return &plugin;
+}
+
+
+
 
 // EOF

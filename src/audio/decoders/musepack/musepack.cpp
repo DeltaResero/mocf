@@ -18,6 +18,7 @@
 #include <cinttypes>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -478,24 +479,70 @@ static void musepack_get_error(void *prv_data, struct decoder_error *error)
   decoder_error_copy(error, &data->error);
 }
 
-static struct decoder musepack_decoder = {DECODER_API_VERSION,
-                                          NULL,
-                                          NULL,
-                                          musepack_open,
-                                          musepack_close,
-                                          musepack_decode,
-                                          musepack_seek,
-                                          musepack_info,
-                                          musepack_get_bitrate,
-                                          musepack_get_duration,
-                                          musepack_get_error,
-                                          musepack_our_format_ext,
-                                          NULL /*musepack_our_mime*/,
-                                          musepack_get_name,
-                                          NULL /* musepack_current_tags */,
-                                          musepack_get_stream,
-                                          musepack_get_avg_bitrate};
 
-extern "C" struct decoder *musepack_plugin_init() { return &musepack_decoder; }
+class MusepackDecoder : public AudioDecoder {
+public:
+    void *data;
+    MusepackDecoder(void *d) : data(d) {}
+    ~MusepackDecoder() override { musepack_close(data); }
+    
+    int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
+        return musepack_decode(data, buf, buf_len, sound_params);
+    }
+
+    int seek(int sec) override {
+        return musepack_seek(data, sec);
+    }
+
+    int get_bitrate() override {
+        return musepack_get_bitrate(data);
+    }
+
+    int get_duration() override {
+        return musepack_get_duration(data);
+    }
+
+    void get_error(struct decoder_error *error) override {
+        musepack_get_error(data, error);
+    }
+
+    struct io_stream *get_stream() override {
+        return musepack_get_stream(data);
+    }
+
+    int get_avg_bitrate() override {
+        return musepack_get_avg_bitrate(data);
+    }
+};
+
+class MusepackPlugin : public AudioPlugin {
+public:
+
+    std::unique_ptr<AudioDecoder> open(const char *file) override {
+        void *d = musepack_open(file);
+        if (!d) return nullptr;
+        return std::make_unique<MusepackDecoder>(d);
+    }
+
+    void info(const char *file_name, struct file_tags *info, const int tags_sel) override {
+        musepack_info(file_name, info, tags_sel);
+    }
+
+    int our_format_ext(const char *ext) override {
+        return musepack_our_format_ext(ext);
+    }
+
+    void get_name(const char *file, char buf[4]) override {
+        musepack_get_name(file, buf);
+    }
+};
+
+extern "C" class AudioPlugin *musepack_plugin_init() {
+    static MusepackPlugin plugin;
+    return &plugin;
+}
+
+
+
 
 // EOF

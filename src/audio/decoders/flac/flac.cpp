@@ -17,6 +17,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <memory>
 #include <FLAC/all.h>
 
 #define DEBUG
@@ -35,8 +36,9 @@
   ((FLAC__MAX_BLOCK_SIZE + SAMPLES_PER_WRITE) * MAX_SUPPORTED_CHANNELS *       \
    (32 / 8))
 
-struct flac_data
+class FlacDecoder : public AudioDecoder
 {
+public:
   FLAC__StreamDecoder *decoder;
   struct io_stream *stream;
   int bitrate;
@@ -58,6 +60,16 @@ struct flac_data
 
   int ok; /* was this stream successfully opened? */
   struct decoder_error error;
+
+  FlacDecoder();
+  ~FlacDecoder() override;
+
+  int decode(char *buf, int buf_len, struct sound_params *sound_params) override;
+  int seek(int sec) override;
+  int get_bitrate() override;
+  int get_duration() override;
+  void get_error(struct decoder_error *error) override;
+  int get_avg_bitrate() override;
 };
 
 /* Convert FLAC big-endian data into PCM little-endian. */
@@ -122,7 +134,7 @@ write_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
          const FLAC__Frame *frame, const FLAC__int32 *const buffer[],
          void *client_data)
 {
-  struct flac_data *data = (struct flac_data *)client_data;
+  FlacDecoder *data = (FlacDecoder *)client_data;
   const unsigned int wide_samples = frame->header.blocksize;
 
   if (data->abort)
@@ -140,7 +152,7 @@ write_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
 static void metadata_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
                         const FLAC__StreamMetadata *metadata, void *client_data)
 {
-  struct flac_data *data = (struct flac_data *)client_data;
+  FlacDecoder *data = (FlacDecoder *)client_data;
 
   if (metadata->type == FLAC__METADATA_TYPE_STREAMINFO)
   {
@@ -160,7 +172,7 @@ static void metadata_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
 static void error_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
                      FLAC__StreamDecoderErrorStatus status, void *client_data)
 {
-  struct flac_data *data = (struct flac_data *)client_data;
+  FlacDecoder *data = (FlacDecoder *)client_data;
 
   if (status != FLAC__STREAM_DECODER_ERROR_STATUS_LOST_SYNC)
   {
@@ -177,7 +189,7 @@ static FLAC__StreamDecoderReadStatus
 read_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED, FLAC__byte buffer[],
         size_t *bytes, void *client_data)
 {
-  struct flac_data *data = (struct flac_data *)client_data;
+  FlacDecoder *data = (FlacDecoder *)client_data;
   ssize_t res;
 
   res = io_read(data->stream, buffer, *bytes);
@@ -204,7 +216,7 @@ static FLAC__StreamDecoderSeekStatus
 seek_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
         FLAC__uint64 absolute_byte_offset, void *client_data)
 {
-  struct flac_data *data = (struct flac_data *)client_data;
+  FlacDecoder *data = (FlacDecoder *)client_data;
 
   return io_seek(data->stream, absolute_byte_offset, SEEK_SET) >= 0
              ? FLAC__STREAM_DECODER_SEEK_STATUS_OK
@@ -215,7 +227,7 @@ static FLAC__StreamDecoderTellStatus
 tell_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
         FLAC__uint64 *absolute_byte_offset, void *client_data)
 {
-  struct flac_data *data = (struct flac_data *)client_data;
+  FlacDecoder *data = (FlacDecoder *)client_data;
 
   *absolute_byte_offset = io_tell(data->stream);
 
@@ -227,7 +239,7 @@ length_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
           FLAC__uint64 *stream_length, void *client_data)
 {
   off_t file_size;
-  struct flac_data *data = (struct flac_data *)client_data;
+  FlacDecoder *data = (FlacDecoder *)client_data;
 
   file_size = io_file_size(data->stream);
   if (file_size == -1)
@@ -243,26 +255,39 @@ length_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
 static FLAC__bool eof_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
                          void *client_data)
 {
-  struct flac_data *data = (struct flac_data *)client_data;
+  FlacDecoder *data = (FlacDecoder *)client_data;
 
   return io_eof(data->stream);
 }
 
-static void *flac_open_internal(const char *file, const int buffered)
+FlacDecoder::FlacDecoder()
 {
-  struct flac_data *data;
+  decoder_error_init(&error);
+  decoder = NULL;
+  bitrate = -1;
+  avg_bitrate = -1;
+  abort = 0;
+  sample_buffer_fill = 0;
+  last_decode_position = 0;
+  length = -1;
+  ok = 0;
+}
 
-  data = new flac_data;
-  decoder_error_init(&data->error);
+FlacDecoder::~FlacDecoder()
+{
+  if (decoder)
+  {
+    FLAC__stream_decoder_finish(decoder);
+    FLAC__stream_decoder_delete(decoder);
+  }
 
-  data->decoder = NULL;
-  data->bitrate = -1;
-  data->avg_bitrate = -1;
-  data->abort = 0;
-  data->sample_buffer_fill = 0;
-  data->last_decode_position = 0;
-  data->length = -1;
-  data->ok = 0;
+  io_close(stream);
+  decoder_error_clear(&error);
+}
+
+static std::unique_ptr<AudioDecoder> flac_open_internal(const char *file, const int buffered)
+{
+  auto data = std::make_unique<FlacDecoder>();
 
   data->stream = io_open(file, buffered);
   if (!io_ok(data->stream))
@@ -287,7 +312,7 @@ static void *flac_open_internal(const char *file, const int buffered)
 
   if (FLAC__stream_decoder_init_stream(
           data->decoder, read_cb, seek_cb, tell_cb, length_cb, eof_cb, write_cb,
-          metadata_cb, error_cb, data) != FLAC__STREAM_DECODER_INIT_STATUS_OK)
+          metadata_cb, error_cb, data.get()) != FLAC__STREAM_DECODER_INIT_STATUS_OK)
   {
     decoder_error(&data->error, ERROR_FATAL, 0,
                   "FLAC__stream_decoder_init() failed");
@@ -322,23 +347,6 @@ static void *flac_open_internal(const char *file, const int buffered)
   debug("File opened. Channels %d. Samplerate %d. Duration %d. Avg_Bitrate %d.",
         data->channels, data->sample_rate, data->length, data->avg_bitrate);
   return data;
-}
-
-static void *flac_open(const char *file) { return flac_open_internal(file, 1); }
-
-static void flac_close(void *void_data)
-{
-  struct flac_data *data = (struct flac_data *)void_data;
-
-  if (data->decoder)
-  {
-    FLAC__stream_decoder_finish(data->decoder);
-    FLAC__stream_decoder_delete(data->decoder);
-  }
-
-  io_close(data->stream);
-  decoder_error_clear(&data->error);
-  delete data;
 }
 
 static void fill_tag(FLAC__StreamMetadata_VorbisComment_Entry *comm,
@@ -430,41 +438,19 @@ static void get_vorbiscomments(const char *filename, struct file_tags *tags)
   FLAC__metadata_simple_iterator_delete(iterator);
 }
 
-static void flac_info(const char *file_name, struct file_tags *info,
-                      const int tags_sel)
+int FlacDecoder::seek(int sec)
 {
-  if (tags_sel & TAGS_TIME)
-  {
-    struct flac_data *data;
-
-    data = static_cast<struct flac_data *>(flac_open_internal(file_name, 0));
-    if (data->ok)
-    {
-      info->time = data->length;
-    }
-    flac_close(data);
-  }
-
-  if (tags_sel & TAGS_COMMENTS)
-  {
-    get_vorbiscomments(file_name, info);
-  }
-}
-
-static int flac_seek(void *void_data, int sec)
-{
-  struct flac_data *data = (struct flac_data *)void_data;
   FLAC__uint64 target_sample;
 
-  if ((unsigned int)sec > data->length)
+  if ((unsigned int)sec > length)
   {
     return -1;
   }
 
-  target_sample = (FLAC__uint64)(((double)sec / (double)data->length) *
-                                 (double)data->total_samples);
+  target_sample = (FLAC__uint64)(((double)sec / (double)length) *
+                                 (double)total_samples);
 
-  if (FLAC__stream_decoder_seek_absolute(data->decoder, target_sample))
+  if (FLAC__stream_decoder_seek_absolute(decoder, target_sample))
   {
     return sec;
   }
@@ -474,17 +460,16 @@ static int flac_seek(void *void_data, int sec)
   return -1;
 }
 
-static int flac_decode(void *void_data, char *buf, int buf_len,
+int FlacDecoder::decode(char *buf, int buf_len,
                        struct sound_params *sound_params)
 {
-  struct flac_data *data = (struct flac_data *)void_data;
   unsigned int to_copy;
-  int bytes_per_sample;
+  int bytes_per_sample_val;
   FLAC__uint64 decode_position;
 
-  bytes_per_sample = data->bits_per_sample / 8;
+  bytes_per_sample_val = bits_per_sample / 8;
 
-  switch (bytes_per_sample)
+  switch (bytes_per_sample_val)
   {
     case 1:
       sound_params->fmt = SFMT_S8;
@@ -500,131 +485,133 @@ static int flac_decode(void *void_data, char *buf, int buf_len,
       break;
   }
 
-  sound_params->rate = data->sample_rate;
-  sound_params->channels = data->channels;
+  sound_params->rate = sample_rate;
+  sound_params->channels = channels;
 
-  decoder_error_clear(&data->error);
+  decoder_error_clear(&error);
 
-  if (!data->sample_buffer_fill)
+  if (!sample_buffer_fill)
   {
     debug("decoding...");
 
-    if (FLAC__stream_decoder_get_state(data->decoder) ==
+    if (FLAC__stream_decoder_get_state(decoder) ==
         FLAC__STREAM_DECODER_END_OF_STREAM)
     {
       logit("EOF");
       return 0;
     }
 
-    if (!FLAC__stream_decoder_process_single(data->decoder))
+    if (!FLAC__stream_decoder_process_single(decoder))
     {
-      decoder_error(&data->error, ERROR_FATAL, 0,
+      decoder_error(&error, ERROR_FATAL, 0,
                     "Read error processing frame.");
       return 0;
     }
 
     /* Count the bitrate */
-    if (!FLAC__stream_decoder_get_decode_position(data->decoder,
+    if (!FLAC__stream_decoder_get_decode_position(decoder,
                                                   &decode_position))
     {
       decode_position = 0;
     }
-    if (decode_position > data->last_decode_position)
+    if (decode_position > last_decode_position)
     {
-      int bytes_per_sec = bytes_per_sample * data->sample_rate * data->channels;
+      int bytes_per_sec = bytes_per_sample_val * sample_rate * channels;
 
-      data->bitrate = (decode_position - data->last_decode_position) * 8.0 /
-                      (data->sample_buffer_fill / (float)bytes_per_sec) / 1000;
+      bitrate = (decode_position - last_decode_position) * 8.0 /
+                      (sample_buffer_fill / (float)bytes_per_sec) / 1000;
     }
 
-    data->last_decode_position = decode_position;
+    last_decode_position = decode_position;
   }
   else
   {
     debug("Some date remain in the buffer.");
   }
 
-  debug("Decoded %d bytes", data->sample_buffer_fill);
+  debug("Decoded %d bytes", sample_buffer_fill);
 
-  to_copy = MIN((unsigned int)buf_len, data->sample_buffer_fill);
-  memcpy(buf, data->sample_buffer, to_copy);
-  memmove(data->sample_buffer, data->sample_buffer + to_copy,
-          data->sample_buffer_fill - to_copy);
-  data->sample_buffer_fill -= to_copy;
+  to_copy = MIN((unsigned int)buf_len, sample_buffer_fill);
+  memcpy(buf, sample_buffer, to_copy);
+  memmove(sample_buffer, sample_buffer + to_copy,
+          sample_buffer_fill - to_copy);
+  sample_buffer_fill -= to_copy;
 
   return to_copy;
 }
 
-static int flac_get_bitrate(void *void_data)
+int FlacDecoder::get_bitrate()
 {
-  struct flac_data *data = (struct flac_data *)void_data;
-
-  return data->bitrate;
+  return bitrate;
 }
 
-static int flac_get_avg_bitrate(void *void_data)
+int FlacDecoder::get_avg_bitrate()
 {
-  struct flac_data *data = (struct flac_data *)void_data;
-
-  return data->avg_bitrate / 1000;
+  return avg_bitrate / 1000;
 }
 
-static int flac_get_duration(void *void_data)
+int FlacDecoder::get_duration()
 {
   int result = -1;
-  struct flac_data *data = (struct flac_data *)void_data;
 
-  if (data->ok)
+  if (ok)
   {
-    result = data->length;
+    result = length;
   }
 
   return result;
 }
 
-static void flac_get_name(const char *unused ATTR_UNUSED, char buf[4])
+void FlacDecoder::get_error(struct decoder_error *out_error)
 {
-  strcpy(buf, "FLC");
+  decoder_error_copy(out_error, &error);
 }
 
-static int flac_our_format_ext(const char *ext)
+class FlacPlugin : public AudioPlugin
 {
-  return !strcasecmp(ext, "flac") || !strcasecmp(ext, "fla");
-}
+public:
+  std::unique_ptr<AudioDecoder> open(const char *file) override
+  {
+    return flac_open_internal(file, 1);
+  }
 
-static int flac_our_format_mime(const char *mime)
-{
-  return !strcasecmp(mime, "audio/flac") ||
-         !strncasecmp(mime, "audio/flac;", 11) ||
-         !strcasecmp(mime, "audio/x-flac") ||
-         !strncasecmp(mime, "audio/x-flac;", 13);
-}
+  void info(const char *file_name, struct file_tags *info, const int tags_sel) override
+  {
+    if (tags_sel & TAGS_TIME)
+    {
+      auto data = flac_open_internal(file_name, 0);
+      if (static_cast<FlacDecoder*>(data.get())->ok)
+      {
+        info->time = static_cast<FlacDecoder*>(data.get())->length;
+      }
+    }
 
-static void flac_get_error(void *prv_data, struct decoder_error *error)
-{
-  struct flac_data *data = (struct flac_data *)prv_data;
+    if (tags_sel & TAGS_COMMENTS)
+    {
+      get_vorbiscomments(file_name, info);
+    }
+  }
 
-  decoder_error_copy(error, &data->error);
-}
+  void get_name(const char *unused ATTR_UNUSED, char buf[4]) override
+  {
+    strcpy(buf, "FLC");
+  }
 
-static struct decoder flac_decoder = {DECODER_API_VERSION,
-                                      NULL,
-                                      NULL,
-                                      flac_open,
-                                      flac_close,
-                                      flac_decode,
-                                      flac_seek,
-                                      flac_info,
-                                      flac_get_bitrate,
-                                      flac_get_duration,
-                                      flac_get_error,
-                                      flac_our_format_ext,
-                                      flac_our_format_mime,
-                                      flac_get_name,
-                                      NULL,
-                                      NULL,
-                                      flac_get_avg_bitrate};
+  int our_format_ext(const char *ext) override
+  {
+    return !strcasecmp(ext, "flac") || !strcasecmp(ext, "fla");
+  }
 
-extern "C" struct decoder *flac_plugin_init() { return &flac_decoder; }
+  int our_format_mime(const char *mime) override
+  {
+    return !strcasecmp(mime, "audio/flac") ||
+           !strncasecmp(mime, "audio/flac;", 11) ||
+           !strcasecmp(mime, "audio/x-flac") ||
+           !strncasecmp(mime, "audio/x-flac;", 13);
+  }
+};
+
+static FlacPlugin flac_plugin;
+extern "C" class AudioPlugin *flac_plugin_init() { return &flac_plugin; }
 
 // EOF

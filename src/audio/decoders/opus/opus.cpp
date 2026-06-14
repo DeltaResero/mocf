@@ -19,6 +19,7 @@
 #include <climits>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <opusfile.h>
 
 #define DEBUG
@@ -425,24 +426,78 @@ static int opus_our_mime(const char *mime)
          !strcasecmp(mime, "audio/ogg; codecs=opus");
 }
 
-static struct decoder opus_decoder = {DECODER_API_VERSION,
-                                      NULL,
-                                      NULL,
-                                      opus_open,
-                                      opus_close,
-                                      opus_decodeX,
-                                      opus_seek,
-                                      opus_tags,
-                                      opus_get_bitrate,
-                                      opus_get_duration,
-                                      opus_get_error,
-                                      opus_our_format_ext,
-                                      opus_our_mime,
-                                      opus_get_name,
-                                      opus_current_tags,
-                                      opus_get_stream,
-                                      opus_get_avg_bitrate};
 
-extern "C" struct decoder *opus_plugin_init() { return &opus_decoder; }
+class OpusDecoder : public AudioDecoder {
+public:
+    void *data;
+    OpusDecoder(void *d) : data(d) {}
+    ~OpusDecoder() override { opus_close(data); }
+    
+    int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
+        return opus_decodeX(data, buf, buf_len, sound_params);
+    }
+
+    int seek(int sec) override {
+        return opus_seek(data, sec);
+    }
+
+    int get_bitrate() override {
+        return opus_get_bitrate(data);
+    }
+
+    int get_duration() override {
+        return opus_get_duration(data);
+    }
+
+    void get_error(struct decoder_error *error) override {
+        opus_get_error(data, error);
+    }
+
+    int current_tags(struct file_tags *tags) override {
+        return opus_current_tags(data, tags);
+    }
+
+    struct io_stream *get_stream() override {
+        return opus_get_stream(data);
+    }
+
+    int get_avg_bitrate() override {
+        return opus_get_avg_bitrate(data);
+    }
+};
+
+class OpusPlugin : public AudioPlugin {
+public:
+
+    std::unique_ptr<AudioDecoder> open(const char *file) override {
+        void *d = opus_open(file);
+        if (!d) return nullptr;
+        return std::make_unique<OpusDecoder>(d);
+    }
+
+    void info(const char *file_name, struct file_tags *info, const int tags_sel) override {
+        opus_tags(file_name, info, tags_sel);
+    }
+
+    int our_format_ext(const char *ext) override {
+        return opus_our_format_ext(ext);
+    }
+
+    int our_format_mime(const char *mime) override {
+        return opus_our_mime(mime);
+    }
+
+    void get_name(const char *file, char buf[4]) override {
+        opus_get_name(file, buf);
+    }
+};
+
+extern "C" class AudioPlugin *opus_plugin_init() {
+    static OpusPlugin plugin;
+    return &plugin;
+}
+
+
+
 
 // EOF
