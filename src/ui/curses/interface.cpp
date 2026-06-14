@@ -26,9 +26,11 @@
 #include <locale.h>
 #include <sys/select.h>
 #include <unistd.h>
+#include <algorithm>
 #include <atomic>
 #include <memory>
 #include <string>
+#include <vector>
 
 #ifdef HAVE_SYS_INOTIFY_H
 #include <sys/inotify.h>
@@ -118,7 +120,7 @@ static time_t rounded_time() {
   return curr_time;
 }
 
-static void add_themes_to_list(lists_t_strs *themes, const char *themes_dir) {
+static void add_themes_to_list(std::vector<std::string> &themes, const char *themes_dir) {
   DIR *dir;
   struct dirent *entry;
   if (!(dir = opendir(themes_dir))) {
@@ -130,7 +132,7 @@ static void add_themes_to_list(lists_t_strs *themes, const char *themes_dir) {
     if (entry->d_name[0] == '.') continue;
     if (entry->d_name[strlen(entry->d_name) - 1] == '~') continue;
     if (snprintf(file, sizeof(file), "%s/%s", themes_dir, entry->d_name) >= ssizeof(file)) continue;
-    lists_strs_append(themes, file);
+    themes.push_back(file);
   }
   closedir(dir);
 }
@@ -142,16 +144,16 @@ static bool themes_cmp(const std::string &a, const std::string &b) {
 }
 
 static int add_themes_to_menu(const char *user_themes, const char *system_themes) {
-  lists_t_strs *themes = lists_strs_new(16);
+  std::vector<std::string> themes;
+  themes.reserve(16);
   add_themes_to_list(themes, user_themes);
   add_themes_to_list(themes, system_themes);
-  lists_strs_sort(themes, themes_cmp);
+  std::sort(themes.begin(), themes.end(), themes_cmp);
   int ix;
-  for (ix = 0; ix < lists_strs_size(themes); ix += 1) {
-    const char *file = lists_strs_at(themes, ix).c_str();
+  for (ix = 0; ix < static_cast<int>(themes.size()); ix += 1) {
+    const char *file = themes[ix].c_str();
     iface_add_file(file, strrchr(file, '/') + 1, F_THEME);
   }
-  lists_strs_free(themes);
   return ix;
 }
 
@@ -562,7 +564,7 @@ private:
         char last_dir[PATH_MAX];
         const char *new_dir = dir ? dir : cwd;
         int going_up = 0;
-        lists_t_strs *dirs, *playlists;
+        std::vector<std::string> dirs, playlists;
 
         iface_set_status("Reading directory...");
 
@@ -574,14 +576,12 @@ private:
 
         plist new_dir_plist;
         plist_init(&new_dir_plist);
-        dirs = lists_strs_new(FILES_LIST_INIT_SIZE);
-        playlists = lists_strs_new(FILES_LIST_INIT_SIZE);
+        dirs.reserve(FILES_LIST_INIT_SIZE);
+        playlists.reserve(FILES_LIST_INIT_SIZE);
 
         if (!read_directory(new_dir, dirs, playlists, &new_dir_plist)) {
             iface_set_status("");
             plist_free(&new_dir_plist);
-            lists_strs_free(dirs);
-            lists_strs_free(playlists);
             return 0;
         }
 
@@ -598,8 +598,8 @@ private:
 
         switch_titles_file(&dir_plist);
         plist_sort_fname(&dir_plist);
-        lists_strs_sort(dirs, sort_dirs_func);
-        lists_strs_sort(playlists, sort_strcmp_func);
+        std::sort(dirs.begin(), dirs.end(), sort_dirs_func);
+        std::sort(playlists.begin(), playlists.end(), sort_strcmp_func);
 
         ask_for_tags(&dir_plist, get_tags_setting());
 
@@ -613,8 +613,6 @@ private:
             }
 #endif
         }
-        lists_strs_free(dirs);
-        lists_strs_free(playlists);
         if (going_up) iface_set_curr_item_title(last_dir);
 
         iface_set_title(IFACE_MENU_DIR, cwd);
@@ -671,7 +669,7 @@ private:
         iface_set_status("Loading playlist...");
         if (plist_load(&playlist, file, cwd)) {
             if (!default_playlist) toggle_menu();
-            iface_set_dir_content(IFACE_MENU_PLIST, &playlist, NULL, NULL);
+            iface_set_dir_content(IFACE_MENU_PLIST, &playlist, {}, {});
             iface_update_queue_positions(&queue, &playlist, NULL, NULL);
             interface_message("Playlist loaded.");
         } else {
@@ -756,7 +754,7 @@ private:
         if (plist_count(&playlist)) {
             switch_titles_file(&playlist);
             ask_for_tags(&playlist, get_tags_setting());
-            iface_set_dir_content(IFACE_MENU_PLIST, &playlist, NULL, NULL);
+            iface_set_dir_content(IFACE_MENU_PLIST, &playlist, {}, {});
             iface_update_queue_positions(&queue, &playlist, NULL, NULL);
             iface_switch_to_plist();
         } else {

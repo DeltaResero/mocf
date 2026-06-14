@@ -20,6 +20,7 @@
 #include <cstring>
 #include <dirent.h>
 #include <string>
+#include <vector>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -33,7 +34,6 @@
 
 #include "core/common.h"
 #include "library/playlist.h"
-#include "utils/lists.h"
 #include "ui/curses/interface.h"
 #include "audio/decoder.h"
 #include "core/options.h"
@@ -394,8 +394,8 @@ struct file_tags *read_file_tags(const char *file, struct file_tags *tags,
 /* Read the content of the directory, make an array of absolute paths for
  * all recognized files. Put directories, playlists and sound files
  * in proper structures. Return 0 on error.*/
-int read_directory(const char *directory, lists_t_strs *dirs,
-                   lists_t_strs *playlists, struct plist *plist)
+int read_directory(const char *directory, std::vector<std::string> &dirs,
+                   std::vector<std::string> &playlists, struct plist *plist)
 {
   DIR *dir;
   struct dirent *entry;
@@ -404,8 +404,6 @@ int read_directory(const char *directory, lists_t_strs *dirs,
 
   assert(directory != NULL);
   assert(*directory == '/');
-  assert(dirs != NULL);
-  assert(playlists != NULL);
   assert(plist != NULL);
 
   if (!(dir = opendir(directory)))
@@ -460,11 +458,11 @@ int read_directory(const char *directory, lists_t_strs *dirs,
     }
     else if (type == F_DIR)
     {
-      lists_strs_append(dirs, file);
+      dirs.push_back(file);
     }
     else if (type == F_PLAYLIST)
     {
-      lists_strs_append(playlists, file);
+      playlists.push_back(file);
     }
   }
 

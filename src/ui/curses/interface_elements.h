@@ -26,7 +26,9 @@
 #include <wctype.h>
 #include <wchar.h>
 
-#include "utils/lists.h"
+#include <string>
+#include <vector>
+
 #include "library/files.h"
 #include "ui/input/keys.h"
 
@@ -79,12 +81,12 @@ extern "C"
   void iface_set_status(const char *msg);
   void iface_set_dir_content(const enum iface_menu iface_menu,
                              const struct plist *files,
-                             const lists_t_strs *dirs,
-                             const lists_t_strs *playlists);
+                             const std::vector<std::string> &dirs,
+                             const std::vector<std::string> &playlists);
   void iface_update_dir_content(const enum iface_menu iface_menu,
                                 const struct plist *files,
-                                const lists_t_strs *dirs,
-                                const lists_t_strs *playlists);
+                                const std::vector<std::string> &dirs,
+                                const std::vector<std::string> &playlists);
   void iface_set_curr_item_title(const char *title);
   void iface_get_key(struct iface_key *k);
   int iface_key_is_resize(const struct iface_key *k);

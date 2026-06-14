@@ -12,7 +12,10 @@
 #define FILES_H
 
 #include <stdio.h>
-#include "utils/lists.h"
+
+#include <string>
+#include <vector>
+
 #include "library/playlist.h"
 
 #ifdef __cplusplus
@@ -24,8 +27,8 @@ extern "C"
 
   void files_init();
   void files_cleanup();
-  int read_directory(const char *directory, lists_t_strs *dirs,
-                     lists_t_strs *playlists, struct plist *plist);
+  int read_directory(const char *directory, std::vector<std::string> &dirs,
+                     std::vector<std::string> &playlists, struct plist *plist);
   int read_directory_recurr(const char *directory, struct plist *plist);
   void resolve_path(char *buf, size_t size, const char *file);
   char *ext_pos(const char *file);
