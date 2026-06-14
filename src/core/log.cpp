@@ -22,8 +22,9 @@
 #include <cerrno>
 #include <csignal>
 
+#include <vector>
+
 #include "core/common.h"
-#include "utils/lists.h"
 #include "core/log.h"
 #include "core/options.h"
 
@@ -32,10 +33,11 @@ static FILE *logfp = NULL; /* logging file stream */
 
 static enum { UNINITIALISED, BUFFERING, LOGGING } logging_state = UNINITIALISED;
 
-static lists_t_strs *buffered_log = NULL;
+static std::vector<std::string> buffered_log;
 static int log_records_spilt = 0;
 
-static lists_t_strs *circular_log = NULL;
+static std::vector<std::string> circular_log;
+static bool circular_log_enabled = false;
 static int circular_ptr = 0;
 
 static pthread_mutex_t logging_mtx = PTHREAD_MUTEX_INITIALIZER;
@@ -97,8 +99,8 @@ static void locked_logit(const char *file, const int line, const char *function,
 
   assert(logging_state == BUFFERING || logging_state == LOGGING);
   assert(logging_state != BUFFERING || !logfp);
-  assert(logging_state != BUFFERING || !circular_log);
-  assert(logging_state != LOGGING || logfp || !circular_log);
+  assert(logging_state != BUFFERING || !circular_log_enabled);
+  assert(logging_state != LOGGING || logfp || !circular_log_enabled);
 
   if (logging_state == LOGGING && !logfp)
   {
@@ -110,7 +112,7 @@ static void locked_logit(const char *file, const int line, const char *function,
   localtime_r(&tv_sec, &tm_time);
   strftime(time_str, sizeof(time_str), "%b %e %T", &tm_time);
 
-  if (logfp && !circular_log)
+  if (logfp && !circular_log_enabled)
   {
     fprintf(logfp, fmt, time_str, utc_time.tv_nsec / 1000L, file, line,
             function, msg);
@@ -125,25 +127,25 @@ static void locked_logit(const char *file, const int line, const char *function,
 
   if (logging_state == BUFFERING)
   {
-    lists_strs_push(buffered_log, str);
+    buffered_log.push_back(str);
     free(str);
     return;
   }
 
-  assert(circular_log);
+  assert(circular_log_enabled);
 
-  if (circular_ptr == lists_strs_capacity(circular_log))
+  if (circular_ptr == static_cast<int>(circular_log.capacity()))
   {
     circular_ptr = 0;
   }
-  if (circular_ptr < lists_strs_size(circular_log))
+  if (circular_ptr < static_cast<int>(circular_log.size()))
   {
-    lists_strs_swap(circular_log, circular_ptr, str);
+    circular_log[circular_ptr] = str;
     free(str);
   }
   else
   {
-    lists_strs_push(circular_log, str);
+    circular_log.push_back(str);
     free(str);
   }
   circular_ptr += 1;
@@ -185,12 +187,12 @@ void internal_logit(const char *file LOGIT_ONLY, const int line LOGIT_ONLY,
     switch (logging_state)
     {
       case UNINITIALISED:
-        buffered_log = lists_strs_new(128);
+        buffered_log.reserve(128);
         logging_state = BUFFERING;
         break;
       case BUFFERING:
         /* Don't let storage run away on us. */
-        if (lists_strs_size(buffered_log) < lists_strs_capacity(buffered_log))
+        if (buffered_log.size() < buffered_log.capacity())
         {
           break;
         }
@@ -231,15 +233,13 @@ void log_init_stream(FILE *f LOGIT_ONLY, const char *fn LOGIT_ONLY)
   {
     if (logfp)
     {
-      int ix;
-
-      for (ix = 0; ix < lists_strs_size(buffered_log); ix += 1)
+      for (const auto &entry : buffered_log)
       {
-        fprintf(logfp, "%s", lists_strs_at(buffered_log, ix).c_str());
+        fprintf(logfp, "%s", entry.c_str());
       }
     }
-    lists_strs_free(buffered_log);
-    buffered_log = NULL;
+    buffered_log.clear();
+    buffered_log.shrink_to_fit();
   }
 
   logging_state = LOGGING;
@@ -271,7 +271,7 @@ void log_circular_start()
   int circular_size;
 
   assert(logging_state == LOGGING);
-  assert(!circular_log);
+  assert(!circular_log_enabled);
 
   if (!logfp)
   {
@@ -283,7 +283,8 @@ void log_circular_start()
   {
     LOCK(logging_mtx);
 
-    circular_log = lists_strs_new(circular_size);
+    circular_log.reserve(circular_size);
+    circular_log_enabled = true;
     circular_ptr = 0;
 
     UNLOCK(logging_mtx);
@@ -295,7 +296,7 @@ void log_circular_start()
 #ifndef NDEBUG
 static inline void locked_circular_reset()
 {
-  lists_strs_clear(circular_log);
+  circular_log.clear();
   circular_ptr = 0;
 }
 #endif
@@ -306,7 +307,7 @@ void log_circular_reset()
 #ifndef NDEBUG
   assert(logging_state == LOGGING);
 
-  if (!circular_log)
+  if (!circular_log_enabled)
   {
     return;
   }
@@ -323,11 +324,11 @@ void log_circular_reset()
 void log_circular_log()
 {
 #ifndef NDEBUG
-  int ix;
+  size_t ix;
 
-  assert(logging_state == LOGGING && (logfp || !circular_log));
+  assert(logging_state == LOGGING && (logfp || !circular_log_enabled));
 
-  if (!circular_log)
+  if (!circular_log_enabled)
   {
     return;
   }
@@ -336,16 +337,16 @@ void log_circular_log()
 
   fprintf(logfp, "\n* Circular Log Starts *\n\n");
 
-  for (ix = circular_ptr; ix < lists_strs_size(circular_log); ix += 1)
+  for (ix = circular_ptr; ix < circular_log.size(); ix += 1)
   {
-    fprintf(logfp, "%s", lists_strs_at(circular_log, ix).c_str());
+    fprintf(logfp, "%s", circular_log[ix].c_str());
   }
 
   fflush(logfp);
 
-  for (ix = 0; ix < circular_ptr; ix += 1)
+  for (ix = 0; ix < static_cast<size_t>(circular_ptr); ix += 1)
   {
-    fprintf(logfp, "%s", lists_strs_at(circular_log, ix).c_str());
+    fprintf(logfp, "%s", circular_log[ix].c_str());
   }
 
   fprintf(logfp, "\n* Circular Log Ends *\n\n");
@@ -364,15 +365,16 @@ void log_circular_stop()
 #ifndef NDEBUG
   assert(logging_state == LOGGING);
 
-  if (!circular_log)
+  if (!circular_log_enabled)
   {
     return;
   }
 
   LOCK(logging_mtx);
 
-  lists_strs_free(circular_log);
-  circular_log = NULL;
+  circular_log.clear();
+  circular_log.shrink_to_fit();
+  circular_log_enabled = false;
   circular_ptr = 0;
 
   UNLOCK(logging_mtx);
@@ -390,11 +392,8 @@ void log_close()
     logfp = NULL;
   }
 
-  if (buffered_log)
-  {
-    lists_strs_free(buffered_log);
-    buffered_log = NULL;
-  }
+  buffered_log.clear();
+  buffered_log.shrink_to_fit();
 
   log_records_spilt = 0;
 
