@@ -34,9 +34,8 @@
 #include "library/files.h"
 #include "core/log.h"
 #include "core/options.h"
-#include "utils/lists.h"
 
-using OptionValue = std::variant<int, bool, std::optional<std::string>, lists_t_strs*>;
+using OptionValue = std::variant<int, bool, std::optional<std::string>, std::vector<std::string>>;
 
 struct Option;
 using CheckFunc = bool(*)(const Option&, int, const std::string&);
@@ -60,6 +59,27 @@ static std::string to_lower(const std::string& s) {
     std::string res = s;
     for (char& c : res) c = std::tolower(c);
     return res;
+}
+
+/* Split a colon-separated string into its non-empty segments, mirroring
+ * the behaviour of the old lists_strs_split(list, s, ":"): consecutive
+ * and leading/trailing colons do not produce empty entries. */
+static std::vector<std::string> split_colon_list(const char* s) {
+    std::vector<std::string> result;
+    std::string buf(s);
+    size_t start = 0;
+
+    while (start < buf.size()) {
+        size_t end = buf.find(':', start);
+        if (end == std::string::npos) {
+            result.push_back(buf.substr(start));
+            break;
+        }
+        if (end > start) result.push_back(buf.substr(start, end - start));
+        start = end + 1;
+    }
+
+    return result;
 }
 
 static Option* find_option(const std::string& name, int type_mask) {
@@ -199,9 +219,7 @@ static void add_list(const std::string& name, const char* value, CheckFunc check
     Option opt;
     opt.name = name;
     opt.type = OPTION_LIST;
-    lists_t_strs* list = lists_strs_new(8);
-    if (value) lists_strs_split(list, value, ":");
-    opt.value = list;
+    opt.value = value ? split_colon_list(value) : std::vector<std::string>();
     opt.check = check;
     opt.str_constraints = s_constraints;
     opt.int_constraints = i_constraints;
@@ -277,13 +295,14 @@ void options_set_list(const char *name, const char *value, bool append)
   Option* opt = find_option(name, OPTION_LIST);
   if (!opt) fatal("Tried to set wrong option '%s'!", name);
 
-  lists_t_strs* list = std::get<lists_t_strs*>(opt->value);
-  if (!append && !lists_strs_empty(list))
+  auto& list = std::get<std::vector<std::string>>(opt->value);
+  if (!append && !list.empty())
   {
-    lists_strs_clear(list);
+    list.clear();
   }
   if (value) {
-    lists_strs_split(list, value, ":");
+    std::vector<std::string> tokens = split_colon_list(value);
+    list.insert(list.end(), tokens.begin(), tokens.end());
   }
 }
 
@@ -582,17 +601,12 @@ int options_check_list(const char *name, const char *val)
   Option* opt = find_option(name, OPTION_LIST);
   if (!opt) return 0;
 
-  lists_t_strs* list = lists_strs_new(8);
-  int size = lists_strs_split(list, val, ":");
-  int result = 1;
-  for (int ix = 0; ix < size; ix += 1) {
-      if (!opt->check(*opt, 0, lists_strs_at(list, ix))) {
-          result = 0;
-          break;
+  for (const auto& item : split_colon_list(val)) {
+      if (!opt->check(*opt, 0, item)) {
+          return 0;
       }
   }
-  lists_strs_free(list);
-  return result;
+  return 1;
 }
 
 /* Return 1 if the named option was defaulted. */
@@ -614,11 +628,10 @@ static char *substitute_variable(const char *name_in, const char *value_in)
   static const char accept[] = "abcdefghijklmnopqrstuvwxyz"
                                "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                                "0123456789_";
-  lists_t_strs *strs;
+  std::vector<std::string> strs;
 
   result = xstrdup(value_in);
   ptr = result;
-  strs = lists_strs_new(5);
   dollar = strstr(result, "${");
   while (dollar)
   {
@@ -626,7 +639,7 @@ static char *substitute_variable(const char *name_in, const char *value_in)
     if (dollar > ptr && dollar[-1] == '$')
     {
       dollar[-1] = 0x00;
-      lists_strs_append(strs, ptr);
+      strs.push_back(ptr);
       ptr = dollar;
       dollar = strstr(&dollar[2], "${");
       continue;
@@ -634,7 +647,7 @@ static char *substitute_variable(const char *name_in, const char *value_in)
 
     /* Copy up to this point verbatim. */
     dollar[0] = 0x00;
-    lists_strs_append(strs, ptr);
+    strs.push_back(ptr);
 
     /* Find where the substitution variable name ends. */
     name = &dollar[2];
@@ -684,7 +697,6 @@ static char *substitute_variable(const char *name_in, const char *value_in)
     if (value == NULL && find_option(name, OPTION_ANY) != nullptr)
     {
       char buf[16];
-      lists_t_strs *list;
 
       switch (options_get_type(name))
       {
@@ -703,14 +715,21 @@ static char *substitute_variable(const char *name_in, const char *value_in)
           value = xstrdup(options_get_symb(name));
           break;
         case OPTION_LIST:
-          list = options_get_list(name);
-          if (!lists_strs_empty(list))
+        {
+          const std::vector<std::string> &list = options_get_list(name);
+          if (!list.empty())
           {
-            std::string s = lists_strs_fmt(list, "%s:");
+            std::string s;
+            for (const auto &item : list)
+            {
+              s += item;
+              s += ':';
+            }
             s.pop_back();
             value = xstrdup(s.c_str());
           }
           break;
+        }
         case OPTION_FREE:
         case OPTION_ANY:
           break;
@@ -718,11 +737,11 @@ static char *substitute_variable(const char *name_in, const char *value_in)
     }
     if (value && value[0])
     {
-      lists_strs_append(strs, value);
+      strs.push_back(value);
     }
     else if (dflt)
     {
-      lists_strs_append(strs, dflt);
+      strs.push_back(dflt);
     }
     else
     {
@@ -738,13 +757,14 @@ static char *substitute_variable(const char *name_in, const char *value_in)
   }
 
   /* If anything changed copy segments to result. */
-  if (!lists_strs_empty(strs))
+  if (!strs.empty())
   {
-    lists_strs_append(strs, ptr);
+    strs.push_back(ptr);
     free(result);
-    result = xstrdup(lists_strs_cat(strs).c_str());
+    std::string cat;
+    for (const auto &s : strs) cat += s;
+    result = xstrdup(cat.c_str());
   }
-  lists_strs_free(strs);
 
   return result;
 }
@@ -990,11 +1010,6 @@ void options_parse(const char *config_file)
 
 void options_free()
 {
-  for (auto& [key, opt] : options_map) {
-      if (opt.type == OPTION_LIST) {
-          lists_strs_free(std::get<lists_t_strs*>(opt.value));
-      }
-  }
   options_map.clear();
 }
 
@@ -1028,11 +1043,11 @@ const char *options_get_symb(const char *name)
   return val ? val.value().c_str() : nullptr;
 }
 
-lists_t_strs *options_get_list(const char *name)
+std::vector<std::string> &options_get_list(const char *name)
 {
   Option* opt = find_option(name, OPTION_LIST);
   if (!opt) fatal("Tried to get wrong option '%s'!", name);
-  return std::get<lists_t_strs*>(opt->value);
+  return std::get<std::vector<std::string>>(opt->value);
 }
 
 enum option_type options_get_type(const char *name)

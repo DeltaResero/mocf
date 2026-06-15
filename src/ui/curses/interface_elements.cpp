@@ -26,12 +26,13 @@
 #include <cwchar>
 #include <cwctype>
 #include <unistd.h>
+#include <algorithm>
+#include <string>
 #include <vector>
 
 #include "core/common.h"
 #include "ui/curses/menu.h"
 #include "ui/themes.h"
-#include "utils/lists.h"
 #include "core/options.h"
 #include "ui/curses/interface_elements.h"
 #include "core/log.h"
@@ -127,7 +128,7 @@ static struct main_win
   int help_screen_top;   /* first visible line of the help screen. */
 
   struct side_menu menus[3];
-  lists_t_strs *layout_fmt;
+  std::vector<std::string> *layout_fmt;
   int selected_menu; /* which menu is currently selected by the user */
 } main_win;
 
@@ -927,15 +928,41 @@ static bool parse_layout_coordinate(const char *fmt, int *val, const int max)
   return true;
 }
 
+/* Split a string on any character in delims, mirroring the old
+ * lists_strs_split(): consecutive and leading/trailing delimiters do
+ * not produce empty entries. */
+static std::vector<std::string> split_on_chars(const char *s, const char *delims)
+{
+  std::vector<std::string> result;
+  std::string buf(s);
+  size_t start = 0;
+
+  while (start < buf.size())
+  {
+    size_t end = buf.find_first_of(delims, start);
+    if (end == std::string::npos)
+    {
+      result.push_back(buf.substr(start));
+      break;
+    }
+    if (end > start)
+    {
+      result.push_back(buf.substr(start, end - start));
+    }
+    start = end + 1;
+  }
+
+  return result;
+}
+
 /* Parse the layout string. Return false on error. */
-static bool parse_layout(struct main_win_layout *l, lists_t_strs *fmt)
+static bool parse_layout(struct main_win_layout *l, const std::vector<std::string> &fmt)
 {
   int ix;
   bool result = false;
-  lists_t_strs *format;
+  std::vector<std::string> format;
 
   assert(l != NULL);
-  assert(fmt != NULL);
 
   /* default values */
   l->menus[0].x = 0;
@@ -945,37 +972,36 @@ static bool parse_layout(struct main_win_layout *l, lists_t_strs *fmt)
   l->menus[1] = l->menus[0];
   l->menus[2] = l->menus[0];
 
-  format = lists_strs_new(6);
-  for (ix = 0; ix < lists_strs_size(fmt); ix += 1)
+  for (ix = 0; ix < static_cast<int>(fmt.size()); ix += 1)
   {
     const char *menu, *name;
     struct window_params p;
 
-    lists_strs_clear(format);
-    menu = lists_strs_at(fmt, ix).c_str();
-    if (lists_strs_split(format, menu, "(,)") != 5)
+    menu = fmt[ix].c_str();
+    format = split_on_chars(menu, "(,)");
+    if (format.size() != 5)
     {
       goto err;
     }
 
-    name = lists_strs_at(format, 0).c_str();
+    name = format[0].c_str();
 
-    if (!parse_layout_coordinate(lists_strs_at(format, 1).c_str(), &p.x, COLS))
+    if (!parse_layout_coordinate(format[1].c_str(), &p.x, COLS))
     {
       logit("Coordinate parse error when parsing X");
       goto err;
     }
-    if (!parse_layout_coordinate(lists_strs_at(format, 2).c_str(), &p.y, LINES - 4))
+    if (!parse_layout_coordinate(format[2].c_str(), &p.y, LINES - 4))
     {
       logit("Coordinate parse error when parsing Y");
       goto err;
     }
-    if (!parse_layout_coordinate(lists_strs_at(format, 3).c_str(), &p.width, COLS))
+    if (!parse_layout_coordinate(format[3].c_str(), &p.width, COLS))
     {
       logit("Coordinate parse error when parsing width");
       goto err;
     }
-    if (!parse_layout_coordinate(lists_strs_at(format, 4).c_str(), &p.height,
+    if (!parse_layout_coordinate(format[4].c_str(), &p.height,
                                  LINES - 4))
     {
       logit("Coordinate parse error when parsing height");
@@ -1030,11 +1056,10 @@ static bool parse_layout(struct main_win_layout *l, lists_t_strs *fmt)
   result = true;
 
 err:
-  lists_strs_free(format);
   return result;
 }
 
-static void main_win_init(struct main_win *w, lists_t_strs *layout_fmt)
+static void main_win_init(struct main_win *w, std::vector<std::string> &layout_fmt)
 {
   struct main_win_layout l;
   bool rc ASSERT_ONLY;
@@ -1050,7 +1075,7 @@ static void main_win_init(struct main_win *w, lists_t_strs *layout_fmt)
   w->in_help = 0;
   w->too_small = 0;
   w->help_screen_top = 0;
-  w->layout_fmt = layout_fmt;
+  w->layout_fmt = &layout_fmt;
 
   rc = parse_layout(&l, layout_fmt);
   assert(rc);
@@ -2305,15 +2330,14 @@ static void main_win_swap_plist_items(struct main_win *w, const char *file1,
   main_win_draw(w);
 }
 
-static void main_win_use_layout(struct main_win *w, lists_t_strs *layout_fmt)
+static void main_win_use_layout(struct main_win *w, std::vector<std::string> &layout_fmt)
 {
   struct main_win_layout l;
   bool rc ASSERT_ONLY;
 
   assert(w != NULL);
-  assert(layout_fmt != NULL);
 
-  w->layout_fmt = layout_fmt;
+  w->layout_fmt = &layout_fmt;
 
   rc = parse_layout(&l, layout_fmt);
   assert(rc);
@@ -2327,22 +2351,22 @@ static void main_win_use_layout(struct main_win *w, lists_t_strs *layout_fmt)
 static void validate_layouts()
 {
   struct main_win_layout l;
-  lists_t_strs *layout_fmt;
+  std::vector<std::string> *layout_fmt;
 
-  layout_fmt = options_get_list("Layout1");
-  if (lists_strs_empty(layout_fmt) || !parse_layout(&l, layout_fmt))
+  layout_fmt = &options_get_list("Layout1");
+  if (layout_fmt->empty() || !parse_layout(&l, *layout_fmt))
   {
     interface_fatal("Layout1 is malformed!");
   }
 
-  layout_fmt = options_get_list("Layout2");
-  if (!lists_strs_empty(layout_fmt) && !parse_layout(&l, layout_fmt))
+  layout_fmt = &options_get_list("Layout2");
+  if (!layout_fmt->empty() && !parse_layout(&l, *layout_fmt))
   {
     interface_fatal("Layout2 is malformed!");
   }
 
-  layout_fmt = options_get_list("Layout3");
-  if (!lists_strs_empty(layout_fmt) && !parse_layout(&l, layout_fmt))
+  layout_fmt = &options_get_list("Layout3");
+  if (!layout_fmt->empty() && !parse_layout(&l, *layout_fmt))
   {
     interface_fatal("Layout3 is malformed!");
   }
@@ -2360,7 +2384,7 @@ static void main_win_resize(struct main_win *w)
   wresize(w->win, LINES - 4, COLS);
   werase(w->win);
 
-  rc = parse_layout(&l, w->layout_fmt);
+  rc = parse_layout(&l, *w->layout_fmt);
   assert(rc);
 
   side_menu_resize(&w->menus[0], &l.menus[0]);
@@ -2485,10 +2509,9 @@ static void detect_term()
   term = getenv("TERM");
   if (term)
   {
-    lists_t_strs *xterms;
+    const std::vector<std::string> &xterms = options_get_list("XTerms");
 
-    xterms = options_get_list("XTerms");
-    has_xterm = lists_strs_exists(xterms, term);
+    has_xterm = std::find(xterms.begin(), xterms.end(), term) != xterms.end();
   }
 }
 
@@ -2548,10 +2571,10 @@ static void detect_screen()
   window = getenv("WINDOW");
   if (term && window && isdigit(*window))
   {
-    lists_t_strs *screen_terms;
+    const std::vector<std::string> &screen_terms = options_get_list("ScreenTerms");
 
-    screen_terms = options_get_list("ScreenTerms");
-    has_screen = lists_strs_exists(screen_terms, term);
+    has_screen = std::find(screen_terms.begin(), screen_terms.end(), term) !=
+                 screen_terms.end();
   }
 }
 
@@ -4600,7 +4623,7 @@ void iface_toggle_layout()
 {
   static int curr_layout = 1;
   char layout_option[32];
-  lists_t_strs *layout_fmt;
+  std::vector<std::string> *layout_fmt;
 
   if (++curr_layout > 3)
   {
@@ -4608,14 +4631,14 @@ void iface_toggle_layout()
   }
 
   snprintf(layout_option, sizeof(layout_option), "Layout%d", curr_layout);
-  layout_fmt = options_get_list(layout_option);
-  if (lists_strs_empty(layout_fmt))
+  layout_fmt = &options_get_list(layout_option);
+  if (layout_fmt->empty())
   {
     curr_layout = 1;
-    layout_fmt = options_get_list("Layout1");
+    layout_fmt = &options_get_list("Layout1");
   }
 
-  main_win_use_layout(&main_win, layout_fmt);
+  main_win_use_layout(&main_win, *layout_fmt);
   iface_refresh_screen();
 }
 

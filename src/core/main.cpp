@@ -23,7 +23,9 @@
 #include <cstring>
 #include <ctime>
 #include <locale.h>
+#include <algorithm>
 #include <string>
+#include <vector>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -908,39 +910,33 @@ static void process_deferred_overrides(lists_t_strs *deferred)
 {
   int ix;
   bool cleared;
-  const char marker[] = "*Marker*";
-  char **config_decoders;
-  lists_t_strs *decoders_option;
+  const std::string marker = "*Marker*";
 
   /* We need to shuffle the PreferredDecoders list into the
    * right order as we load any deferred overriding options. */
 
-  decoders_option = options_get_list("PreferredDecoders");
-  lists_strs_reverse(decoders_option);
-  config_decoders = lists_strs_save(decoders_option);
-  lists_strs_clear(decoders_option);
-  lists_strs_append(decoders_option, marker);
+  std::vector<std::string> &decoders_option = options_get_list("PreferredDecoders");
+
+  std::reverse(decoders_option.begin(), decoders_option.end());
+  std::vector<std::string> config_decoders = decoders_option;
+  decoders_option.clear();
+  decoders_option.push_back(marker);
 
   for (ix = 0; ix < lists_strs_size(deferred); ix += 1)
   {
     override_config_option(lists_strs_at(deferred, ix).c_str(), NULL);
   }
 
-  cleared = lists_strs_empty(decoders_option) ||
-            lists_strs_at(decoders_option, 0) != marker;
-  lists_strs_reverse(decoders_option);
+  cleared = decoders_option.empty() || decoders_option[0] != marker;
+  std::reverse(decoders_option.begin(), decoders_option.end());
   if (!cleared)
   {
-    char **override_decoders;
-
-    lists_strs_pop(decoders_option);
-    override_decoders = lists_strs_save(decoders_option);
-    lists_strs_clear(decoders_option);
-    lists_strs_load(decoders_option, (const char **)config_decoders);
-    lists_strs_load(decoders_option, (const char **)override_decoders);
-    free(override_decoders);
+    decoders_option.pop_back();
+    std::vector<std::string> override_decoders = decoders_option;
+    decoders_option = config_decoders;
+    decoders_option.insert(decoders_option.end(), override_decoders.begin(),
+                           override_decoders.end());
   }
-  free(config_decoders);
 }
 
 static void log_environment_variables()
