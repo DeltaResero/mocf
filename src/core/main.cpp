@@ -40,7 +40,6 @@
 #include "core/protocol.h"
 #include "core/log.h"
 #include "audio/decoder.h"
-#include "utils/lists.h"
 #include "library/files.h"
 
 static int mocf_argc;
@@ -109,7 +108,7 @@ static void *server_thread_func(void *arg)
 }
 
 /* Run client and server in the same process. */
-static void start_moc(const struct parameters *params, lists_t_strs *args)
+static void start_moc(const struct parameters *params, const std::vector<std::string> &args)
 {
   pthread_t server_thread;
   struct server_thread_args *th_args;
@@ -376,35 +375,34 @@ static struct poptOption mocf_opts[] = {
 /* Read the POPT configuration files as given in MOCF_POPTRC. */
 static void read_mocf_poptrc(poptContext ctx, const char *env_poptrc)
 {
-  int ix, rc, count;
-  lists_t_strs *files;
+  std::vector<std::string> files;
+  std::string buf(env_poptrc);
+  size_t start = 0;
 
-  files = lists_strs_new(4);
-  count = lists_strs_split(files, env_poptrc, ":");
-
-  for (ix = 0; ix < count; ix += 1)
+  while (start <= buf.size())
   {
-    const char *fn;
+    size_t end = buf.find(':', start);
+    std::string fn = (end == std::string::npos) ? buf.substr(start)
+                                                 : buf.substr(start, end - start);
+    start = (end == std::string::npos) ? buf.size() + 1 : end + 1;
 
-    fn = lists_strs_at(files, ix).c_str();
-    if (!strlen(fn))
+    if (fn.empty())
     {
       continue;
     }
 
-    if (!is_secure(fn))
+    if (!is_secure(fn.c_str()))
     {
-      fatal("POPT config file is not secure: %s", fn);
+      fatal("POPT config file is not secure: %s", fn.c_str());
     }
 
-    rc = poptReadConfigFile(ctx, fn);
+    int rc = poptReadConfigFile(ctx, fn.c_str());
     if (rc < 0)
     {
-      fatal("Error reading POPT config file '%s': %s", fn, poptStrerror(rc));
+      fatal("Error reading POPT config file '%s': %s", fn.c_str(),
+            poptStrerror(rc));
     }
   }
-
-  lists_strs_free(files);
 }
 
 /* Check that the ~/.popt file is secure. */
@@ -651,11 +649,10 @@ struct poptOption *find_popt_option(struct poptOption *opts, int wanted)
   return NULL;
 }
 
-/* Render the command line as interpreted by POPT. */
 static char *render_popt_command_line()
 {
   int rc;
-  lists_t_strs *cmdline;
+  std::vector<std::string> cmdline;
   char *result;
   const char **rest;
   poptContext ctx;
@@ -669,8 +666,8 @@ static char *render_popt_command_line()
   read_popt_config(ctx);
   prepend_mocf_opts(ctx);
 
-  cmdline = lists_strs_new(mocf_argc * 2);
-  lists_strs_append(cmdline, mocf_argv[0]);
+  cmdline.reserve(mocf_argc * 2);
+  cmdline.push_back(mocf_argv[0]);
 
   while (1)
   {
@@ -686,7 +683,7 @@ static char *render_popt_command_line()
 
     if (rc == POPT_ERROR_BADOPT)
     {
-      lists_strs_append(cmdline, poptBadOption(ctx, 0));
+      cmdline.push_back(poptBadOption(ctx, 0));
       continue;
     }
 
@@ -712,27 +709,37 @@ static char *render_popt_command_line()
             : std::string(1, '-') + opt->shortName;
     }
 
-    lists_strs_push(cmdline, std::move(str));
+    cmdline.push_back(std::move(str));
     free((void *)arg);
   }
 
   rest = poptGetArgs(ctx);
   if (rest)
   {
-    lists_strs_load(cmdline, rest);
+    while (*rest)
+    {
+      cmdline.push_back(*rest++);
+    }
   }
 
-  result = xstrdup(lists_strs_fmt(cmdline, "%s ").c_str());
+  {
+    std::string joined;
+    for (const auto &s : cmdline)
+    {
+      joined += s;
+      joined += ' ';
+    }
+    result = xstrdup(joined.c_str());
+  }
 
 err:
   poptFreeContext(ctx);
   free_popt_clone(null_opts);
-  lists_strs_free(cmdline);
 
   return result;
 }
 
-static void override_config_option(const char *arg, lists_t_strs *deferred)
+static void override_config_option(const char *arg, std::vector<std::string> *deferred)
 {
   int len;
   bool append;
@@ -762,7 +769,7 @@ static void override_config_option(const char *arg, lists_t_strs *deferred)
   {
     if (deferred)
     {
-      lists_strs_append(deferred, arg);
+      deferred->push_back(arg);
       free(name);
       return;
     }
@@ -808,7 +815,7 @@ error:
 }
 
 /* Process the command line options. */
-static void process_options(poptContext ctx, lists_t_strs *deferred)
+static void process_options(poptContext ctx, std::vector<std::string> *deferred)
 {
   int rc;
 
@@ -880,11 +887,11 @@ static void process_options(poptContext ctx, lists_t_strs *deferred)
 }
 
 /* Process the command line options and arguments. */
-static lists_t_strs *process_command_line(lists_t_strs *deferred)
+static std::vector<std::string> process_command_line(std::vector<std::string> *deferred)
 {
   const char **rest;
   poptContext ctx;
-  lists_t_strs *result;
+  std::vector<std::string> result;
 
   assert(deferred != NULL);
 
@@ -894,11 +901,13 @@ static lists_t_strs *process_command_line(lists_t_strs *deferred)
   prepend_mocf_opts(ctx);
   process_options(ctx, deferred);
 
-  result = lists_strs_new(4);
   rest = poptGetArgs(ctx);
   if (rest)
   {
-    lists_strs_load(result, rest);
+    while (*rest)
+    {
+      result.push_back(*rest++);
+    }
   }
 
   poptFreeContext(ctx);
@@ -906,14 +915,10 @@ static lists_t_strs *process_command_line(lists_t_strs *deferred)
   return result;
 }
 
-static void process_deferred_overrides(lists_t_strs *deferred)
+static void process_deferred_overrides(std::vector<std::string> &deferred)
 {
-  int ix;
   bool cleared;
   const std::string marker = "*Marker*";
-
-  /* We need to shuffle the PreferredDecoders list into the
-   * right order as we load any deferred overriding options. */
 
   std::vector<std::string> &decoders_option = options_get_list("PreferredDecoders");
 
@@ -922,9 +927,9 @@ static void process_deferred_overrides(lists_t_strs *deferred)
   decoders_option.clear();
   decoders_option.push_back(marker);
 
-  for (ix = 0; ix < lists_strs_size(deferred); ix += 1)
+  for (const auto &item : deferred)
   {
-    override_config_option(lists_strs_at(deferred, ix).c_str(), NULL);
+    override_config_option(item.c_str(), nullptr);
   }
 
   cleared = decoders_option.empty() || decoders_option[0] != marker;
@@ -961,17 +966,20 @@ static void log_environment_variables()
 static void log_command_line()
 {
 #ifndef NDEBUG
-  lists_t_strs *cmdline = lists_strs_new(mocf_argc);
-  if (lists_strs_load(cmdline, mocf_argv) > 0)
+  if (mocf_argc > 0)
   {
-    std::string str = lists_strs_fmt(cmdline, "%s ");
+    std::string str;
+    for (int ix = 0; ix < mocf_argc; ix += 1)
+    {
+      str += mocf_argv[ix];
+      str += ' ';
+    }
     logit("%s", str.c_str());
   }
   else
   {
     logit("No command line available");
   }
-  lists_strs_free(cmdline);
 #endif
 }
 
@@ -992,7 +1000,7 @@ static void log_popt_command_line()
 
 int main(int argc, const char *argv[])
 {
-  lists_t_strs *deferred_overrides, *args;
+  std::vector<std::string> deferred_overrides, args;
 
   assert(argc >= 0);
   assert(argv != NULL);
@@ -1033,7 +1041,6 @@ int main(int argc, const char *argv[])
 
   memset(&params, 0, sizeof(params));
   options_init();
-  deferred_overrides = lists_strs_new(4);
 
   /* set locale according to the environment variables */
   if (!setlocale(LC_ALL, ""))
@@ -1043,7 +1050,7 @@ int main(int argc, const char *argv[])
 
   log_environment_variables();
   log_command_line();
-  args = process_command_line(deferred_overrides);
+  args = process_command_line(&deferred_overrides);
   log_popt_command_line();
 
   if (!params.no_config_file)
@@ -1063,8 +1070,6 @@ int main(int argc, const char *argv[])
   }
 
   process_deferred_overrides(deferred_overrides);
-  lists_strs_free(deferred_overrides);
-  deferred_overrides = NULL;
 
   check_moc_dir();
 
@@ -1074,7 +1079,6 @@ int main(int argc, const char *argv[])
 
   start_moc(&params, args);
 
-  lists_strs_free(args);
   options_free();
   decoder_cleanup();
   io_cleanup();

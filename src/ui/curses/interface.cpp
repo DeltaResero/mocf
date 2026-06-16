@@ -42,7 +42,6 @@
 #include "core/log.h"
 #include "ui/curses/interface_elements.h"
 #include "ui/curses/interface.h"
-#include "utils/lists.h"
 #include "library/playlist.h"
 #include "library/playlist_file.h"
 #include "core/protocol.h"
@@ -707,14 +706,13 @@ private:
         iface_set_status("");
     }
 
-    void process_multiple_args(lists_t_strs *args) {
-        int size = lists_strs_size(args);
+    void process_multiple_args(const std::vector<std::string> &args) {
         char this_cwd[PATH_MAX];
 
         if (!getcwd(this_cwd, sizeof(cwd))) interface_fatal("Can't get CWD: %s", xstrerror(errno).c_str());
 
-        for (int ix = 0; ix < size; ix += 1) {
-            const char *arg = lists_strs_at(args, ix).c_str();
+        for (const auto &a : args) {
+            const char *arg = a.c_str();
             int dir = is_dir(arg);
             char path[2 * PATH_MAX];
 
@@ -736,16 +734,15 @@ private:
         }
     }
 
-    void process_args(lists_t_strs *args) {
-        int size = lists_strs_size(args);
-        const char *arg = lists_strs_at(args, 0).c_str();
+    void process_args(const std::vector<std::string> &args) {
+        const char *arg = args[0].c_str();
 
-        if (size == 1 && is_dir(arg) == 1) {
+        if (args.size() == 1 && is_dir(arg) == 1) {
             process_dir_arg(arg);
             return;
         }
 
-        if (size == 1 && is_plist_file(arg)) {
+        if (args.size() == 1 && is_plist_file(arg)) {
             process_plist_arg(arg);
         } else {
             process_multiple_args(args);
@@ -1501,7 +1498,7 @@ private:
     }
 
 public:
-    UserInterface(engine_event_queue *eq, lists_t_strs *args) {
+    UserInterface(engine_event_queue *eq, const std::vector<std::string> &args) {
         if (!setlocale(LC_CTYPE, "")) logit("Could not set locale!");
 
         g_engine_eq = eq;
@@ -1535,7 +1532,7 @@ public:
         xsignal(SIGWINCH, sig_winch);
 #endif
 
-        if (!lists_strs_empty(args)) {
+        if (!args.empty()) {
             process_args(args);
             if (plist_count(&playlist) == 0) load_playlist();
         } else {
@@ -1641,7 +1638,7 @@ public:
 
 static std::unique_ptr<UserInterface> ui;
 
-void init_interface(struct engine_event_queue *eq, lists_t_strs *args) {
+void init_interface(struct engine_event_queue *eq, const std::vector<std::string> &args) {
     ui = std::make_unique<UserInterface>(eq, args);
 }
 

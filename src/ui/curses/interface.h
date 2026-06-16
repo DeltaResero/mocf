@@ -11,7 +11,9 @@
 #ifndef INTERFACE_H
 #define INTERFACE_H
 
-#include "utils/lists.h"
+#include <string>
+#include <vector>
+
 #include "core/server.h"
 
 #ifdef __cplusplus
@@ -26,7 +28,7 @@ extern "C"
     QUIT_APP  /* quit the application and audio engine */
   };
 
-  void init_interface(struct engine_event_queue *eq, lists_t_strs *args);
+  void init_interface(struct engine_event_queue *eq, const std::vector<std::string> &args);
   void interface_loop();
   void interface_end();
   int user_wants_interrupt();
