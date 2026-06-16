@@ -95,7 +95,7 @@ extern "C"
   int iface_in_dir_menu();
   int iface_in_plist_menu();
   int iface_in_theme_menu();
-  char *iface_get_curr_file();
+  std::string iface_get_curr_file();
   void iface_update_item(const enum iface_menu menu, const struct plist *plist,
                          const int n);
   void iface_set_curr_time(const int time);

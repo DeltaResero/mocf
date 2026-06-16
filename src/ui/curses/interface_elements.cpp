@@ -1468,7 +1468,7 @@ static enum file_type side_menu_curritem_get_type(const struct side_menu *m)
   return F_OTHER;
 }
 
-static char *side_menu_get_curr_file(const struct side_menu *m)
+static std::string side_menu_get_curr_file(const struct side_menu *m)
 {
   struct menu_item *mi;
 
@@ -1481,10 +1481,10 @@ static char *side_menu_get_curr_file(const struct side_menu *m)
 
   if (mi)
   {
-    return xstrdup(menu_item_get_file(mi).c_str());
+    return menu_item_get_file(mi);
   }
 
-  return NULL;
+  return "";
 }
 
 static struct side_menu *find_side_menu(struct main_win *w,
@@ -2080,7 +2080,7 @@ static enum file_type main_win_curritem_get_type(const struct main_win *w)
   return side_menu_curritem_get_type(&w->menus[w->selected_menu]);
 }
 
-static char *main_win_get_curr_file(const struct main_win *w)
+static std::string main_win_get_curr_file(const struct main_win *w)
 {
   assert(w != NULL);
 
@@ -4299,9 +4299,9 @@ int iface_in_plist_menu() { return main_win_in_plist_menu(&main_win); }
 /* Return a non zero value if the theme menu is currently selected. */
 int iface_in_theme_menu() { return main_win_in_theme_menu(&main_win); }
 
-/* Return the currently selected file (malloc()ed) or NULL if the menu is
+/* Return the currently selected file or an empty string if the menu is
  * empty. */
-char *iface_get_curr_file() { return main_win_get_curr_file(&main_win); }
+std::string iface_get_curr_file() { return main_win_get_curr_file(&main_win); }
 
 /* Set the current time of playing. */
 void iface_set_curr_time(const int time)

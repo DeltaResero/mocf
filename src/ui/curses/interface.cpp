@@ -800,18 +800,17 @@ private:
 
     void go_file() {
         enum file_type type = iface_curritem_get_type();
-        char *file = iface_get_curr_file();
-        if (!file) return;
+        std::string file = iface_get_curr_file();
+        if (file.empty()) return;
 
         if (type == F_SOUND) {
-            play_it(file);
+            play_it(file.c_str());
         } else if (type == F_DIR && iface_in_dir_menu()) {
-            if (!strcmp(file, "..")) go_dir_up();
-            else go_to_dir(file, 0);
+            if (file == "..") go_dir_up();
+            else go_to_dir(file.c_str(), 0);
         } else if (type == F_PLAYLIST) {
-            go_to_playlist(file, false);
+            go_to_playlist(file.c_str(), false);
         }
-        free(file);
     }
 
     void switch_pause() {
@@ -835,19 +834,17 @@ private:
             return;
         }
 
-        char *file = iface_get_curr_file();
-        if (!file) return;
+        std::string file = iface_get_curr_file();
+        if (file.empty()) return;
 
         enum file_type type = iface_curritem_get_type();
         if (type != F_DIR && type != F_PLAYLIST) {
             iface_error("This is not a directory or a playlist.");
-            free(file);
             return;
         }
 
-        if (!strcmp(file, "..")) {
-            free(file);
-            file = xstrdup(cwd);
+        if (file == "..") {
+            file = cwd;
         }
 
         iface_set_status("Reading directories...");
@@ -855,10 +852,10 @@ private:
         plist_init(&p);
 
         if (type == F_DIR) {
-            read_directory_recurr(file, &p);
+            read_directory_recurr(file.c_str(), &p);
             plist_sort_fname(&p);
         } else {
-            plist_load(&p, file, cwd);
+            plist_load(&p, file.c_str(), cwd);
         }
 
         plist_remove_common_items(&p, &playlist);
@@ -873,7 +870,6 @@ private:
         plist_cat(&playlist, &p);
 
         plist_free(&p);
-        free(file);
     }
 
     void remove_file_from_playlist(const char *file) {
@@ -913,50 +909,46 @@ private:
             return;
         }
 
-        char *file = iface_get_curr_file();
-        if (!file) return;
+        std::string file = iface_get_curr_file();
+        if (file.empty()) return;
 
         if (iface_curritem_get_type() != F_SOUND) {
             iface_error("You can only add a file using this command.");
-            free(file);
             return;
         }
 
-        if (plist_find_fname(&playlist, file) == -1) {
+        if (plist_find_fname(&playlist, file.c_str()) == -1) {
             int added;
-            plist_item *item = &dir_plist.items[plist_find_fname(&dir_plist, file)];
+            plist_item *item = &dir_plist.items[plist_find_fname(&dir_plist, file.c_str())];
 
             added = plist_add_from_item(&playlist, item);
             iface_add_to_plist(&playlist, added);
 
-            if (engine_plist == &playlist) audio_plist_add(file);
+            if (engine_plist == &playlist) audio_plist_add(file.c_str());
             else playlist_dirty = true;
         } else {
             iface_error("The file is already on the playlist.");
         }
 
         iface_menu_key(KEY_CMD_MENU_DOWN);
-        free(file);
     }
 
     void queue_toggle_file() {
-        char *file = iface_get_curr_file();
-        if (!file) return;
+        std::string file = iface_get_curr_file();
+        if (file.empty()) return;
 
         if (iface_curritem_get_type() != F_SOUND) {
             iface_error("You can only add a file using this command.");
-            free(file);
             return;
         }
 
-        if (plist_find_fname(&queue, file) == -1) {
-            engine_queue_add(file);
+        if (plist_find_fname(&queue, file.c_str()) == -1) {
+            engine_queue_add(file.c_str());
         } else {
-            engine_queue_del(file);
+            engine_queue_del(file.c_str());
         }
 
         iface_menu_key(KEY_CMD_MENU_DOWN);
-        free(file);
     }
 
     void toggle_option(const char *name) {
@@ -1074,21 +1066,21 @@ private:
 
     void entry_key_search(const iface_key *k) {
         if (k->type == IFACE_KEY_CHAR && k->key.ucs == '\n') {
-            char *file = iface_get_curr_file();
+            std::string file = iface_get_curr_file();
             char *text = iface_entry_get_text();
             iface_entry_disable();
 
             if (text[0]) {
-                if (!strcmp(file, "..")) {
-                    free(file);
-                    file = dir_up(cwd);
+                if (file == "..") {
+                    char *up = dir_up(cwd);
+                    file = up;
+                    free(up);
                 }
-                if (file_type(file) == F_DIR) go_to_dir(file, 0);
-                else if (file_type(file) == F_PLAYLIST) go_to_playlist(file, false);
-                else play_it(file);
+                if (file_type(file.c_str()) == F_DIR) go_to_dir(file.c_str(), 0);
+                else if (file_type(file.c_str()) == F_PLAYLIST) go_to_playlist(file.c_str(), false);
+                else play_it(file.c_str());
             }
             free(text);
-            free(file);
         } else {
             iface_entry_handle_key(k);
         }
@@ -1204,9 +1196,8 @@ private:
             iface_error("You can only delete an item from the playlist.");
             return;
         }
-        char *file = iface_get_curr_file();
-        remove_file_from_playlist(file);
-        free(file);
+        std::string file = iface_get_curr_file();
+        remove_file_from_playlist(file.c_str());
     }
 
     void go_to_playing_file() {
@@ -1249,26 +1240,24 @@ private:
             return;
         }
 
-        char *file = iface_get_curr_file();
-        if (!file) return;
+        std::string file = iface_get_curr_file();
+        if (file.empty()) return;
 
-        int second = plist_find_fname(&playlist, file);
+        int second = plist_find_fname(&playlist, file.c_str());
         if (direction == -1) second = plist_next(&playlist, second);
         else if (direction == 1) second = plist_prev(&playlist, second);
 
         if (second == -1) {
-            free(file);
             return;
         }
 
         char *second_file = plist_get_file(&playlist, second);
-        swap_playlist_items(file, second_file);
+        swap_playlist_items(file.c_str(), second_file);
 
-        if (engine_plist == &playlist) audio_plist_move(file, second_file);
+        if (engine_plist == &playlist) audio_plist_move(file.c_str(), second_file);
         else playlist_dirty = true;
 
         free(second_file);
-        free(file);
     }
 
     void do_silent_seek() {
@@ -1306,12 +1295,11 @@ private:
     }
 
     void use_theme() {
-        char *file = iface_get_curr_file();
-        if (!file) return;
-        themes_switch_theme(file);
+        std::string file = iface_get_curr_file();
+        if (file.empty()) return;
+        themes_switch_theme(file.c_str());
         iface_update_attrs();
         iface_refresh();
-        free(file);
     }
 
     void theme_menu_key(const iface_key *k) {
