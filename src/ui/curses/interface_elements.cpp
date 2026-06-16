@@ -1481,7 +1481,7 @@ static char *side_menu_get_curr_file(const struct side_menu *m)
 
   if (mi)
   {
-    return menu_item_get_file(mi);
+    return xstrdup(menu_item_get_file(mi).c_str());
   }
 
   return NULL;
