@@ -73,7 +73,7 @@ struct side_menu
   enum side_menu_type type;
   int visible; /* is it visible (are the other fields initialized) ? */
   WINDOW *win; /* window for the menu */
-  char *title; /* title of the window */
+  std::string title; /* title of the window */
 
   /* Position and size of the menu in the window. */
   int posx;
@@ -162,8 +162,8 @@ struct entry
   wchar_t text_ucs[512];  /* unicode */
   wchar_t saved_ucs[512]; /* unicode saved during history scrolling */
 
-  char *title;                   /* displayed title */
-  char *file;                    /* optional: file associated with the entry */
+  std::string title;             /* displayed title */
+  std::string file;              /* optional: file associated with the entry */
   int cur_pos;                   /* cursor position */
   int display_from;              /* displaying from this char */
   struct entry_history *history; /* history to use with this entry or
@@ -186,9 +186,9 @@ struct queued_message
   /* What type is this message? */
   enum message_type type;
   /* Message to be displayed instead of the file's title. */
-  char *msg;
+  std::string msg;
   /* Prompt to use for user query menu. */
-  char *prompt;
+  std::string prompt;
   /* How many seconds does the message linger? */
   time_t timeout;
   /* The callback function and opaque data for user replies. */
@@ -359,7 +359,7 @@ static void entry_draw(const struct entry *e, WINDOW *w, const int posx,
 
   wmove(w, posy, posx);
   wattrset(w, get_color(CLR_ENTRY_TITLE));
-  xwprintw(w, "%s", e->title);
+  xwprintw(w, "%s", e->title.c_str());
 
   wattrset(w, get_color(CLR_ENTRY));
   size_t len = wcslen(e->text_ucs) - e->display_from;
@@ -379,7 +379,7 @@ static void entry_draw(const struct entry *e, WINDOW *w, const int posx,
   xwprintw(w, " %-*s", e->width, text.data());
 
   /* Move the cursor */
-  wmove(w, posy, e->cur_pos - e->display_from + strwidth(e->title) + posx + 1);
+  wmove(w, posy, e->cur_pos - e->display_from + strwidth(e->title.c_str()) + posx + 1);
 }
 
 static void entry_init(struct entry *e, const enum entry_type type,
@@ -414,15 +414,12 @@ static void entry_init(struct entry *e, const enum entry_type type,
   e->type = type;
   e->text_ucs[0] = L'\0';
   e->saved_ucs[0] = L'\0';
-  e->file = NULL;
-  e->title = xstrdup(title);
-  if (e->title[strlen(e->title) - 1] != ':' &&
-      e->title[strlen(e->title) - 1] != '?')
+  e->file = "";
+  e->title = title;
+  if (e->title[e->title.size() - 1] != ':' &&
+      e->title[e->title.size() - 1] != '?')
   {
-    char *t = static_cast<char *>(xmalloc(strlen(e->title) + 2));
-    snprintf(t, strlen(e->title) + 2, "%s:", e->title);
-    free(e->title);
-    e->title = t;
+    e->title += ':';
   }
   e->width = width - strwidth(title);
   e->cur_pos = 0;
@@ -660,7 +657,7 @@ static void entry_resize(struct entry *e, const int width)
   assert(e != NULL);
   assert(width > 0);
 
-  e->width = width - strlen(e->title);
+  e->width = width - e->title.length();
   entry_end(e);
 }
 
@@ -746,27 +743,14 @@ static void entry_set_file(struct entry *e, const char *file)
   assert(e != NULL);
   assert(file != NULL);
 
-  if (e->file)
-  {
-    free(e->file);
-  }
-  e->file = xstrdup(file);
+  e->file = file;
 }
 
-static char *entry_get_file(const struct entry *e) { return xstrdup(e->file); }
+static char *entry_get_file(const struct entry *e) { return xstrdup(e->file.c_str()); }
 
 static void entry_destroy(struct entry *e)
 {
   assert(e != NULL);
-
-  if (e->file)
-  {
-    free(e->file);
-  }
-  if (e->title)
-  {
-    free(e->title);
-  }
 }
 
 static void entry_add_text_to_history(struct entry *e)
@@ -815,7 +799,7 @@ static void side_menu_init(struct side_menu *m, const enum side_menu_type type,
   m->height = wp->height;
   m->width = wp->width;
 
-  m->title = NULL;
+  m->title = "";
 
   m->total_time = 0;
   m->total_time_for_all = 0;
@@ -872,10 +856,6 @@ static void side_menu_destroy(struct side_menu *m)
       abort();
     }
 
-    if (m->title)
-    {
-      free(m->title);
-    }
     m->visible = 0;
   }
 }
@@ -885,11 +865,7 @@ static void side_menu_set_title(struct side_menu *m, const char *title)
   assert(m != NULL);
   assert(title != NULL);
 
-  if (m->title)
-  {
-    free(m->title);
-  }
-  m->title = xstrdup(title);
+  m->title = title;
 }
 
 /* Parse one layout coordinate from "0,2,54%,1" and put it in val.
@@ -1315,20 +1291,20 @@ static void side_menu_draw_frame(const struct side_menu *m)
   assert(m != NULL);
   assert(m->visible);
 
-  if (m->title)
+  if (!m->title.empty())
   {
-    if ((int)strwidth(m->title) > m->width - 4)
+    if ((int)strwidth(m->title.c_str()) > m->width - 4)
     {
       char *tail;
 
-      tail = xstrtail(m->title, m->width - 7);
+      tail = xstrtail(m->title.c_str(), m->width - 7);
       title = (char *)xmalloc(strlen(tail) + 4);
       snprintf(title, strlen(tail) + 4, "...%s", tail);
       free(tail);
     }
     else
     {
-      title = xstrdup(m->title);
+      title = xstrdup(m->title.c_str());
     }
   }
   else
@@ -2797,8 +2773,8 @@ static struct queued_message *queued_message_create(enum message_type type)
   result = new queued_message;
   result->next = NULL;
   result->type = type;
-  result->msg = NULL;
-  result->prompt = NULL;
+  result->msg = "";
+  result->prompt = "";
   result->timeout = 0;
   result->callback = NULL;
   result->data = NULL;
@@ -2810,15 +2786,6 @@ static void queued_message_destroy(struct queued_message *msg)
 {
   assert(msg != NULL);
 
-  if (msg->msg)
-  {
-    free(msg->msg);
-  }
-  if (msg->prompt)
-  {
-    free(msg->prompt);
-  }
-
   delete msg;
 }
 
@@ -2827,7 +2794,7 @@ static void set_startup_message(struct info_win *w)
   assert(w != NULL);
 
   w->current_message = queued_message_create(NORMAL_MSG);
-  w->current_message->msg = xstrdup(STARTUP_MESSAGE);
+  w->current_message->msg = STARTUP_MESSAGE;
   w->current_message->timeout = time(NULL);
   w->current_message->timeout += options_get_int("MessageLingerTime");
 
@@ -2836,7 +2803,7 @@ static void set_startup_message(struct info_win *w)
     struct queued_message *msg;
 
     msg = queued_message_create(NORMAL_MSG);
-    msg->msg = xstrdup("Press 'h' for the list of commands.");
+    msg->msg = "Press 'h' for the list of commands.";
     msg->timeout = options_get_int("MessageLingerTime");
 
     w->queued_message_head = msg;
@@ -3029,13 +2996,13 @@ static void info_win_draw_title(const struct info_win *w)
   {
     clear_area(w->win, 4, 1, COLS - 5, 1);
 
-    if (w->current_message && w->current_message->msg &&
+    if (w->current_message && !w->current_message->msg.empty() &&
         w->current_message->timeout >= time(NULL))
     {
       wattrset(w->win, w->current_message->type == ERROR_MSG
                            ? get_color(CLR_ERROR)
                            : get_color(CLR_MESSAGE));
-      xmvwaddnstr(w->win, 1, 4, w->current_message->msg, COLS - 5);
+      xmvwaddnstr(w->win, 1, 4, w->current_message->msg.c_str(), COLS - 5);
     }
     else
     {
@@ -3344,7 +3311,7 @@ static void info_win_make_entry(struct info_win *w, const enum entry_type type)
       break;
     case ENTRY_USER_QUERY:
       history = &w->user_history;
-      prompt = w->current_message->prompt;
+      prompt = w->current_message->prompt.c_str();
       break;
     default:
       history = NULL;
@@ -3388,22 +3355,15 @@ static void info_win_display_msg(struct info_win *w)
       w->queued_message_errors -= 1;
     }
 
-    if (msg_changed && w->current_message->msg &&
+    if (msg_changed && !w->current_message->msg.empty() &&
         options_get_bool("PrefixQueuedMessages"))
     {
-      char *msg;
       const char *decorator;
-      int len;
 
-      msg = w->current_message->msg;
       decorator = options_get_str("ErrorMessagesQueued");
-      len = strlen(msg) + strlen(decorator) + 10;
-      w->current_message->msg = (char *)xmalloc(len);
-      snprintf(w->current_message->msg, len, "(%d%s) %s",
-               w->queued_message_total,
-               (w->queued_message_errors ? decorator : ""), msg);
-      w->current_message->msg[len - 1] = 0x00;
-      free(msg);
+      w->current_message->msg = "(" + std::to_string(w->queued_message_total) +
+                                (w->queued_message_errors ? decorator : "") +
+                                ") " + w->current_message->msg;
     }
 
     if (w->current_message->type == QUERY_MSG)
@@ -3472,11 +3432,11 @@ static void info_win_msg(struct info_win *w, const char *msg,
   this_msg = queued_message_create(msg_type);
   if (msg)
   {
-    this_msg->msg = xstrdup(msg);
+    this_msg->msg = msg;
   }
   if (prompt)
   {
-    this_msg->prompt = xstrdup(prompt);
+    this_msg->prompt = prompt;
   }
   this_msg->timeout = options_get_int("MessageLingerTime");
   this_msg->callback = callback;
