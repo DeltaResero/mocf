@@ -148,8 +148,7 @@ struct bar
 /* History for entries' values. */
 struct entry_history
 {
-  char *items[HISTORY_SIZE];
-  int num; /* number of items */
+  std::vector<std::string> items;
 };
 
 /* An input area where a user can type text to enter a file name etc. */
@@ -278,7 +277,7 @@ static void entry_history_init(struct entry_history *h)
 {
   assert(h != NULL);
 
-  h->num = 0;
+  h->items.clear();
 }
 
 static void entry_history_add(struct entry_history *h, const char *text)
@@ -288,18 +287,13 @@ static void entry_history_add(struct entry_history *h, const char *text)
 
   if (strlen(text) != strspn(text, " "))
   {
-    if (h->num == 0 || strcmp(text, h->items[h->num - 1]))
+    if (h->items.empty() || h->items.back() != text)
     {
-      if (h->num < HISTORY_SIZE)
+      if (h->items.size() >= HISTORY_SIZE)
       {
-        h->items[h->num++] = xstrdup(text);
+        h->items.erase(h->items.begin());
       }
-      else
-      {
-        free(h->items[0]);
-        memmove(h->items, h->items + 1, (HISTORY_SIZE - 1) * sizeof(char *));
-        h->items[h->num - 1] = xstrdup(text);
-      }
+      h->items.push_back(text);
     }
   }
 }
@@ -308,43 +302,35 @@ static void entry_history_replace(struct entry_history *h, int num,
                                   const char *text)
 {
   assert(h != NULL);
-  assert(LIMIT(num, h->num));
+  assert(LIMIT(num, static_cast<int>(h->items.size())));
   assert(text != NULL);
 
-  if (strlen(text) != strspn(text, " ") && strcmp(h->items[num], text))
+  if (strlen(text) != strspn(text, " ") && h->items[num] != text)
   {
-    free(h->items[num]);
-    h->items[num] = xstrdup(text);
+    h->items[num] = text;
   }
 }
 
 static void entry_history_clear(struct entry_history *h)
 {
-  int i;
-
   assert(h != NULL);
 
-  for (i = 0; i < h->num; i++)
-  {
-    free(h->items[i]);
-  }
-
-  h->num = 0;
+  h->items.clear();
 }
 
 static int entry_history_nitems(const struct entry_history *h)
 {
   assert(h != NULL);
 
-  return h->num;
+  return static_cast<int>(h->items.size());
 }
 
 static char *entry_history_get(const struct entry_history *h, const int num)
 {
   assert(h != NULL);
-  assert(LIMIT(num, h->num));
+  assert(LIMIT(num, static_cast<int>(h->items.size())));
 
-  return xstrdup(h->items[num]);
+  return xstrdup(h->items[num].c_str());
 }
 
 /* Draw the entry.  Use this function at the end of screen drawing
@@ -428,7 +414,7 @@ static void entry_init(struct entry *e, const enum entry_type type,
 
   if (history)
   {
-    e->history_pos = history->num;
+    e->history_pos = static_cast<int>(history->items.size());
   }
 }
 
