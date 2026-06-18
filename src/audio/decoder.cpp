@@ -63,8 +63,8 @@ struct decoder_s_preference
 #endif
   int decoders;                  /* number of decoders */
   int decoder_list[PLUGINS_NUM]; /* decoder indices */
-  char *subtype;                 /* MIME subtype or NULL */
-  char type[];                   /* MIME type or filename extn */
+  std::string subtype;           /* MIME subtype or empty */
+  std::string type;              /* MIME type or filename extn */
 };
 typedef struct decoder_s_preference decoder_t_preference;
 static decoder_t_preference *preferences = NULL;
@@ -131,9 +131,9 @@ static decoder_t_preference *lookup_preference(const char *extn,
   subtype = NULL;
   for (result = preferences; result; result = result->next)
   {
-    if (!result->subtype)
+    if (result->subtype.empty())
     {
-      if (extn && !strcasecmp(result->type, extn))
+      if (extn && !strcasecmp(result->type.c_str(), extn))
       {
         break;
       }
@@ -163,8 +163,8 @@ static decoder_t_preference *lookup_preference(const char *extn,
 
       if (type)
       {
-        if (!strcasecmp(result->type, type) &&
-            !strcasecmp(result->subtype, subtype))
+        if (!strcasecmp(result->type.c_str(), type) &&
+            !strcasecmp(result->subtype.c_str(), subtype))
         {
           break;
         }
@@ -230,7 +230,7 @@ static int find_decoder(const char *extn, const char *file, char **mime)
   pref = lookup_preference(extn, file, mime);
   if (pref)
   {
-    if (pref->subtype)
+    if (!pref->subtype.empty())
     {
       return find_mime_decoder(pref->decoder_list, pref->decoders, *mime);
     }
@@ -427,20 +427,24 @@ static char *list_decoder_names(int *decoder_list, int count)
 static decoder_t_preference *make_preference(const char *prefix)
 {
   decoder_t_preference *result;
+  char *buf, *subtype;
 
   assert(prefix && prefix[0]);
 
-  result = (decoder_t_preference *)xmalloc(
-      offsetof(decoder_t_preference, type) + strlen(prefix) + 1);
+  result = new decoder_t_preference;
   result->next = NULL;
   result->decoders = 0;
-  strcpy(result->type, prefix);
-  result->subtype = strchr(result->type, '/');
-  if (result->subtype)
+  result->subtype = "";
+
+  buf = xstrdup(prefix);
+  subtype = strchr(buf, '/');
+  if (subtype)
   {
-    *result->subtype++ = 0x00;
-    result->subtype = clean_mime_subtype(result->subtype);
+    *subtype++ = 0x00;
+    result->subtype = clean_mime_subtype(subtype);
   }
+  result->type = buf;
+  free(buf);
 
   return result;
 }
@@ -656,7 +660,7 @@ static void cleanup_preferences()
   for (pref = preferences; pref; pref = next)
   {
     next = pref->next;
-    free(pref);
+    delete pref;
   }
 
   preferences = NULL;
