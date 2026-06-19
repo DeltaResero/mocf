@@ -236,7 +236,7 @@ static struct info_win
   int plist_time;         /* total time of files displayed in the menu */
   int plist_time_for_all; /* is the above time for all files? */
 
-  char *title;         /* title of the played song. */
+  std::string title;       /* title of the played song. */
   char status_msg[26]; /* status message */
   int state_play;      /* STATE_(PLAY | STOP | PAUSE) */
 
@@ -2811,7 +2811,7 @@ static void info_win_init(struct info_win *w)
   w->block_start = -1;
   w->block_end = -1;
 
-  w->title = NULL;
+  w->title = "";
   w->status_msg[0] = 0;
 
   w->in_entry = 0;
@@ -2975,7 +2975,7 @@ static void info_win_draw_title(const struct info_win *w)
     else
     {
       wattrset(w->win, get_color(CLR_TITLE));
-      xmvwaddnstr(w->win, 1, 4, w->title ? w->title : "", COLS - 5);
+      xmvwaddnstr(w->win, 1, 4, w->title.c_str(), COLS - 5);
     }
   }
 
@@ -2988,8 +2988,8 @@ static void info_win_set_state(struct info_win *w, const int state)
   assert(state == STATE_PLAY || state == STATE_STOP || state == STATE_PAUSE);
 
   w->state_play = state;
-  xterm_set_title(state, w->title);
-  screen_set_title(state, w->title);
+  xterm_set_title(state, w->title.c_str());
+  screen_set_title(state, w->title.c_str());
   info_win_draw_state(w);
 }
 
@@ -3149,21 +3149,17 @@ static void info_win_set_played_title(struct info_win *w, const char *title)
 {
   assert(w != NULL);
 
-  if (!w->title && !title)
+  if (w->title.empty() && !title)
   {
     return;
   }
 
-  if (w->title && title && !strcmp(w->title, title))
+  if (title && w->title == title)
   {
     return;
   }
 
-  if (w->title)
-  {
-    free(w->title);
-  }
-  w->title = xstrdup(title);
+  w->title = title ? title : "";
   xterm_set_title(w->state_play, title);
   screen_set_title(w->state_play, title);
   info_win_draw_title(w);
