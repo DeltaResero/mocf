@@ -152,16 +152,14 @@ int __unique_frame(struct id3_tag *tag, struct id3_frame *frame)
 
 static std::string get_tag(struct id3_tag *tag, const char *what)
 {
-  struct id3_frame *frame;
-  union id3_field *field;
-  const id3_ucs4_t *ucs4;
   std::string result;
   char *comm = NULL;
 
-  frame = id3_tag_findframe(tag, what, 0);
-  if (frame && (field = &frame->fields[1]))
+  struct id3_frame *frame = id3_tag_findframe(tag, what, 0);
+  if (frame)
   {
-    ucs4 = id3_field_getstrings(field, 0);
+    union id3_field *field = &frame->fields[1];
+    const id3_ucs4_t *ucs4 = id3_field_getstrings(field, 0);
     if (ucs4)
     {
       /* Workaround for ID3 tags v1/v1.1 where the encoding
@@ -510,7 +508,8 @@ static int put_output(char *buf, int buf_len, struct mad_pcm *pcm,
                       struct mad_header *header)
 {
   unsigned int nsamples;
-  mad_fixed_t const *left_ch, *right_ch;
+  mad_fixed_t const *left_ch;
+  mad_fixed_t const *right_ch;
   int olen;
 
   nsamples = pcm->length;
@@ -804,7 +803,7 @@ public:
     void *data;
     Mp3Decoder(void *d) : data(d) {}
     ~Mp3Decoder() override { mp3_close(data); }
-    
+
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
         return mp3_decode(data, buf, buf_len, sound_params);
     }
@@ -872,8 +871,5 @@ extern "C" class AudioPlugin *mp3_plugin_init() {
     static Mp3Plugin plugin;
     return &plugin;
 }
-
-
-
 
 // EOF
