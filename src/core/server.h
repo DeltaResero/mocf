@@ -11,7 +11,6 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-#include <stdbool.h>
 #include "core/protocol.h"
 #include "library/playlist.h"
 

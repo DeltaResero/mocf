@@ -13,10 +13,10 @@
 #include "config.h"
 #endif
 
-#include <stddef.h>
+#include <cstddef>
 #include <sys/types.h>
-#include <assert.h>
-#include <string.h>
+#include <cassert>
+#include <cstring>
 #include <vector>
 
 #include "core/common.h"

@@ -23,7 +23,7 @@
 #include <curses.h>
 #endif
 
-#include <stdarg.h>
+#include <cstdarg>
 #ifdef HAVE_ICONV
 #include <iconv.h>
 #endif

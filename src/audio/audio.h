@@ -11,7 +11,7 @@
 #ifndef AUDIO_H
 #define AUDIO_H
 
-#include <stdlib.h>
+#include <cstdlib>
 
 #ifdef __cplusplus
 extern "C"

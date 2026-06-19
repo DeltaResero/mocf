@@ -11,7 +11,7 @@
 #ifndef LOG_H
 #define LOG_H
 
-#include <stdio.h>
+#include <cstdio>
 #ifdef __cplusplus
 #include <string>
 #endif

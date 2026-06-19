@@ -12,7 +12,7 @@
 #define AUDIO_CONVERSION_H
 
 #ifdef HAVE_STDINT_H
-#include <stdint.h>
+#include <cstdint>
 #endif
 
 #include <sys/types.h>

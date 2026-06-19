@@ -17,7 +17,7 @@
 #endif
 
 #include <pthread.h>
-#include <string.h>
+#include <cstring>
 #include <strings.h>
 #include <algorithm>
 #include <memory>

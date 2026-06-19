@@ -15,10 +15,9 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <limits.h>
+#include <cstdlib>
+#include <cstdarg>
+#include <climits>
 #include <string>
 
 #include "core/compat.h"
