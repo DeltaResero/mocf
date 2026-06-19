@@ -121,7 +121,7 @@ struct main_win_layout
 static struct main_win
 {
   WINDOW *win;
-  char *curr_file; /* currently played file. */
+  std::string curr_file; /* currently played file. */
 
   int in_help;           /* are we displaying help screen? */
   int too_small;         /* is the terminal window too small to display mocf? */
@@ -1033,7 +1033,7 @@ static void main_win_init(struct main_win *w, std::vector<std::string> &layout_f
   nodelay(w->win, TRUE);
   keypad(w->win, TRUE);
 
-  w->curr_file = NULL;
+  w->curr_file = "";
   w->in_help = 0;
   w->too_small = 0;
   w->help_screen_top = 0;
@@ -1061,10 +1061,6 @@ static void main_win_destroy(struct main_win *w)
   if (w->win)
   {
     delwin(w->win);
-  }
-  if (w->curr_file)
-  {
-    free(w->curr_file);
   }
 }
 
@@ -1933,9 +1929,9 @@ static void main_win_set_dir_content(struct main_win *w,
 
   side_menu_make_list_content(m, files, dirs, playlists,
                               iface_menu == IFACE_MENU_DIR);
-  if (w->curr_file)
+  if (!w->curr_file.empty())
   {
-    side_menu_mark_file(m, w->curr_file);
+    side_menu_mark_file(m, w->curr_file.c_str());
   }
   main_win_draw(w);
 }
@@ -1971,9 +1967,9 @@ static void main_win_update_dir_content(struct main_win *w,
   side_menu_get_state(m, &ms);
   side_menu_make_list_content(m, files, dirs, playlists, 1);
   side_menu_set_state(m, &ms);
-  if (w->curr_file)
+  if (!w->curr_file.empty())
   {
-    side_menu_mark_file(m, w->curr_file);
+    side_menu_mark_file(m, w->curr_file.c_str());
   }
   main_win_draw(w);
 }
@@ -2112,11 +2108,7 @@ static void main_win_set_played_file(struct main_win *w, const char *file)
 
   assert(w != NULL);
 
-  if (w->curr_file)
-  {
-    free(w->curr_file);
-  }
-  w->curr_file = xstrdup(file);
+  w->curr_file = file;
 
   for (ix = 0; ix < ARRAY_SIZE(w->menus); ix += 1)
   {
@@ -2181,9 +2173,9 @@ static void main_win_add_to_plist(struct main_win *w, const struct plist *plist,
 
   m = find_side_menu(w, MENU_PLAYLIST);
   need_redraw = side_menu_add_plist_item(m, plist, num);
-  if (w->curr_file)
+  if (!w->curr_file.empty())
   {
-    side_menu_mark_file(m, w->curr_file);
+    side_menu_mark_file(m, w->curr_file.c_str());
   }
   if (need_redraw)
   {
