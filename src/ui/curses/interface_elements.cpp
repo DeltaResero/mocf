@@ -137,7 +137,7 @@ struct bar
 {
   int width;        /* width in chars */
   float filled;     /* how much is it filled in percent */
-  char *orig_title; /* optional title */
+  std::string orig_title; /* optional title */
   char title[512];  /* title with the percent value */
   int show_val;     /* show the title and the value? */
   int show_pct;     /* show percentage in the title value? */
@@ -2622,7 +2622,7 @@ static void bar_update_title(struct bar *b)
   {
     maxsize -= 5;
   }
-  len = strnlen(b->orig_title, maxsize - 2 * margin);
+  len = std::min(b->orig_title.size(), maxsize - 2 * margin);
 
   // center text
   total_space = maxsize - 2 * margin - len;
@@ -2630,7 +2630,7 @@ static void bar_update_title(struct bar *b)
   right_space = left_space;
 
   memset(b->title, ' ', left_space * sizeof(char));
-  memcpy(b->title + left_space, b->orig_title, len);
+  memcpy(b->title + left_space, b->orig_title.c_str(), len);
   if (total_space % 2)
   {
     // pad
@@ -2653,8 +2653,7 @@ static void bar_set_title(struct bar *b, const char *title)
   assert(title != NULL);
   assert(strlen(title) < sizeof(b->title) - 5);
 
-  strncpy(b->orig_title, title, b->width);
-  b->orig_title[b->width] = 0;
+  b->orig_title = title;
   bar_update_title(b);
 }
 
@@ -2675,12 +2674,11 @@ static void bar_init(struct bar *b, const int width, const char *title,
 
   if (show_val)
   {
-    b->orig_title = static_cast<char *>(xmalloc(b->width + 1));
     bar_set_title(b, title);
   }
   else
   {
-    b->orig_title = NULL;
+    b->orig_title = "";
     memset(b->title, ' ', b->width);
     b->title[b->width] = 0;
   }
@@ -2722,14 +2720,6 @@ static void bar_resize(struct bar *b, const int width)
 {
   assert(b != NULL);
   assert(width > 5 && width < ssizeof(b->title));
-
-  if (b->show_val && b->width < width)
-  {
-    char *new_title = static_cast<char *>(xmalloc(width + 1));
-    strcpy(new_title, b->orig_title);
-    free(b->orig_title);
-    b->orig_title = new_title;
-  }
 
   b->width = width;
 
