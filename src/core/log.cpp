@@ -91,7 +91,7 @@ static void locked_logit(const char *file, const int line, const char *function,
                          const char *msg)
 {
   int len;
-  char *str, time_str[20];
+  char time_str[20];
   struct timespec utc_time;
   time_t tv_sec;
   struct tm tm_time;
@@ -121,14 +121,14 @@ static void locked_logit(const char *file, const int line, const char *function,
 
   len = snprintf(NULL, 0, fmt, time_str, utc_time.tv_nsec / 1000L, file, line,
                  function, msg);
-  str = static_cast<char *>(xmalloc(len + 1));
-  snprintf(str, len + 1, fmt, time_str, utc_time.tv_nsec / 1000L, file, line,
+  std::string log_str(len + 1, '\0');
+  snprintf(&log_str[0], len + 1, fmt, time_str, utc_time.tv_nsec / 1000L, file, line,
            function, msg);
+  log_str.resize(len);
 
   if (logging_state == BUFFERING)
   {
-    buffered_log.push_back(str);
-    free(str);
+    buffered_log.push_back(log_str);
     return;
   }
 
@@ -140,13 +140,11 @@ static void locked_logit(const char *file, const int line, const char *function,
   }
   if (circular_ptr < static_cast<int>(circular_log.size()))
   {
-    circular_log[circular_ptr] = str;
-    free(str);
+    circular_log[circular_ptr] = log_str;
   }
   else
   {
-    circular_log.push_back(str);
-    free(str);
+    circular_log.push_back(log_str);
   }
   circular_ptr += 1;
 }
