@@ -16,6 +16,8 @@
 
 #include "utils/fifo_buf.h"
 
+#include <string>
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -39,7 +41,7 @@ extern "C"
     off_t size;     /* size of the file */
     int errno_val;  /* errno value of the last operation  - 0 if ok */
     int read_error; /* set to != 0 if the last read operation dailed */
-    char *strerror; /* error string */
+    std::string strerror; /* error string */
     int opened;     /* was the stream opened (open(), mmap(), etc.)? */
     int eof;        /* was the end of file reached? */
     int after_seek; /* are we after seek and need to do fresh read()? */
@@ -72,7 +74,7 @@ extern "C"
   off_t io_seek(struct io_stream *s, off_t offset, int whence);
   void io_close(struct io_stream *s);
   int io_ok(struct io_stream *s);
-  char *io_strerror(struct io_stream *s);
+  const char *io_strerror(struct io_stream *s);
   off_t io_file_size(const struct io_stream *s);
   off_t io_tell(struct io_stream *s);
   int io_eof(struct io_stream *s);
