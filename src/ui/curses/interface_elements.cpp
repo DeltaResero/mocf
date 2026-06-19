@@ -26,12 +26,13 @@
 #include <cwchar>
 #include <cwctype>
 #include <unistd.h>
+#include <algorithm>
+#include <string>
 #include <vector>
 
 #include "core/common.h"
 #include "ui/curses/menu.h"
 #include "ui/themes.h"
-#include "utils/lists.h"
 #include "core/options.h"
 #include "ui/curses/interface_elements.h"
 #include "core/log.h"
@@ -72,7 +73,7 @@ struct side_menu
   enum side_menu_type type;
   int visible; /* is it visible (are the other fields initialized) ? */
   WINDOW *win; /* window for the menu */
-  char *title; /* title of the window */
+  std::string title; /* title of the window */
 
   /* Position and size of the menu in the window. */
   int posx;
@@ -120,14 +121,14 @@ struct main_win_layout
 static struct main_win
 {
   WINDOW *win;
-  char *curr_file; /* currently played file. */
+  std::string curr_file; /* currently played file. */
 
   int in_help;           /* are we displaying help screen? */
   int too_small;         /* is the terminal window too small to display mocf? */
   int help_screen_top;   /* first visible line of the help screen. */
 
   struct side_menu menus[3];
-  lists_t_strs *layout_fmt;
+  std::vector<std::string> *layout_fmt;
   int selected_menu; /* which menu is currently selected by the user */
 } main_win;
 
@@ -136,7 +137,7 @@ struct bar
 {
   int width;        /* width in chars */
   float filled;     /* how much is it filled in percent */
-  char *orig_title; /* optional title */
+  std::string orig_title; /* optional title */
   char title[512];  /* title with the percent value */
   int show_val;     /* show the title and the value? */
   int show_pct;     /* show percentage in the title value? */
@@ -147,8 +148,7 @@ struct bar
 /* History for entries' values. */
 struct entry_history
 {
-  char *items[HISTORY_SIZE];
-  int num; /* number of items */
+  std::vector<std::string> items;
 };
 
 /* An input area where a user can type text to enter a file name etc. */
@@ -161,8 +161,8 @@ struct entry
   wchar_t text_ucs[512];  /* unicode */
   wchar_t saved_ucs[512]; /* unicode saved during history scrolling */
 
-  char *title;                   /* displayed title */
-  char *file;                    /* optional: file associated with the entry */
+  std::string title;             /* displayed title */
+  std::string file;              /* optional: file associated with the entry */
   int cur_pos;                   /* cursor position */
   int display_from;              /* displaying from this char */
   struct entry_history *history; /* history to use with this entry or
@@ -185,9 +185,9 @@ struct queued_message
   /* What type is this message? */
   enum message_type type;
   /* Message to be displayed instead of the file's title. */
-  char *msg;
+  std::string msg;
   /* Prompt to use for user query menu. */
-  char *prompt;
+  std::string prompt;
   /* How many seconds does the message linger? */
   time_t timeout;
   /* The callback function and opaque data for user replies. */
@@ -236,7 +236,7 @@ static struct info_win
   int plist_time;         /* total time of files displayed in the menu */
   int plist_time_for_all; /* is the above time for all files? */
 
-  char *title;         /* title of the played song. */
+  std::string title;       /* title of the played song. */
   char status_msg[26]; /* status message */
   int state_play;      /* STATE_(PLAY | STOP | PAUSE) */
 
@@ -277,7 +277,7 @@ static void entry_history_init(struct entry_history *h)
 {
   assert(h != NULL);
 
-  h->num = 0;
+  h->items.clear();
 }
 
 static void entry_history_add(struct entry_history *h, const char *text)
@@ -287,18 +287,13 @@ static void entry_history_add(struct entry_history *h, const char *text)
 
   if (strlen(text) != strspn(text, " "))
   {
-    if (h->num == 0 || strcmp(text, h->items[h->num - 1]))
+    if (h->items.empty() || h->items.back() != text)
     {
-      if (h->num < HISTORY_SIZE)
+      if (h->items.size() >= HISTORY_SIZE)
       {
-        h->items[h->num++] = xstrdup(text);
+        h->items.erase(h->items.begin());
       }
-      else
-      {
-        free(h->items[0]);
-        memmove(h->items, h->items + 1, (HISTORY_SIZE - 1) * sizeof(char *));
-        h->items[h->num - 1] = xstrdup(text);
-      }
+      h->items.push_back(text);
     }
   }
 }
@@ -307,43 +302,35 @@ static void entry_history_replace(struct entry_history *h, int num,
                                   const char *text)
 {
   assert(h != NULL);
-  assert(LIMIT(num, h->num));
+  assert(LIMIT(num, static_cast<int>(h->items.size())));
   assert(text != NULL);
 
-  if (strlen(text) != strspn(text, " ") && strcmp(h->items[num], text))
+  if (strlen(text) != strspn(text, " ") && h->items[num] != text)
   {
-    free(h->items[num]);
-    h->items[num] = xstrdup(text);
+    h->items[num] = text;
   }
 }
 
 static void entry_history_clear(struct entry_history *h)
 {
-  int i;
-
   assert(h != NULL);
 
-  for (i = 0; i < h->num; i++)
-  {
-    free(h->items[i]);
-  }
-
-  h->num = 0;
+  h->items.clear();
 }
 
 static int entry_history_nitems(const struct entry_history *h)
 {
   assert(h != NULL);
 
-  return h->num;
+  return static_cast<int>(h->items.size());
 }
 
 static char *entry_history_get(const struct entry_history *h, const int num)
 {
   assert(h != NULL);
-  assert(LIMIT(num, h->num));
+  assert(LIMIT(num, static_cast<int>(h->items.size())));
 
-  return xstrdup(h->items[num]);
+  return xstrdup(h->items[num].c_str());
 }
 
 /* Draw the entry.  Use this function at the end of screen drawing
@@ -358,7 +345,7 @@ static void entry_draw(const struct entry *e, WINDOW *w, const int posx,
 
   wmove(w, posy, posx);
   wattrset(w, get_color(CLR_ENTRY_TITLE));
-  xwprintw(w, "%s", e->title);
+  xwprintw(w, "%s", e->title.c_str());
 
   wattrset(w, get_color(CLR_ENTRY));
   size_t len = wcslen(e->text_ucs) - e->display_from;
@@ -378,7 +365,7 @@ static void entry_draw(const struct entry *e, WINDOW *w, const int posx,
   xwprintw(w, " %-*s", e->width, text.data());
 
   /* Move the cursor */
-  wmove(w, posy, e->cur_pos - e->display_from + strwidth(e->title) + posx + 1);
+  wmove(w, posy, e->cur_pos - e->display_from + strwidth(e->title.c_str()) + posx + 1);
 }
 
 static void entry_init(struct entry *e, const enum entry_type type,
@@ -413,15 +400,12 @@ static void entry_init(struct entry *e, const enum entry_type type,
   e->type = type;
   e->text_ucs[0] = L'\0';
   e->saved_ucs[0] = L'\0';
-  e->file = NULL;
-  e->title = xstrdup(title);
-  if (e->title[strlen(e->title) - 1] != ':' &&
-      e->title[strlen(e->title) - 1] != '?')
+  e->file = "";
+  e->title = title;
+  if (e->title[e->title.size() - 1] != ':' &&
+      e->title[e->title.size() - 1] != '?')
   {
-    char *t = static_cast<char *>(xmalloc(strlen(e->title) + 2));
-    snprintf(t, strlen(e->title) + 2, "%s:", e->title);
-    free(e->title);
-    e->title = t;
+    e->title += ':';
   }
   e->width = width - strwidth(title);
   e->cur_pos = 0;
@@ -430,7 +414,7 @@ static void entry_init(struct entry *e, const enum entry_type type,
 
   if (history)
   {
-    e->history_pos = history->num;
+    e->history_pos = static_cast<int>(history->items.size());
   }
 }
 
@@ -659,7 +643,7 @@ static void entry_resize(struct entry *e, const int width)
   assert(e != NULL);
   assert(width > 0);
 
-  e->width = width - strlen(e->title);
+  e->width = width - e->title.length();
   entry_end(e);
 }
 
@@ -745,27 +729,14 @@ static void entry_set_file(struct entry *e, const char *file)
   assert(e != NULL);
   assert(file != NULL);
 
-  if (e->file)
-  {
-    free(e->file);
-  }
-  e->file = xstrdup(file);
+  e->file = file;
 }
 
-static char *entry_get_file(const struct entry *e) { return xstrdup(e->file); }
+static char *entry_get_file(const struct entry *e) { return xstrdup(e->file.c_str()); }
 
 static void entry_destroy(struct entry *e)
 {
   assert(e != NULL);
-
-  if (e->file)
-  {
-    free(e->file);
-  }
-  if (e->title)
-  {
-    free(e->title);
-  }
 }
 
 static void entry_add_text_to_history(struct entry *e)
@@ -814,7 +785,7 @@ static void side_menu_init(struct side_menu *m, const enum side_menu_type type,
   m->height = wp->height;
   m->width = wp->width;
 
-  m->title = NULL;
+  m->title = "";
 
   m->total_time = 0;
   m->total_time_for_all = 0;
@@ -871,10 +842,6 @@ static void side_menu_destroy(struct side_menu *m)
       abort();
     }
 
-    if (m->title)
-    {
-      free(m->title);
-    }
     m->visible = 0;
   }
 }
@@ -884,11 +851,7 @@ static void side_menu_set_title(struct side_menu *m, const char *title)
   assert(m != NULL);
   assert(title != NULL);
 
-  if (m->title)
-  {
-    free(m->title);
-  }
-  m->title = xstrdup(title);
+  m->title = title;
 }
 
 /* Parse one layout coordinate from "0,2,54%,1" and put it in val.
@@ -927,15 +890,41 @@ static bool parse_layout_coordinate(const char *fmt, int *val, const int max)
   return true;
 }
 
+/* Split a string on any character in delims, mirroring the old
+ * lists_strs_split(): consecutive and leading/trailing delimiters do
+ * not produce empty entries. */
+static std::vector<std::string> split_on_chars(const char *s, const char *delims)
+{
+  std::vector<std::string> result;
+  std::string buf(s);
+  size_t start = 0;
+
+  while (start < buf.size())
+  {
+    size_t end = buf.find_first_of(delims, start);
+    if (end == std::string::npos)
+    {
+      result.push_back(buf.substr(start));
+      break;
+    }
+    if (end > start)
+    {
+      result.push_back(buf.substr(start, end - start));
+    }
+    start = end + 1;
+  }
+
+  return result;
+}
+
 /* Parse the layout string. Return false on error. */
-static bool parse_layout(struct main_win_layout *l, lists_t_strs *fmt)
+static bool parse_layout(struct main_win_layout *l, const std::vector<std::string> &fmt)
 {
   int ix;
   bool result = false;
-  lists_t_strs *format;
+  std::vector<std::string> format;
 
   assert(l != NULL);
-  assert(fmt != NULL);
 
   /* default values */
   l->menus[0].x = 0;
@@ -945,37 +934,36 @@ static bool parse_layout(struct main_win_layout *l, lists_t_strs *fmt)
   l->menus[1] = l->menus[0];
   l->menus[2] = l->menus[0];
 
-  format = lists_strs_new(6);
-  for (ix = 0; ix < lists_strs_size(fmt); ix += 1)
+  for (ix = 0; ix < static_cast<int>(fmt.size()); ix += 1)
   {
     const char *menu, *name;
     struct window_params p;
 
-    lists_strs_clear(format);
-    menu = lists_strs_at(fmt, ix).c_str();
-    if (lists_strs_split(format, menu, "(,)") != 5)
+    menu = fmt[ix].c_str();
+    format = split_on_chars(menu, "(,)");
+    if (format.size() != 5)
     {
       goto err;
     }
 
-    name = lists_strs_at(format, 0).c_str();
+    name = format[0].c_str();
 
-    if (!parse_layout_coordinate(lists_strs_at(format, 1).c_str(), &p.x, COLS))
+    if (!parse_layout_coordinate(format[1].c_str(), &p.x, COLS))
     {
       logit("Coordinate parse error when parsing X");
       goto err;
     }
-    if (!parse_layout_coordinate(lists_strs_at(format, 2).c_str(), &p.y, LINES - 4))
+    if (!parse_layout_coordinate(format[2].c_str(), &p.y, LINES - 4))
     {
       logit("Coordinate parse error when parsing Y");
       goto err;
     }
-    if (!parse_layout_coordinate(lists_strs_at(format, 3).c_str(), &p.width, COLS))
+    if (!parse_layout_coordinate(format[3].c_str(), &p.width, COLS))
     {
       logit("Coordinate parse error when parsing width");
       goto err;
     }
-    if (!parse_layout_coordinate(lists_strs_at(format, 4).c_str(), &p.height,
+    if (!parse_layout_coordinate(format[4].c_str(), &p.height,
                                  LINES - 4))
     {
       logit("Coordinate parse error when parsing height");
@@ -1030,11 +1018,10 @@ static bool parse_layout(struct main_win_layout *l, lists_t_strs *fmt)
   result = true;
 
 err:
-  lists_strs_free(format);
   return result;
 }
 
-static void main_win_init(struct main_win *w, lists_t_strs *layout_fmt)
+static void main_win_init(struct main_win *w, std::vector<std::string> &layout_fmt)
 {
   struct main_win_layout l;
   bool rc ASSERT_ONLY;
@@ -1046,11 +1033,11 @@ static void main_win_init(struct main_win *w, lists_t_strs *layout_fmt)
   nodelay(w->win, TRUE);
   keypad(w->win, TRUE);
 
-  w->curr_file = NULL;
+  w->curr_file = "";
   w->in_help = 0;
   w->too_small = 0;
   w->help_screen_top = 0;
-  w->layout_fmt = layout_fmt;
+  w->layout_fmt = &layout_fmt;
 
   rc = parse_layout(&l, layout_fmt);
   assert(rc);
@@ -1074,10 +1061,6 @@ static void main_win_destroy(struct main_win *w)
   if (w->win)
   {
     delwin(w->win);
-  }
-  if (w->curr_file)
-  {
-    free(w->curr_file);
   }
 }
 
@@ -1195,8 +1178,8 @@ static void side_menu_clear(struct side_menu *m)
 /* Fill the directory or playlist side menu with this content. */
 static void side_menu_make_list_content(struct side_menu *m,
                                         const struct plist *files,
-                                        const lists_t_strs *dirs,
-                                        const lists_t_strs *playlists,
+                                        const std::vector<std::string> &dirs,
+                                        const std::vector<std::string> &playlists,
                                         const int add_up_dir)
 {
   struct menu_item *added;
@@ -1216,44 +1199,38 @@ static void side_menu_make_list_content(struct side_menu *m,
     menu_item_set_attr_sel(added, get_color(CLR_MENU_ITEM_DIR_SELECTED));
   }
 
-  if (dirs)
+  for (i = 0; i < static_cast<int>(dirs.size()); i++)
   {
-    for (i = 0; i < lists_strs_size(dirs); i++)
+    char title[PATH_MAX];
+
+        if (options_get_bool("FileNamesIconv"))
     {
-      char title[PATH_MAX];
+      char *conv_title =
+          files_iconv_str(strrchr(dirs[i].c_str(), '/') + 1);
 
-          if (options_get_bool("FileNamesIconv"))
-      {
-        char *conv_title =
-            files_iconv_str(strrchr(lists_strs_at(dirs, i).c_str(), '/') + 1);
+      strcpy(title, conv_title);
+      strcat(title, "/");
 
-        strcpy(title, conv_title);
-        strcat(title, "/");
-
-        free(conv_title);
-      }
-      else
-      {
-        strcpy(title, strrchr(lists_strs_at(dirs, i).c_str(), '/') + 1);
-        strcat(title, "/");
-      }
-
-      added = menu_add(m->menu.list.main, title, F_DIR, lists_strs_at(dirs, i).c_str());
-      menu_item_set_attr_normal(added, get_color(CLR_MENU_ITEM_DIR));
-      menu_item_set_attr_sel(added, get_color(CLR_MENU_ITEM_DIR_SELECTED));
+      free(conv_title);
     }
+    else
+    {
+      strcpy(title, strrchr(dirs[i].c_str(), '/') + 1);
+      strcat(title, "/");
+    }
+
+    added = menu_add(m->menu.list.main, title, F_DIR, dirs[i].c_str());
+    menu_item_set_attr_normal(added, get_color(CLR_MENU_ITEM_DIR));
+    menu_item_set_attr_sel(added, get_color(CLR_MENU_ITEM_DIR_SELECTED));
   }
 
-  if (playlists)
+  for (i = 0; i < static_cast<int>(playlists.size()); i++)
   {
-    for (i = 0; i < lists_strs_size(playlists); i++)
-    {
-      added = menu_add(m->menu.list.main,
-                       strrchr(lists_strs_at(playlists, i).c_str(), '/') + 1,
-                       F_PLAYLIST, lists_strs_at(playlists, i).c_str());
-      menu_item_set_attr_normal(added, get_color(CLR_MENU_ITEM_PLAYLIST));
-      menu_item_set_attr_sel(added, get_color(CLR_MENU_ITEM_PLAYLIST_SELECTED));
-    }
+    added = menu_add(m->menu.list.main,
+                     strrchr(playlists[i].c_str(), '/') + 1,
+                     F_PLAYLIST, playlists[i].c_str());
+    menu_item_set_attr_normal(added, get_color(CLR_MENU_ITEM_PLAYLIST));
+    menu_item_set_attr_sel(added, get_color(CLR_MENU_ITEM_PLAYLIST_SELECTED));
   }
 
   /* playlist items */
@@ -1296,20 +1273,20 @@ static void side_menu_draw_frame(const struct side_menu *m)
   assert(m != NULL);
   assert(m->visible);
 
-  if (m->title)
+  if (!m->title.empty())
   {
-    if ((int)strwidth(m->title) > m->width - 4)
+    if ((int)strwidth(m->title.c_str()) > m->width - 4)
     {
       char *tail;
 
-      tail = xstrtail(m->title, m->width - 7);
+      tail = xstrtail(m->title.c_str(), m->width - 7);
       title = (char *)xmalloc(strlen(tail) + 4);
       snprintf(title, strlen(tail) + 4, "...%s", tail);
       free(tail);
     }
     else
     {
-      title = xstrdup(m->title);
+      title = xstrdup(m->title.c_str());
     }
   }
   else
@@ -1449,7 +1426,7 @@ static enum file_type side_menu_curritem_get_type(const struct side_menu *m)
   return F_OTHER;
 }
 
-static char *side_menu_get_curr_file(const struct side_menu *m)
+static std::string side_menu_get_curr_file(const struct side_menu *m)
 {
   struct menu_item *mi;
 
@@ -1465,7 +1442,7 @@ static char *side_menu_get_curr_file(const struct side_menu *m)
     return menu_item_get_file(mi);
   }
 
-  return NULL;
+  return "";
 }
 
 static struct side_menu *find_side_menu(struct main_win *w,
@@ -1941,8 +1918,8 @@ static enum side_menu_type iface_to_side_menu(const enum iface_menu iface_menu)
 static void main_win_set_dir_content(struct main_win *w,
                                      const enum iface_menu iface_menu,
                                      const struct plist *files,
-                                     const lists_t_strs *dirs,
-                                     const lists_t_strs *playlists)
+                                     const std::vector<std::string> &dirs,
+                                     const std::vector<std::string> &playlists)
 {
   struct side_menu *m;
 
@@ -1952,9 +1929,9 @@ static void main_win_set_dir_content(struct main_win *w,
 
   side_menu_make_list_content(m, files, dirs, playlists,
                               iface_menu == IFACE_MENU_DIR);
-  if (w->curr_file)
+  if (!w->curr_file.empty())
   {
-    side_menu_mark_file(m, w->curr_file);
+    side_menu_mark_file(m, w->curr_file.c_str());
   }
   main_win_draw(w);
 }
@@ -1976,8 +1953,8 @@ static void main_win_set_title(struct main_win *w,
 static void main_win_update_dir_content(struct main_win *w,
                                         const enum iface_menu iface_menu,
                                         const struct plist *files,
-                                        const lists_t_strs *dirs,
-                                        const lists_t_strs *playlists)
+                                        const std::vector<std::string> &dirs,
+                                        const std::vector<std::string> &playlists)
 {
   struct side_menu *m;
   struct side_menu_state ms;
@@ -1990,9 +1967,9 @@ static void main_win_update_dir_content(struct main_win *w,
   side_menu_get_state(m, &ms);
   side_menu_make_list_content(m, files, dirs, playlists, 1);
   side_menu_set_state(m, &ms);
-  if (w->curr_file)
+  if (!w->curr_file.empty())
   {
-    side_menu_mark_file(m, w->curr_file);
+    side_menu_mark_file(m, w->curr_file.c_str());
   }
   main_win_draw(w);
 }
@@ -2061,7 +2038,7 @@ static enum file_type main_win_curritem_get_type(const struct main_win *w)
   return side_menu_curritem_get_type(&w->menus[w->selected_menu]);
 }
 
-static char *main_win_get_curr_file(const struct main_win *w)
+static std::string main_win_get_curr_file(const struct main_win *w)
 {
   assert(w != NULL);
 
@@ -2131,11 +2108,7 @@ static void main_win_set_played_file(struct main_win *w, const char *file)
 
   assert(w != NULL);
 
-  if (w->curr_file)
-  {
-    free(w->curr_file);
-  }
-  w->curr_file = xstrdup(file);
+  w->curr_file = file;
 
   for (ix = 0; ix < ARRAY_SIZE(w->menus); ix += 1)
   {
@@ -2200,9 +2173,9 @@ static void main_win_add_to_plist(struct main_win *w, const struct plist *plist,
 
   m = find_side_menu(w, MENU_PLAYLIST);
   need_redraw = side_menu_add_plist_item(m, plist, num);
-  if (w->curr_file)
+  if (!w->curr_file.empty())
   {
-    side_menu_mark_file(m, w->curr_file);
+    side_menu_mark_file(m, w->curr_file.c_str());
   }
   if (need_redraw)
   {
@@ -2311,15 +2284,14 @@ static void main_win_swap_plist_items(struct main_win *w, const char *file1,
   main_win_draw(w);
 }
 
-static void main_win_use_layout(struct main_win *w, lists_t_strs *layout_fmt)
+static void main_win_use_layout(struct main_win *w, std::vector<std::string> &layout_fmt)
 {
   struct main_win_layout l;
   bool rc ASSERT_ONLY;
 
   assert(w != NULL);
-  assert(layout_fmt != NULL);
 
-  w->layout_fmt = layout_fmt;
+  w->layout_fmt = &layout_fmt;
 
   rc = parse_layout(&l, layout_fmt);
   assert(rc);
@@ -2333,22 +2305,22 @@ static void main_win_use_layout(struct main_win *w, lists_t_strs *layout_fmt)
 static void validate_layouts()
 {
   struct main_win_layout l;
-  lists_t_strs *layout_fmt;
+  std::vector<std::string> *layout_fmt;
 
-  layout_fmt = options_get_list("Layout1");
-  if (lists_strs_empty(layout_fmt) || !parse_layout(&l, layout_fmt))
+  layout_fmt = &options_get_list("Layout1");
+  if (layout_fmt->empty() || !parse_layout(&l, *layout_fmt))
   {
     interface_fatal("Layout1 is malformed!");
   }
 
-  layout_fmt = options_get_list("Layout2");
-  if (!lists_strs_empty(layout_fmt) && !parse_layout(&l, layout_fmt))
+  layout_fmt = &options_get_list("Layout2");
+  if (!layout_fmt->empty() && !parse_layout(&l, *layout_fmt))
   {
     interface_fatal("Layout2 is malformed!");
   }
 
-  layout_fmt = options_get_list("Layout3");
-  if (!lists_strs_empty(layout_fmt) && !parse_layout(&l, layout_fmt))
+  layout_fmt = &options_get_list("Layout3");
+  if (!layout_fmt->empty() && !parse_layout(&l, *layout_fmt))
   {
     interface_fatal("Layout3 is malformed!");
   }
@@ -2366,7 +2338,7 @@ static void main_win_resize(struct main_win *w)
   wresize(w->win, LINES - 4, COLS);
   werase(w->win);
 
-  rc = parse_layout(&l, w->layout_fmt);
+  rc = parse_layout(&l, *w->layout_fmt);
   assert(rc);
 
   side_menu_resize(&w->menus[0], &l.menus[0]);
@@ -2491,10 +2463,9 @@ static void detect_term()
   term = getenv("TERM");
   if (term)
   {
-    lists_t_strs *xterms;
+    const std::vector<std::string> &xterms = options_get_list("XTerms");
 
-    xterms = options_get_list("XTerms");
-    has_xterm = lists_strs_exists(xterms, term);
+    has_xterm = std::find(xterms.begin(), xterms.end(), term) != xterms.end();
   }
 }
 
@@ -2554,10 +2525,10 @@ static void detect_screen()
   window = getenv("WINDOW");
   if (term && window && isdigit(*window))
   {
-    lists_t_strs *screen_terms;
+    const std::vector<std::string> &screen_terms = options_get_list("ScreenTerms");
 
-    screen_terms = options_get_list("ScreenTerms");
-    has_screen = lists_strs_exists(screen_terms, term);
+    has_screen = std::find(screen_terms.begin(), screen_terms.end(), term) !=
+                 screen_terms.end();
   }
 }
 
@@ -2651,7 +2622,7 @@ static void bar_update_title(struct bar *b)
   {
     maxsize -= 5;
   }
-  len = strnlen(b->orig_title, maxsize - 2 * margin);
+  len = std::min(b->orig_title.size(), maxsize - 2 * margin);
 
   // center text
   total_space = maxsize - 2 * margin - len;
@@ -2659,7 +2630,7 @@ static void bar_update_title(struct bar *b)
   right_space = left_space;
 
   memset(b->title, ' ', left_space * sizeof(char));
-  memcpy(b->title + left_space, b->orig_title, len);
+  memcpy(b->title + left_space, b->orig_title.c_str(), len);
   if (total_space % 2)
   {
     // pad
@@ -2682,8 +2653,7 @@ static void bar_set_title(struct bar *b, const char *title)
   assert(title != NULL);
   assert(strlen(title) < sizeof(b->title) - 5);
 
-  strncpy(b->orig_title, title, b->width);
-  b->orig_title[b->width] = 0;
+  b->orig_title = title;
   bar_update_title(b);
 }
 
@@ -2704,12 +2674,11 @@ static void bar_init(struct bar *b, const int width, const char *title,
 
   if (show_val)
   {
-    b->orig_title = static_cast<char *>(xmalloc(b->width + 1));
     bar_set_title(b, title);
   }
   else
   {
-    b->orig_title = NULL;
+    b->orig_title = "";
     memset(b->title, ' ', b->width);
     b->title[b->width] = 0;
   }
@@ -2752,14 +2721,6 @@ static void bar_resize(struct bar *b, const int width)
   assert(b != NULL);
   assert(width > 5 && width < ssizeof(b->title));
 
-  if (b->show_val && b->width < width)
-  {
-    char *new_title = static_cast<char *>(xmalloc(width + 1));
-    strcpy(new_title, b->orig_title);
-    free(b->orig_title);
-    b->orig_title = new_title;
-  }
-
   b->width = width;
 
   if (b->show_val)
@@ -2780,8 +2741,8 @@ static struct queued_message *queued_message_create(enum message_type type)
   result = new queued_message;
   result->next = NULL;
   result->type = type;
-  result->msg = NULL;
-  result->prompt = NULL;
+  result->msg = "";
+  result->prompt = "";
   result->timeout = 0;
   result->callback = NULL;
   result->data = NULL;
@@ -2793,15 +2754,6 @@ static void queued_message_destroy(struct queued_message *msg)
 {
   assert(msg != NULL);
 
-  if (msg->msg)
-  {
-    free(msg->msg);
-  }
-  if (msg->prompt)
-  {
-    free(msg->prompt);
-  }
-
   delete msg;
 }
 
@@ -2810,7 +2762,7 @@ static void set_startup_message(struct info_win *w)
   assert(w != NULL);
 
   w->current_message = queued_message_create(NORMAL_MSG);
-  w->current_message->msg = xstrdup(STARTUP_MESSAGE);
+  w->current_message->msg = STARTUP_MESSAGE;
   w->current_message->timeout = time(NULL);
   w->current_message->timeout += options_get_int("MessageLingerTime");
 
@@ -2819,7 +2771,7 @@ static void set_startup_message(struct info_win *w)
     struct queued_message *msg;
 
     msg = queued_message_create(NORMAL_MSG);
-    msg->msg = xstrdup("Press 'h' for the list of commands.");
+    msg->msg = "Press 'h' for the list of commands.";
     msg->timeout = options_get_int("MessageLingerTime");
 
     w->queued_message_head = msg;
@@ -2859,7 +2811,7 @@ static void info_win_init(struct info_win *w)
   w->block_start = -1;
   w->block_end = -1;
 
-  w->title = NULL;
+  w->title = "";
   w->status_msg[0] = 0;
 
   w->in_entry = 0;
@@ -3012,18 +2964,18 @@ static void info_win_draw_title(const struct info_win *w)
   {
     clear_area(w->win, 4, 1, COLS - 5, 1);
 
-    if (w->current_message && w->current_message->msg &&
+    if (w->current_message && !w->current_message->msg.empty() &&
         w->current_message->timeout >= time(NULL))
     {
       wattrset(w->win, w->current_message->type == ERROR_MSG
                            ? get_color(CLR_ERROR)
                            : get_color(CLR_MESSAGE));
-      xmvwaddnstr(w->win, 1, 4, w->current_message->msg, COLS - 5);
+      xmvwaddnstr(w->win, 1, 4, w->current_message->msg.c_str(), COLS - 5);
     }
     else
     {
       wattrset(w->win, get_color(CLR_TITLE));
-      xmvwaddnstr(w->win, 1, 4, w->title ? w->title : "", COLS - 5);
+      xmvwaddnstr(w->win, 1, 4, w->title.c_str(), COLS - 5);
     }
   }
 
@@ -3036,8 +2988,8 @@ static void info_win_set_state(struct info_win *w, const int state)
   assert(state == STATE_PLAY || state == STATE_STOP || state == STATE_PAUSE);
 
   w->state_play = state;
-  xterm_set_title(state, w->title);
-  screen_set_title(state, w->title);
+  xterm_set_title(state, w->title.c_str());
+  screen_set_title(state, w->title.c_str());
   info_win_draw_state(w);
 }
 
@@ -3197,21 +3149,17 @@ static void info_win_set_played_title(struct info_win *w, const char *title)
 {
   assert(w != NULL);
 
-  if (!w->title && !title)
+  if (w->title.empty() && !title)
   {
     return;
   }
 
-  if (w->title && title && !strcmp(w->title, title))
+  if (title && w->title == title)
   {
     return;
   }
 
-  if (w->title)
-  {
-    free(w->title);
-  }
-  w->title = xstrdup(title);
+  w->title = title ? title : "";
   xterm_set_title(w->state_play, title);
   screen_set_title(w->state_play, title);
   info_win_draw_title(w);
@@ -3327,7 +3275,7 @@ static void info_win_make_entry(struct info_win *w, const enum entry_type type)
       break;
     case ENTRY_USER_QUERY:
       history = &w->user_history;
-      prompt = w->current_message->prompt;
+      prompt = w->current_message->prompt.c_str();
       break;
     default:
       history = NULL;
@@ -3371,22 +3319,15 @@ static void info_win_display_msg(struct info_win *w)
       w->queued_message_errors -= 1;
     }
 
-    if (msg_changed && w->current_message->msg &&
+    if (msg_changed && !w->current_message->msg.empty() &&
         options_get_bool("PrefixQueuedMessages"))
     {
-      char *msg;
       const char *decorator;
-      int len;
 
-      msg = w->current_message->msg;
       decorator = options_get_str("ErrorMessagesQueued");
-      len = strlen(msg) + strlen(decorator) + 10;
-      w->current_message->msg = (char *)xmalloc(len);
-      snprintf(w->current_message->msg, len, "(%d%s) %s",
-               w->queued_message_total,
-               (w->queued_message_errors ? decorator : ""), msg);
-      w->current_message->msg[len - 1] = 0x00;
-      free(msg);
+      w->current_message->msg = "(" + std::to_string(w->queued_message_total) +
+                                (w->queued_message_errors ? decorator : "") +
+                                ") " + w->current_message->msg;
     }
 
     if (w->current_message->type == QUERY_MSG)
@@ -3455,11 +3396,11 @@ static void info_win_msg(struct info_win *w, const char *msg,
   this_msg = queued_message_create(msg_type);
   if (msg)
   {
-    this_msg->msg = xstrdup(msg);
+    this_msg->msg = msg;
   }
   if (prompt)
   {
-    this_msg->prompt = xstrdup(prompt);
+    this_msg->prompt = prompt;
   }
   this_msg->timeout = options_get_int("MessageLingerTime");
   this_msg->callback = callback;
@@ -4040,16 +3981,17 @@ static void iface_show_num_files(const int num)
 /* Change the content of the directory menu to these files, directories, and
  * playlists. */
 void iface_set_dir_content(const enum iface_menu iface_menu,
-                           const struct plist *files, const lists_t_strs *dirs,
-                           const lists_t_strs *playlists)
+                           const struct plist *files,
+                           const std::vector<std::string> &dirs,
+                           const std::vector<std::string> &playlists)
 {
   main_win_set_dir_content(&main_win, iface_menu, files, dirs, playlists);
   info_win_set_files_time(&info_win,
                           main_win_get_files_time(&main_win, iface_menu),
                           main_win_is_time_for_all(&main_win, iface_menu));
 
-  iface_show_num_files(plist_count(files) + (dirs ? lists_strs_size(dirs) : 0) +
-                       (playlists ? lists_strs_size(playlists) : 0));
+  iface_show_num_files(static_cast<int>(plist_count(files) + dirs.size() +
+                                        playlists.size()));
 
   iface_refresh_screen();
 }
@@ -4128,16 +4070,16 @@ void iface_update_theme_selection(const char *file)
  * a new menu. */
 void iface_update_dir_content(const enum iface_menu iface_menu,
                               const struct plist *files,
-                              const lists_t_strs *dirs,
-                              const lists_t_strs *playlists)
+                              const std::vector<std::string> &dirs,
+                              const std::vector<std::string> &playlists)
 {
   main_win_update_dir_content(&main_win, iface_menu, files, dirs, playlists);
   info_win_set_files_time(&info_win,
                           main_win_get_files_time(&main_win, iface_menu),
                           main_win_is_time_for_all(&main_win, iface_menu));
 
-  iface_show_num_files(plist_count(files) + (dirs ? lists_strs_size(dirs) : 0) +
-                       (playlists ? lists_strs_size(playlists) : 0));
+  iface_show_num_files(static_cast<int>(plist_count(files) + dirs.size() +
+                                        playlists.size()));
 
   iface_refresh_screen();
 }
@@ -4281,9 +4223,9 @@ int iface_in_plist_menu() { return main_win_in_plist_menu(&main_win); }
 /* Return a non zero value if the theme menu is currently selected. */
 int iface_in_theme_menu() { return main_win_in_theme_menu(&main_win); }
 
-/* Return the currently selected file (malloc()ed) or NULL if the menu is
+/* Return the currently selected file or an empty string if the menu is
  * empty. */
-char *iface_get_curr_file() { return main_win_get_curr_file(&main_win); }
+std::string iface_get_curr_file() { return main_win_get_curr_file(&main_win); }
 
 /* Set the current time of playing. */
 void iface_set_curr_time(const int time)
@@ -4605,7 +4547,7 @@ void iface_toggle_layout()
 {
   static int curr_layout = 1;
   char layout_option[32];
-  lists_t_strs *layout_fmt;
+  std::vector<std::string> *layout_fmt;
 
   if (++curr_layout > 3)
   {
@@ -4613,14 +4555,14 @@ void iface_toggle_layout()
   }
 
   snprintf(layout_option, sizeof(layout_option), "Layout%d", curr_layout);
-  layout_fmt = options_get_list(layout_option);
-  if (lists_strs_empty(layout_fmt))
+  layout_fmt = &options_get_list(layout_option);
+  if (layout_fmt->empty())
   {
     curr_layout = 1;
-    layout_fmt = options_get_list("Layout1");
+    layout_fmt = &options_get_list("Layout1");
   }
 
-  main_win_use_layout(&main_win, layout_fmt);
+  main_win_use_layout(&main_win, *layout_fmt);
   iface_refresh_screen();
 }
 

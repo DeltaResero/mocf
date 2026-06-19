@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <string>
 #include <pthread.h>
 
 #define DEBUG
@@ -73,7 +74,7 @@ struct md5_data
 
 struct precache
 {
-  char *file;                 /* the file to precache */
+  std::string file;           /* the file to precache */
   char buf[2 * PCM_BUF_SIZE]; /* PCM buffer with precached data */
   int buf_fill;
   int ok;                           /* 1 if precache succeed */
@@ -257,10 +258,10 @@ static void *precache_thread(void *data)
   precache->sound_params.channels = 0; /* mark that sound_params were not
             yet filled. */
   precache->decoded_time = 0.0;
-  precache->f = get_decoder(precache->file);
+  precache->f = get_decoder(precache->file.c_str());
   assert(precache->f != NULL);
 
-  precache->decoder_data = precache->f->open(precache->file);
+  precache->decoder_data = precache->f->open(precache->file.c_str());
   precache->decoder_data->get_error(&err);
   if (err.type != ERROR_OK)
   {
@@ -270,7 +271,7 @@ static void *precache_thread(void *data)
     return NULL;
   }
 
-  audio_plist_set_time(precache->file,
+  audio_plist_set_time(precache->file.c_str(),
                        precache->decoder_data->get_duration());
 
   /* Stop at PCM_BUF_SIZE, because when we decode too much, there is no
@@ -341,7 +342,7 @@ static void start_precache(struct precache *precache, const char *file)
   assert(!precache->running);
   assert(file != NULL);
 
-  precache->file = xstrdup(file);
+  precache->file = file;
   bitrate_list_init(&precache->bitrate_list);
   logit("Precaching file %s", file);
   precache->ok = 0;
@@ -387,17 +388,16 @@ static void precache_reset(struct precache *precache)
   }
 
   precache->ok = 0;
-  if (precache->file)
+  if (!precache->file.empty())
   {
-    free(precache->file);
-    precache->file = NULL;
+    precache->file = "";
     bitrate_list_destroy(&precache->bitrate_list);
   }
 }
 
 void player_init()
 {
-  precache.file = NULL;
+  precache.file = "";
   precache.running = 0;
   precache.ok = 0;
 }
@@ -534,7 +534,7 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
              (eof && out_buf_get_fill(out_buf)))
     {
       debug("waiting...");
-      if (eof && !precache.file && next_file &&
+      if (eof && precache.file.empty() && next_file &&
           file_type(next_file) == F_SOUND && options_get_bool("Precache") &&
           options_get_bool("AutoNext"))
       {
@@ -735,13 +735,13 @@ static void play_file(const char *file, AudioPlugin *f,
 
   precache_wait(&precache);
 
-  if (precache.ok && strcmp(precache.file, file))
+  if (precache.ok && precache.file != file)
   {
     logit("The precached file is not the file we want.");
     precache_reset(&precache);
   }
 
-  if (precache.ok && !strcmp(precache.file, file))
+  if (precache.ok && precache.file == file)
   {
     struct decoder_error err;
 

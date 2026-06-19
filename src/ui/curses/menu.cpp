@@ -82,18 +82,18 @@ static void draw_item(const struct menu *menu, const struct menu_item *mi,
     title_space -= queue_pos_len;
   }
 
-  title_width = strwidth(mi->title);
+  title_width = strwidth(mi->title.c_str());
 
   getyx(menu->win, y, x);
   if (title_width <= title_space || mi->align == MENU_ALIGN_LEFT)
   {
-    xwaddnstr(menu->win, mi->title, title_space);
+    xwaddnstr(menu->win, mi->title.c_str(), title_space);
   }
   else
   {
     char *ptr;
 
-    ptr = xstrtail(mi->title, title_space);
+    ptr = xstrtail(mi->title.c_str(), title_space);
     xwaddstr(menu->win, ptr);
     free(ptr);
   }
@@ -272,9 +272,9 @@ struct menu_item *menu_add(struct menu *menu, const char *title,
 
   mi = new menu_item;
 
-  mi->title = xstrdup(title);
+  mi->title = title;
   mi->type = type;
-  mi->file = xstrdup(file);
+  mi->file = file ? file : "";
   mi->num = menu->nitems;
 
   mi->attr_normal = A_NORMAL;
@@ -326,7 +326,8 @@ static struct menu_item *menu_add_from_item(struct menu *menu,
   assert(menu != NULL);
   assert(mi != NULL);
 
-  new_item = menu_add(menu, mi->title, mi->type, mi->file);
+  new_item = menu_add(menu, mi->title.c_str(), mi->type,
+                      mi->file.empty() ? NULL : mi->file.c_str());
 
   new_item->attr_normal = mi->attr_normal;
   new_item->attr_sel = mi->attr_sel;
@@ -392,13 +393,6 @@ void menu_update_size(struct menu *menu, const int posx, const int posy,
 static void menu_item_free(struct menu_item *mi)
 {
   assert(mi != NULL);
-  assert(mi->title != NULL);
-
-  free(mi->title);
-  if (mi->file)
-  {
-    free(mi->file);
-  }
 
   delete mi;
 }
@@ -545,7 +539,7 @@ void menu_setcurritem_title(struct menu *menu, const char *title)
   /* Find it */
   for (mi = menu->top; mi; mi = mi->next)
   {
-    if (!strcmp(mi->title, title))
+    if (mi->title == title)
     {
       break;
     }
@@ -627,7 +621,7 @@ struct menu *menu_filter_pattern(const struct menu *menu, const char *pattern)
 
   for (mi = menu->items; mi; mi = mi->next)
   {
-    if (strcasestr(mi->title, pattern))
+    if (strcasestr(mi->title.c_str(), pattern))
     {
       menu_add_from_item(new_menu, mi);
     }
@@ -635,7 +629,7 @@ struct menu *menu_filter_pattern(const struct menu *menu, const char *pattern)
 
   if (menu->marked)
   {
-    menu_mark_item(new_menu, menu->marked->file);
+    menu_mark_item(new_menu, menu->marked->file.c_str());
   }
 
   return new_menu;
@@ -743,22 +737,18 @@ enum file_type menu_item_get_type(const struct menu_item *mi)
   return mi->type;
 }
 
-char *menu_item_get_file(const struct menu_item *mi)
+const std::string &menu_item_get_file(const struct menu_item *mi)
 {
   assert(mi != NULL);
 
-  return xstrdup(mi->file);
+  return mi->file;
 }
 
 void menu_item_set_title(struct menu_item *mi, const char *title)
 {
   assert(mi != NULL);
 
-  if (mi->title)
-  {
-    free(mi->title);
-  }
-  mi->title = xstrdup(title);
+  mi->title = title;
 }
 
 int menu_nitems(const struct menu *menu)
@@ -847,7 +837,7 @@ static void menu_delete(struct menu *menu, struct menu_item *mi)
     menu->top = mi->next ? mi->next : mi->prev;
   }
 
-  if (mi->file)
+  if (!mi->file.empty())
   {
     menu->search_tree.erase(mi->file);
   }

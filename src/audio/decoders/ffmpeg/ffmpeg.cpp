@@ -57,7 +57,9 @@ extern "C" {
 #include "audio/decoder.h"
 #include "core/log.h"
 #include "library/files.h"
-#include "utils/lists.h"
+
+#include <algorithm>
+#include <string>
 
 #ifndef AV_CODEC_CAP_DELAY
 #define AV_CODEC_CAP_DELAY CODEC_CAP_DELAY
@@ -115,7 +117,7 @@ struct extn_list
   const char *format;
 };
 
-static lists_t_strs *supported_extns = NULL;
+static std::vector<std::string> supported_extns;
 
 static void ffmpeg_log_repeats(const char *msg LOGIT_ONLY)
 {
@@ -142,16 +144,27 @@ static void ffmpeg_log_repeats(const char *msg LOGIT_ONLY)
   }
   if (prev_msg.empty() && msg)
   {
-    int count, ix;
-    lists_t_strs *lines;
+    std::string buf(msg);
+    size_t start = 0;
 
-    lines = lists_strs_new(4);
-    count = lists_strs_split(lines, msg, "\n");
-    for (ix = 0; ix < count; ix += 1)
+    while (start <= buf.size())
     {
-      logit("FFmpeg said: %s", lists_strs_at(lines, ix).c_str());
+      size_t end = buf.find('\n', start);
+
+      if (end == std::string::npos)
+      {
+        if (start < buf.size())
+        {
+          logit("FFmpeg said: %s", buf.substr(start).c_str());
+        }
+        break;
+      }
+      if (end > start)
+      {
+        logit("FFmpeg said: %s", buf.substr(start, end - start).c_str());
+      }
+      start = end + 1;
     }
-    lists_strs_free(lines);
 
     prev_msg = msg;
     msg_count = 1;
@@ -243,7 +256,7 @@ static unsigned int find_first_audio(AVFormatContext *ic)
   return result;
 }
 
-static void load_audio_extns(lists_t_strs *list)
+static void load_audio_extns(std::vector<std::string> &list)
 {
   int ix;
 
@@ -269,24 +282,24 @@ static void load_audio_extns(lists_t_strs *list)
   {
     if (av_find_input_format(audio_extns[ix].format))
     {
-      lists_strs_append(list, audio_extns[ix].extn);
+      list.push_back(audio_extns[ix].extn);
     }
   }
 
   if (av_find_input_format("ogg"))
   {
-    lists_strs_append(list, "ogg");
+    list.push_back("ogg");
     if (avcodec_find_decoder(AV_CODEC_ID_VORBIS))
     {
-      lists_strs_append(list, "oga");
+      list.push_back("oga");
     }
     if (avcodec_find_decoder(AV_CODEC_ID_OPUS))
     {
-      lists_strs_append(list, "opus");
+      list.push_back("opus");
     }
     if (avcodec_find_decoder(AV_CODEC_ID_THEORA))
     {
-      lists_strs_append(list, "ogv");
+      list.push_back("ogv");
     }
   }
 
@@ -294,11 +307,11 @@ static void load_audio_extns(lists_t_strs *list)
    * In practice, it breaks badly. */
 #if 0
 	if (avcodec_find_decoder (AV_CODEC_ID_SPEEX))
-		lists_strs_append (list, "spx");
+		list.push_back("spx");
 #endif
 }
 
-static void load_video_extns(lists_t_strs *list)
+static void load_video_extns(std::vector<std::string> &list)
 {
   int ix;
   const struct extn_list video_extns[] = {
@@ -309,7 +322,7 @@ static void load_video_extns(lists_t_strs *list)
   {
     if (av_find_input_format(video_extns[ix].format))
     {
-      lists_strs_append(list, video_extns[ix].extn);
+      list.push_back(video_extns[ix].extn);
     }
   }
 }
@@ -416,7 +429,7 @@ static void ffmpeg_init()
   av_register_all();
 #endif
 
-  supported_extns = lists_strs_new(16);
+  supported_extns.reserve(16);
   load_audio_extns(supported_extns);
   load_video_extns(supported_extns);
 
@@ -441,7 +454,7 @@ static void ffmpeg_destroy()
   av_log_set_level(AV_LOG_QUIET);
   ffmpeg_log_repeats(NULL);
 
-  lists_strs_free(supported_extns);
+  supported_extns.clear();
 }
 
 /* Fill info structure with data from ffmpeg comments. */
@@ -1514,7 +1527,10 @@ static int ffmpeg_get_duration(void *prv_data)
 
 static int ffmpeg_our_format_ext(const char *ext)
 {
-  return (lists_strs_exists(supported_extns, ext)) ? 1 : 0;
+  return (std::find(supported_extns.begin(), supported_extns.end(), ext) !=
+          supported_extns.end())
+             ? 1
+             : 0;
 }
 
 static int ffmpeg_our_format_mime(const char *mime_type)

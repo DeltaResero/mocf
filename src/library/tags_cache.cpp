@@ -81,7 +81,7 @@ typedef unsigned long int u_long;
 struct request_queue_node
 {
   struct request_queue_node *next;
-  char *file;   /* file that this request is for (malloc()ed) */
+  std::string file; /* file that this request is for */
   int tags_sel; /* which tags to read (TAGS_*) */
 };
 
@@ -155,7 +155,6 @@ static void request_queue_clear(struct request_queue *q)
 
     q->head = q->head->next;
 
-    free(o->file);
     delete o;
   }
 
@@ -175,12 +174,11 @@ static void request_queue_clear_up_to(struct request_queue *q, const char *file)
 
     q->head = q->head->next;
 
-    if (!strcmp(o->file, file))
+    if (o->file == file)
     {
       stop = 1;
     }
 
-    free(o->file);
     delete o;
   }
 
@@ -209,7 +207,7 @@ static void request_queue_add(struct request_queue *q, const char *file,
     q->tail = q->tail->next;
   }
 
-  q->tail->file = xstrdup(file);
+  q->tail->file = file;
   q->tail->tags_sel = tags_sel;
   q->tail->next = NULL;
 }
@@ -221,23 +219,23 @@ static int request_queue_empty(const struct request_queue *q)
   return q->head == NULL;
 }
 
-/* Get the file name of the first element in the queue or NULL if the queue is
- * empty. Put tags to be read in *tags_sel. Returned memory is malloc()ed. */
-static char *request_queue_pop(struct request_queue *q, int *tags_sel)
+/* Get the file name of the first element in the queue or an empty string if
+ * the queue is empty. Put tags to be read in *tags_sel. */
+static std::string request_queue_pop(struct request_queue *q, int *tags_sel)
 {
   struct request_queue_node *n;
-  char *file;
+  std::string file;
 
   assert(q != NULL);
 
   if (q->head == NULL)
   {
-    return NULL;
+    return "";
   }
 
   n = q->head;
   q->head = n->next;
-  file = n->file;
+  file = std::move(n->file);
   *tags_sel = n->tags_sel;
   delete n;
 
@@ -739,7 +737,7 @@ static void *reader_thread(void *cache_ptr)
 
   while (!c->stop_reader_thread)
   {
-    char *request_file;
+    std::string request_file;
     int tags_sel = 0;
 
     if (request_queue_empty(&c->queue))
@@ -752,8 +750,8 @@ static void *reader_thread(void *cache_ptr)
     request_file = request_queue_pop(&c->queue, &tags_sel);
     UNLOCK(c->mutex);
 
-    tags_cache_read_add(c, request_file, tags_sel, 1);
-    free(request_file);
+    if (!request_file.empty())
+      tags_cache_read_add(c, request_file.c_str(), tags_sel, 1);
 
     LOCK(c->mutex);
   }

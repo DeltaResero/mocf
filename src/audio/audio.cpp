@@ -19,6 +19,7 @@
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
+#include <algorithm>
 #include <vector>
 #include <string>
 #include <thread>
@@ -32,7 +33,6 @@
 #include "audio/decoder.h"
 #include "library/playlist.h"
 #include "core/log.h"
-#include "utils/lists.h"
 
 #ifdef HAVE_PULSE
 #include "audio/outputs/pulse.h"
@@ -1190,17 +1190,13 @@ void audio_close()
 
 /* Try to initialize drivers from the list and fill funcs with
  * those of the first working driver. */
-static void find_working_driver(lists_t_strs *drivers, struct hw_funcs *funcs)
+static void find_working_driver(const std::vector<std::string> &drivers, struct hw_funcs *funcs)
 {
-  int ix;
-
   memset(funcs, 0, sizeof(*funcs));
 
-  for (ix = 0; ix < lists_strs_size(drivers); ix += 1)
+  for (const auto &driver : drivers)
   {
-    const char *name;
-
-    name = lists_strs_at(drivers, ix).c_str();
+    const char *name = driver.c_str();
 
 #ifdef HAVE_SNDIO
     if (!strcasecmp(name, "sndio"))
@@ -1289,55 +1285,59 @@ print_output_capabilities(const struct output_driver_caps *caps LOGIT_ONLY)
         sfmt_str(caps->formats, fmt_name, sizeof(fmt_name)));
 }
 
-static long decode_masked_formats(lists_t_strs *list)
+static long decode_masked_formats(const std::vector<std::string> &list)
 {
   long fmt = 0;
-  if (lists_strs_exists(list, "S8"))
+  auto exists = [&list](const char *s) {
+    return std::find(list.begin(), list.end(), s) != list.end();
+  };
+
+  if (exists("S8"))
   {
     fmt |= SFMT_S8;
   }
-  if (lists_strs_exists(list, "U8"))
+  if (exists("U8"))
   {
     fmt |= SFMT_U8;
   }
-  if (lists_strs_exists(list, "S16"))
+  if (exists("S16"))
   {
     fmt |= SFMT_S16;
   }
-  if (lists_strs_exists(list, "U16"))
+  if (exists("U16"))
   {
     fmt |= SFMT_U16;
   }
-  if (lists_strs_exists(list, "S24"))
+  if (exists("S24"))
   {
     fmt |= SFMT_S24;
   }
-  if (lists_strs_exists(list, "U24"))
+  if (exists("U24"))
   {
     fmt |= SFMT_U24;
   }
-  if (lists_strs_exists(list, "S24_3"))
+  if (exists("S24_3"))
   {
     fmt |= SFMT_S24_3;
   }
-  if (lists_strs_exists(list, "U24_3"))
+  if (exists("U24_3"))
   {
     fmt |= SFMT_U24_3;
   }
-  if (lists_strs_exists(list, "S32"))
+  if (exists("S32"))
   {
     fmt |= SFMT_S32;
   }
-  if (lists_strs_exists(list, "U32"))
+  if (exists("U32"))
   {
     fmt |= SFMT_U32;
   }
-  if (lists_strs_exists(list, "FLOAT"))
+  if (exists("FLOAT"))
   {
     fmt |= SFMT_FLOAT;
   }
 
-  if (lists_strs_size(list) != __builtin_popcount(fmt))
+  if (list.size() != static_cast<size_t>(__builtin_popcount(fmt)))
   {
     fatal("Incorrect setting for MaskOutputFormats");
     return 0;

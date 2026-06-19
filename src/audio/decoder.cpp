@@ -17,10 +17,12 @@
 #include <cctype>
 #include <cerrno>
 #include <cstdarg>
+#include <algorithm>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include "core/common.h"
 #include "audio/decoder.h"
@@ -61,8 +63,8 @@ struct decoder_s_preference
 #endif
   int decoders;                  /* number of decoders */
   int decoder_list[PLUGINS_NUM]; /* decoder indices */
-  char *subtype;                 /* MIME subtype or NULL */
-  char type[];                   /* MIME type or filename extn */
+  std::string subtype;           /* MIME subtype or empty */
+  std::string type;              /* MIME type or filename extn */
 };
 typedef struct decoder_s_preference decoder_t_preference;
 static decoder_t_preference *preferences = NULL;
@@ -88,6 +90,33 @@ static char *clean_mime_subtype(char *subtype)
   return subtype;
 }
 
+/* Split a string on any character in delims, mirroring the old
+ * lists_strs_split(): consecutive and leading/trailing delimiters do
+ * not produce empty entries. */
+static std::vector<std::string> split_on_chars(const char *s, const char *delims)
+{
+  std::vector<std::string> result;
+  std::string buf(s);
+  size_t start = 0;
+
+  while (start < buf.size())
+  {
+    size_t end = buf.find_first_of(delims, start);
+    if (end == std::string::npos)
+    {
+      result.push_back(buf.substr(start));
+      break;
+    }
+    if (end > start)
+    {
+      result.push_back(buf.substr(start, end - start));
+    }
+    start = end + 1;
+  }
+
+  return result;
+}
+
 /* Find a preference entry matching the given filename extension and/or
  * MIME media type, or NULL. */
 static decoder_t_preference *lookup_preference(const char *extn,
@@ -102,9 +131,9 @@ static decoder_t_preference *lookup_preference(const char *extn,
   subtype = NULL;
   for (result = preferences; result; result = result->next)
   {
-    if (!result->subtype)
+    if (result->subtype.empty())
     {
-      if (extn && !strcasecmp(result->type, extn))
+      if (extn && !strcasecmp(result->type.c_str(), extn))
       {
         break;
       }
@@ -134,8 +163,8 @@ static decoder_t_preference *lookup_preference(const char *extn,
 
       if (type)
       {
-        if (!strcasecmp(result->type, type) &&
-            !strcasecmp(result->subtype, subtype))
+        if (!strcasecmp(result->type.c_str(), type) &&
+            !strcasecmp(result->subtype.c_str(), subtype))
         {
           break;
         }
@@ -201,7 +230,7 @@ static int find_decoder(const char *extn, const char *file, char **mime)
   pref = lookup_preference(extn, file, mime);
   if (pref)
   {
-    if (pref->subtype)
+    if (!pref->subtype.empty())
     {
       return find_mime_decoder(pref->decoder_list, pref->decoders, *mime);
     }
@@ -350,42 +379,45 @@ static char *list_decoder_names(int *decoder_list, int count)
 {
   int ix;
   std::string result;
-  lists_t_strs *names;
+  std::vector<std::string> names;
 
   if (count == 0)
   {
     return xstrdup("");
   }
 
-  names = lists_strs_new(count);
+  names.reserve(count);
   for (ix = 0; ix < count; ix += 1)
   {
-    lists_strs_append(names, plugins[decoder_list[ix]].name);
+    names.push_back(plugins[decoder_list[ix]].name);
   }
 
   if (have_tremor)
   {
-    ix = lists_strs_find(names, "vorbis");
-    if (ix < lists_strs_size(names))
+    auto it = std::find(names.begin(), names.end(), "vorbis");
+    if (it != names.end())
     {
-      lists_strs_replace(names, ix, "vorbis(tremor)");
+      *it = "vorbis(tremor)";
     }
   }
 
-  ix = lists_strs_find(names, "ffmpeg");
-  if (ix < lists_strs_size(names))
+  auto it = std::find(names.begin(), names.end(), "ffmpeg");
+  if (it != names.end())
   {
 #if defined(HAVE_FFMPEG)
-    lists_strs_replace(names, ix, "ffmpeg");
+    *it = "ffmpeg";
 #elif defined(HAVE_LIBAV)
-    lists_strs_replace(names, ix, "ffmpeg(libav)");
+    *it = "ffmpeg(libav)";
 #else
-    lists_strs_replace(names, ix, "ffmpeg/libav");
+    *it = "ffmpeg/libav";
 #endif
   }
 
-  result = lists_strs_fmt(names, " %s");
-  lists_strs_free(names);
+  for (const auto &name : names)
+  {
+    result += " ";
+    result += name;
+  }
 
   return xstrdup(result.c_str());
 }
@@ -395,20 +427,24 @@ static char *list_decoder_names(int *decoder_list, int count)
 static decoder_t_preference *make_preference(const char *prefix)
 {
   decoder_t_preference *result;
+  char *buf, *subtype;
 
   assert(prefix && prefix[0]);
 
-  result = (decoder_t_preference *)xmalloc(
-      offsetof(decoder_t_preference, type) + strlen(prefix) + 1);
+  result = new decoder_t_preference;
   result->next = NULL;
   result->decoders = 0;
-  strcpy(result->type, prefix);
-  result->subtype = strchr(result->type, '/');
-  if (result->subtype)
+  result->subtype = "";
+
+  buf = xstrdup(prefix);
+  subtype = strchr(buf, '/');
+  if (subtype)
   {
-    *result->subtype++ = 0x00;
-    result->subtype = clean_mime_subtype(result->subtype);
+    *subtype++ = 0x00;
+    result->subtype = clean_mime_subtype(subtype);
   }
+  result->type = buf;
+  free(buf);
 
   return result;
 }
@@ -463,22 +499,21 @@ static void load_each_decoder(decoder_t_preference *pref, const char *name)
 }
 
 /* Build a preference's decoder list. */
-static void load_decoders(decoder_t_preference *pref, lists_t_strs *tokens)
+static void load_decoders(decoder_t_preference *pref, const std::vector<std::string> &tokens)
 {
   int ix, dx, asterisk_at;
   int decoder[PLUGINS_NUM];
   const char *name;
 
   assert(pref);
-  assert(tokens);
 
   asterisk_at = -1;
 
   /* Add the index of each known decoder to the decoders list.
    * Note the position following the first asterisk. */
-  for (ix = 1; ix < lists_strs_size(tokens); ix += 1)
+  for (ix = 1; ix < static_cast<int>(tokens.size()); ix += 1)
   {
-    name = lists_strs_at(tokens, ix).c_str();
+    name = tokens[ix].c_str();
     if (strcmp(name, "*"))
     {
       load_each_decoder(pref, name);
@@ -519,14 +554,13 @@ static void load_decoders(decoder_t_preference *pref, lists_t_strs *tokens)
 static void load_each_preference(const char *preference)
 {
   const char *prefix;
-  lists_t_strs *tokens;
+  std::vector<std::string> tokens;
   decoder_t_preference *pref;
 
   assert(preference && preference[0]);
 
-  tokens = lists_strs_new(4);
-  lists_strs_split(tokens, preference, "(,)");
-  prefix = lists_strs_at(tokens, 0).c_str();
+  tokens = split_on_chars(preference, "(,)");
+  prefix = tokens[0].c_str();
   pref = make_preference(prefix);
 #ifdef DEBUG
   pref->source = preference;
@@ -534,22 +568,14 @@ static void load_each_preference(const char *preference)
   load_decoders(pref, tokens);
   pref->next = preferences;
   preferences = pref;
-  lists_strs_free(tokens);
 }
 
 /* Load all preferences given by the user in PreferredDecoders. */
 static void load_preferences()
 {
-  int ix;
-  const char *preference;
-  lists_t_strs *list;
-
-  list = options_get_list("PreferredDecoders");
-
-  for (ix = 0; ix < lists_strs_size(list); ix += 1)
+  for (const auto &preference : options_get_list("PreferredDecoders"))
   {
-    preference = lists_strs_at(list, ix).c_str();
-    load_each_preference(preference);
+    load_each_preference(preference.c_str());
   }
 
 #ifdef DEBUG
@@ -634,7 +660,7 @@ static void cleanup_preferences()
   for (pref = preferences; pref; pref = next)
   {
     next = pref->next;
-    free(pref);
+    delete pref;
   }
 
   preferences = NULL;

@@ -341,7 +341,6 @@ set(MOCF_SOURCES
     src/library/tags_cache.cpp
     src/utils/utf8.cpp
     src/audio/processing/softmixer.cpp
-    src/utils/lists.cpp
     src/audio/processing/equalizer.cpp
     ${EXTRA_OBJS}
     ${DECODER_OBJECTS})

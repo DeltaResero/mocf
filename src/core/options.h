@@ -11,7 +11,8 @@
 #ifndef OPTIONS_H
 #define OPTIONS_H
 
-#include "utils/lists.h"
+#include <string>
+#include <vector>
 
 #ifdef __cplusplus
 extern "C"
@@ -34,7 +35,7 @@ extern "C"
   bool options_get_bool(const char *name);
   const char *options_get_str(const char *name);
   const char *options_get_symb(const char *name);
-  lists_t_strs *options_get_list(const char *name);
+  std::vector<std::string> &options_get_list(const char *name);
   void options_set_int(const char *name, const int value);
   void options_set_bool(const char *name, const bool value);
   void options_set_str(const char *name, const char *value);

@@ -152,16 +152,14 @@ int __unique_frame(struct id3_tag *tag, struct id3_frame *frame)
 
 static std::string get_tag(struct id3_tag *tag, const char *what)
 {
-  struct id3_frame *frame;
-  union id3_field *field;
-  const id3_ucs4_t *ucs4;
   std::string result;
   char *comm = NULL;
 
-  frame = id3_tag_findframe(tag, what, 0);
-  if (frame && (field = &frame->fields[1]))
+  struct id3_frame *frame = id3_tag_findframe(tag, what, 0);
+  if (frame)
   {
-    ucs4 = id3_field_getstrings(field, 0);
+    union id3_field *field = &frame->fields[1];
+    const id3_ucs4_t *ucs4 = id3_field_getstrings(field, 0);
     if (ucs4)
     {
       /* Workaround for ID3 tags v1/v1.1 where the encoding
@@ -175,7 +173,7 @@ static std::string get_tag(struct id3_tag *tag, const char *what)
       {
         char *t;
 
-        comm = (char *)id3_ucs4_latin1duplicate(ucs4);
+        comm = reinterpret_cast<char *>(id3_ucs4_latin1duplicate(ucs4));
 
           t = comm;
           comm = id3v1_fix(comm);
@@ -183,7 +181,7 @@ static std::string get_tag(struct id3_tag *tag, const char *what)
       }
       else
       {
-        comm = (char *)id3_ucs4_utf8duplicate(ucs4);
+        comm = reinterpret_cast<char *>(id3_ucs4_utf8duplicate(ucs4));
       }
     }
   }
@@ -417,7 +415,7 @@ static void *mp3_open(const char *file) { return mp3_open_internal(file, 1); }
 
 static void mp3_close(void *void_data)
 {
-  struct mp3_data *data = (struct mp3_data *)void_data;
+  struct mp3_data *data = static_cast<struct mp3_data *>(void_data);
 
   if (data->ok)
   {
@@ -510,7 +508,8 @@ static int put_output(char *buf, int buf_len, struct mad_pcm *pcm,
                       struct mad_header *header)
 {
   unsigned int nsamples;
-  mad_fixed_t const *left_ch, *right_ch;
+  mad_fixed_t const *left_ch;
+  mad_fixed_t const *right_ch;
   int olen;
 
   nsamples = pcm->length;
@@ -572,7 +571,7 @@ static ssize_t flush_id3_tag(struct mp3_data *data)
 static int mp3_decode(void *void_data, char *buf, int buf_len,
                       struct sound_params *sound_params)
 {
-  struct mp3_data *data = (struct mp3_data *)void_data;
+  struct mp3_data *data = static_cast<struct mp3_data *>(void_data);
 
   decoder_error_clear(&data->error);
 
@@ -659,7 +658,7 @@ static int mp3_decode(void *void_data, char *buf, int buf_len,
 
 static int mp3_seek(void *void_data, int sec)
 {
-  struct mp3_data *data = (struct mp3_data *)void_data;
+  struct mp3_data *data = static_cast<struct mp3_data *>(void_data);
   off_t new_position;
 
   assert(sec >= 0);
@@ -708,21 +707,21 @@ static int mp3_seek(void *void_data, int sec)
 
 static int mp3_get_bitrate(void *void_data)
 {
-  struct mp3_data *data = (struct mp3_data *)void_data;
+  struct mp3_data *data = static_cast<struct mp3_data *>(void_data);
 
   return data->bitrate / 1000;
 }
 
 static int mp3_get_avg_bitrate(void *void_data)
 {
-  struct mp3_data *data = (struct mp3_data *)void_data;
+  struct mp3_data *data = static_cast<struct mp3_data *>(void_data);
 
   return data->avg_bitrate / 1000;
 }
 
 static int mp3_get_duration(void *void_data)
 {
-  struct mp3_data *data = (struct mp3_data *)void_data;
+  struct mp3_data *data = static_cast<struct mp3_data *>(void_data);
 
   return data->duration;
 }
@@ -731,26 +730,26 @@ static void mp3_get_name(const char *file, char buf[4])
 {
   char *ext;
 
-  strcpy(buf, "MPx");
+  strncpy(buf, "MPx", 4);
 
   ext = ext_pos(file);
   if (ext)
   {
     if (!strcasecmp(ext, "mp3"))
     {
-      strcpy(buf, "MP3");
+      strncpy(buf, "MP3", 4);
     }
     else if (!strcasecmp(ext, "mp2"))
     {
-      strcpy(buf, "MP2");
+      strncpy(buf, "MP2", 4);
     }
     else if (!strcasecmp(ext, "mp1"))
     {
-      strcpy(buf, "MP1");
+      strncpy(buf, "MP1", 4);
     }
     else if (!strcasecmp(ext, "mpga"))
     {
-      strcpy(buf, "MPG");
+      strncpy(buf, "MPG", 4);
     }
   }
 }
@@ -763,14 +762,14 @@ static int mp3_our_format_ext(const char *ext)
 
 static void mp3_get_error(void *prv_data, struct decoder_error *error)
 {
-  struct mp3_data *data = (struct mp3_data *)prv_data;
+  struct mp3_data *data = static_cast<struct mp3_data *>(prv_data);
 
   decoder_error_copy(error, &data->error);
 }
 
 static struct io_stream *mp3_get_stream(void *prv_data)
 {
-  struct mp3_data *data = (struct mp3_data *)prv_data;
+  struct mp3_data *data = static_cast<struct mp3_data *>(prv_data);
 
   return data->io_stream;
 }
@@ -802,9 +801,9 @@ static void mp3_destroy()
 class Mp3Decoder : public AudioDecoder {
 public:
     void *data;
-    Mp3Decoder(void *d) : data(d) {}
+    explicit Mp3Decoder(void *d) : data(d) {}
     ~Mp3Decoder() override { mp3_close(data); }
-    
+
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
         return mp3_decode(data, buf, buf_len, sound_params);
     }
@@ -868,12 +867,9 @@ public:
     }
 };
 
+static Mp3Plugin mp3_plugin;
 extern "C" class AudioPlugin *mp3_plugin_init() {
-    static Mp3Plugin plugin;
-    return &plugin;
+    return &mp3_plugin;
 }
-
-
-
 
 // EOF

@@ -381,10 +381,6 @@ void io_close(struct io_stream *s)
     log_errno("Destroying io_mtx failed", rc);
   }
 
-  if (s->strerror)
-  {
-    free(s->strerror);
-  }
   delete s;
 
   logit("done");
@@ -551,7 +547,7 @@ struct io_stream *io_open(const char *file, const int buffered)
   s = new io_stream;
   s->errno_val = 0;
   s->read_error = 0;
-  s->strerror = NULL;
+  s->strerror = "";
   s->opened = 0;
   s->size = -1;
   s->buf_fill_callback = NULL;
@@ -740,23 +736,13 @@ ssize_t io_peek(struct io_stream *s, void *buf, size_t count)
 }
 
 /* Get the string describing the error associated with the stream. */
-char *io_strerror(struct io_stream *s)
+const char *io_strerror(struct io_stream *s)
 {
-  if (s->strerror)
-  {
-    free(s->strerror);
-  }
-
   if (s->errno_val)
-  {
-    s->strerror = xstrdup(xstrerror(s->errno_val).c_str());
-  }
+    s->strerror = xstrerror(s->errno_val);
   else
-  {
-    s->strerror = xstrdup("OK");
-  }
-
-  return s->strerror;
+    s->strerror = "OK";
+  return s->strerror.c_str();
 }
 
 /* Get the file size if available or -1. */

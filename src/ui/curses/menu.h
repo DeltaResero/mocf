@@ -53,7 +53,7 @@ extern "C"
 
   struct menu_item
   {
-    char *title;           /* Title of the item */
+    std::string title;     /* Title of the item */
     enum menu_align align; /* Align of the title */
     int num;               /* Position of the item starting from 0. */
 
@@ -64,7 +64,7 @@ extern "C"
     int attr_sel_marked;
 
     /* Associated file: */
-    char *file;
+    std::string file;
     enum file_type type;
 
     /* Additional information shown: */
@@ -149,7 +149,7 @@ extern "C"
   void menu_set_info_attr_sel_marked(struct menu *menu, const int attr);
   void menu_set_items_numbering(struct menu *menu, const int number);
   enum file_type menu_item_get_type(const struct menu_item *mi);
-  char *menu_item_get_file(const struct menu_item *mi);
+  const std::string &menu_item_get_file(const struct menu_item *mi);
   struct menu_item *menu_curritem(struct menu *menu);
   void menu_item_set_title(struct menu_item *mi, const char *title);
   int menu_nitems(const struct menu *menu);
