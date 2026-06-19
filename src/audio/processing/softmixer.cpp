@@ -34,7 +34,9 @@
 
 static int active;
 static int mix_mono;
-static int mixer_val, mixer_amp, mixer_real;
+static int mixer_val;
+static int mixer_amp;
+static int mixer_real;
 static float mixer_realf;
 
 static void softmixer_read_config();
@@ -151,9 +153,9 @@ static void softmixer_read_config()
   while ((linebuffer = read_line(cf)))
   {
     if (strncasecmp(linebuffer, SOFTMIXER_CFG_ACTIVE,
-                    strlen(SOFTMIXER_CFG_ACTIVE)) == 0)
+                    sizeof(SOFTMIXER_CFG_ACTIVE) - 1) == 0)
     {
-      if (sscanf(linebuffer, "%*s %i", &tmp) > 0)
+      if (sscanf(linebuffer + sizeof(SOFTMIXER_CFG_ACTIVE) - 1, " %i", &tmp) == 1)
       {
         if (tmp > 0)
         {
@@ -165,10 +167,10 @@ static void softmixer_read_config()
         }
       }
     }
-    if (strncasecmp(linebuffer, SOFTMIXER_CFG_AMP, strlen(SOFTMIXER_CFG_AMP)) ==
+    if (strncasecmp(linebuffer, SOFTMIXER_CFG_AMP, sizeof(SOFTMIXER_CFG_AMP) - 1) ==
         0)
     {
-      if (sscanf(linebuffer, "%*s %i", &tmp) > 0)
+      if (sscanf(linebuffer + sizeof(SOFTMIXER_CFG_AMP) - 1, " %i", &tmp) == 1)
       {
         if (RANGE(SOFTMIXER_MIN, tmp, SOFTMIXER_MAX))
         {
@@ -181,9 +183,9 @@ static void softmixer_read_config()
       }
     }
     if (strncasecmp(linebuffer, SOFTMIXER_CFG_VALUE,
-                    strlen(SOFTMIXER_CFG_VALUE)) == 0)
+                    sizeof(SOFTMIXER_CFG_VALUE) - 1) == 0)
     {
-      if (sscanf(linebuffer, "%*s %i", &tmp) > 0)
+      if (sscanf(linebuffer + sizeof(SOFTMIXER_CFG_VALUE) - 1, " %i", &tmp) == 1)
       {
         if (RANGE(0, tmp, 100))
         {
@@ -196,9 +198,9 @@ static void softmixer_read_config()
       }
     }
     if (strncasecmp(linebuffer, SOFTMIXER_CFG_MONO,
-                    strlen(SOFTMIXER_CFG_MONO)) == 0)
+                    sizeof(SOFTMIXER_CFG_MONO) - 1) == 0)
     {
-      if (sscanf(linebuffer, "%*s %i", &tmp) > 0)
+      if (sscanf(linebuffer + sizeof(SOFTMIXER_CFG_MONO) - 1, " %i", &tmp) == 1)
       {
         if (tmp > 0)
         {
@@ -242,7 +244,8 @@ static void softmixer_write_config()
 void softmixer_process_buffer(char *buf, size_t size,
                               const struct sound_params *sound_params)
 {
-  int do_softmix, do_monomix;
+  int do_softmix;
+  int do_monomix;
 
   debug("Processing %zu bytes...", size);
 
@@ -264,97 +267,97 @@ void softmixer_process_buffer(char *buf, size_t size,
     case SFMT_U8:
       if (do_softmix)
       {
-        process_buffer_u8((uint8_t *)buf, size);
+        process_buffer_u8(reinterpret_cast<uint8_t *>(buf), size);
       }
       if (do_monomix)
       {
-        mix_mono_u8((uint8_t *)buf, sound_params->channels, size);
+        mix_mono_u8(reinterpret_cast<uint8_t *>(buf), sound_params->channels, size);
       }
       break;
     case SFMT_S8:
       if (do_softmix)
       {
-        process_buffer_s8((int8_t *)buf, size);
+        process_buffer_s8(reinterpret_cast<int8_t *>(buf), size);
       }
       if (do_monomix)
       {
-        mix_mono_s8((int8_t *)buf, sound_params->channels, size);
+        mix_mono_s8(reinterpret_cast<int8_t *>(buf), sound_params->channels, size);
       }
       break;
     case SFMT_U16:
       if (do_softmix)
       {
-        process_buffer_u16((uint16_t *)buf, size / sizeof(uint16_t));
+        process_buffer_u16(reinterpret_cast<uint16_t *>(buf), size / sizeof(uint16_t));
       }
       if (do_monomix)
       {
-        mix_mono_u16((uint16_t *)buf, sound_params->channels,
+        mix_mono_u16(reinterpret_cast<uint16_t *>(buf), sound_params->channels,
                      size / sizeof(uint16_t));
       }
       break;
     case SFMT_S16:
       if (do_softmix)
       {
-        process_buffer_s16((int16_t *)buf, size / sizeof(int16_t));
+        process_buffer_s16(reinterpret_cast<int16_t *>(buf), size / sizeof(int16_t));
       }
       if (do_monomix)
       {
-        mix_mono_s16((int16_t *)buf, sound_params->channels,
+        mix_mono_s16(reinterpret_cast<int16_t *>(buf), sound_params->channels,
                      size / sizeof(int16_t));
       }
       break;
     case SFMT_U24:
       if (do_softmix)
       {
-        process_buffer_u24((uint32_t *)buf, size / sizeof(uint32_t));
+        process_buffer_u24(reinterpret_cast<uint32_t *>(buf), size / sizeof(uint32_t));
       }
       if (mix_mono)
       {
-        mix_mono_u24((uint32_t *)buf, sound_params->channels,
+        mix_mono_u24(reinterpret_cast<uint32_t *>(buf), sound_params->channels,
                      size / sizeof(uint32_t));
       }
       break;
     case SFMT_S24:
       if (do_softmix)
       {
-        process_buffer_s24((int32_t *)buf, size / sizeof(int32_t));
+        process_buffer_s24(reinterpret_cast<int32_t *>(buf), size / sizeof(int32_t));
       }
       if (mix_mono)
       {
-        mix_mono_s24((int32_t *)buf, sound_params->channels,
+        mix_mono_s24(reinterpret_cast<int32_t *>(buf), sound_params->channels,
                      size / sizeof(int32_t));
       }
       break;
     case SFMT_U32:
       if (do_softmix)
       {
-        process_buffer_u32((uint32_t *)buf, size / sizeof(uint32_t));
+        process_buffer_u32(reinterpret_cast<uint32_t *>(buf), size / sizeof(uint32_t));
       }
       if (do_monomix)
       {
-        mix_mono_u32((uint32_t *)buf, sound_params->channels,
+        mix_mono_u32(reinterpret_cast<uint32_t *>(buf), sound_params->channels,
                      size / sizeof(uint32_t));
       }
       break;
     case SFMT_S32:
       if (do_softmix)
       {
-        process_buffer_s32((int32_t *)buf, size / sizeof(int32_t));
+        process_buffer_s32(reinterpret_cast<int32_t *>(buf), size / sizeof(int32_t));
       }
       if (do_monomix)
       {
-        mix_mono_s32((int32_t *)buf, sound_params->channels,
+        mix_mono_s32(reinterpret_cast<int32_t *>(buf), sound_params->channels,
                      size / sizeof(int32_t));
       }
       break;
     case SFMT_FLOAT:
       if (do_softmix)
       {
-        process_buffer_float((float *)buf, size / sizeof(float));
+        process_buffer_float(reinterpret_cast<float *>(buf), size / sizeof(float));
       }
       if (do_monomix)
       {
-        mix_mono_float((float *)buf, sound_params->channels,
+        mix_mono_float(reinterpret_cast<float *>(buf), sound_params->channels,
                        size / sizeof(float));
       }
       break;
