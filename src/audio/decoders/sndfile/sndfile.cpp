@@ -190,7 +190,7 @@ static void *sndfile_open(const char *file)
   data->sndfile = sf_open_fd(fd, SFM_READ, &data->snd_info, SF_TRUE);
   if (!data->sndfile)
   {
-    /* FIXME: sf_strerror is not thread safe with NULL argument */
+    /* FIXME: sf_strerror is not thread safe with nullptr argument */
     decoder_error(&data->error, ERROR_FATAL, 0, "Can't open file: %s",
                   sf_strerror(nullptr));
     return data;
@@ -223,7 +223,7 @@ static void *sndfile_open(const char *file)
   if ((data->snd_info.format & SF_FORMAT_SUBMASK) == SF_FORMAT_FLOAT ||
       (data->snd_info.format & SF_FORMAT_SUBMASK) == SF_FORMAT_DOUBLE)
   {
-    sf_command(data->sndfile, SFC_SET_SCALE_FLOAT_INT_READ, NULL, SF_TRUE);
+    sf_command(data->sndfile, SFC_SET_SCALE_FLOAT_INT_READ, nullptr, SF_TRUE);
   }
 #endif
   return data;

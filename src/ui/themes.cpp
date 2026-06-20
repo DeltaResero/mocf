@@ -209,7 +209,7 @@ static enum color_index find_color_element_name(const char *name)
                    {"message", CLR_MESSAGE},
                    {"plist_time", CLR_PLIST_TIME}};
 
-  assert(name != NULL);
+  assert(name != nullptr);
 
   for (ix = 0; ix < ARRAY_SIZE(color_tab); ix += 1)
   {
@@ -293,7 +293,7 @@ static int get_exe_dir(char *buf, size_t len)
   {
     int    mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1};
     size_t sz = sizeof(exe_path);
-    if (sysctl(mib, 4, exe_path, &sz, NULL, 0) == 0)
+    if (sysctl(mib, 4, exe_path, &sz, nullptr, 0) == 0)
     {
       path_retrieved = 1;
     }
@@ -304,7 +304,7 @@ static int get_exe_dir(char *buf, size_t len)
      * process ID as the third level, not under KERN_PROC like FreeBSD. */
     int    mib[4] = {CTL_KERN, KERN_PROC_ARGS, getpid(), KERN_PROC_PATHNAME};
     size_t sz = sizeof(exe_path);
-    if (sysctl(mib, 4, exe_path, &sz, NULL, 0) == 0)
+    if (sysctl(mib, 4, exe_path, &sz, nullptr, 0) == 0)
     {
       path_retrieved = 1;
     }

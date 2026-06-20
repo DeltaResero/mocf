@@ -943,7 +943,7 @@ static void reset_sound_params(struct sound_params *params)
   params->fmt = 0;
 }
 
-/* Return 0 on error. If sound params == NULL, open the device using
+/* Return 0 on error. If sound params == nullptr, open the device using
  * the previous parameters. */
 int audio_open(struct sound_params *sound_params)
 {
@@ -1262,7 +1262,7 @@ static void find_working_driver(const std::vector<std::string> &drivers, struct 
     if (!strcasecmp(name, "null"))
     {
       null_funcs(funcs);
-      printf("Trying NULL...\n");
+      printf("Trying nullptr...\n");
       if (funcs->init(&hw_caps))
       {
         return;

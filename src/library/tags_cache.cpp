@@ -61,7 +61,7 @@ typedef unsigned long int u_long;
 /* The name of the version tag file in the cache directory. */
 #define MOC_VERSION_TAG "mocf_version_tag"
 
-/* The maximum length of the version tag (including trailing NULL). */
+/* The maximum length of the version tag (including trailing nullptr). */
 #define VERSION_TAG_MAX 64
 
 /* Number used to create cache version tag to detect incompatibilities
@@ -139,7 +139,7 @@ static inline char *bdb_strerror(int errnum)
 
 static void request_queue_init(struct request_queue *q)
 {
-  assert(q != NULL);
+  assert(q != nullptr);
 
   q->head = nullptr;
   q->tail = nullptr;
@@ -147,7 +147,7 @@ static void request_queue_init(struct request_queue *q)
 
 static void request_queue_clear(struct request_queue *q)
 {
-  assert(q != NULL);
+  assert(q != nullptr);
 
   while (q->head)
   {
@@ -166,7 +166,7 @@ static void request_queue_clear_up_to(struct request_queue *q, const char *file)
 {
   int stop = 0;
 
-  assert(q != NULL);
+  assert(q != nullptr);
 
   while (q->head && !stop)
   {
@@ -191,7 +191,7 @@ static void request_queue_clear_up_to(struct request_queue *q, const char *file)
 static void request_queue_add(struct request_queue *q, const char *file,
                               int tags_sel)
 {
-  assert(q != NULL);
+  assert(q != nullptr);
 
   if (!q->head)
   {
@@ -200,8 +200,8 @@ static void request_queue_add(struct request_queue *q, const char *file,
   }
   else
   {
-    assert(q->tail != NULL);
-    assert(q->tail->next == NULL);
+    assert(q->tail != nullptr);
+    assert(q->tail->next == nullptr);
 
     q->tail->next = new request_queue_node;
     q->tail = q->tail->next;
@@ -214,7 +214,7 @@ static void request_queue_add(struct request_queue *q, const char *file,
 
 static int request_queue_empty(const struct request_queue *q)
 {
-  assert(q != NULL);
+  assert(q != nullptr);
 
   return q->head == nullptr;
 }
@@ -226,7 +226,7 @@ static std::string request_queue_pop(struct request_queue *q, int *tags_sel)
   struct request_queue_node *n;
   std::string file;
 
-  assert(q != NULL);
+  assert(q != nullptr);
 
   if (q->head == nullptr)
   {
@@ -316,8 +316,8 @@ static int cache_record_deserialize(struct cache_record *rec,
   size_t bytes_left = size;
   size_t str_len;
 
-  assert(rec != NULL);
-  assert(serialized != NULL);
+  assert(rec != nullptr);
+  assert(serialized != nullptr);
 
   if (!skip_tags)
   {
@@ -407,7 +407,7 @@ static void *with_db_lock(t_locked_fn fn, struct tags_cache *c,
   DB_LOCK lock;
   DBT key, record;
 
-  assert(c->db_env != NULL);
+  assert(c->db_env != nullptr);
 
   memset(&key, 0, sizeof(key));
   key.data = const_cast<char *>(file);
@@ -445,7 +445,7 @@ static void tags_cache_remove_rec(struct tags_cache *c, const char *fname)
   DBT key;
   int ret;
 
-  assert(fname != NULL);
+  assert(fname != nullptr);
 
   debug("Removing %s from the cache...", fname);
 
@@ -572,7 +572,7 @@ static void tags_cache_add(struct tags_cache *c, const char *file, DBT *key,
   DBT data;
   int ret;
 
-  assert(tags != NULL);
+  assert(tags != nullptr);
 
   debug("Adding/updating cache object");
 
@@ -604,7 +604,7 @@ static void tags_cache_add(struct tags_cache *c, const char *file, DBT *key,
 }
 #endif
 
-/* Read time tags for a file into tags structure (or create it if NULL). */
+/* Read time tags for a file into tags structure (or create it if nullptr). */
 struct file_tags *read_missing_tags(const char *file, struct file_tags *tags,
                                     int tags_sel)
 {
@@ -642,7 +642,7 @@ static void *locked_read_add(struct tags_cache *c, const char *file,
   int ret;
   struct file_tags *tags = nullptr;
 
-  assert(c->db != NULL);
+  assert(c->db != nullptr);
 
   ret = c->db->get(c->db, nullptr, key, serialized_cache_rec, 0);
   if (ret && ret != DB_NOTFOUND)
@@ -696,7 +696,7 @@ static struct file_tags *tags_cache_read_add(struct tags_cache *c DB_ONLY,
 {
   struct file_tags *tags = nullptr;
 
-  assert(file != NULL);
+  assert(file != nullptr);
 
   debug("Getting tags for %s", file);
 
@@ -729,7 +729,7 @@ static void *reader_thread(void *cache_ptr)
 
   logit("Tags reader thread started");
 
-  assert(cache_ptr != NULL);
+  assert(cache_ptr != nullptr);
 
   c = static_cast<struct tags_cache *>(cache_ptr);
 
@@ -804,7 +804,7 @@ void tags_cache_free(struct tags_cache *c)
 {
   int rc;
 
-  assert(c != NULL);
+  assert(c != nullptr);
 
   LOCK(c->mutex);
   c->stop_reader_thread = 1;
@@ -815,9 +815,9 @@ void tags_cache_free(struct tags_cache *c)
   if (c->db)
   {
 #ifndef NDEBUG
-    c->db->set_errcall(c->db, NULL);
-    c->db->set_msgcall(c->db, NULL);
-    c->db->set_paniccall(c->db, NULL);
+    c->db->set_errcall(c->db, nullptr);
+    c->db->set_msgcall(c->db, nullptr);
+    c->db->set_paniccall(c->db, nullptr);
 #endif
     c->db->close(c->db, 0);
     c->db = nullptr;
@@ -829,9 +829,9 @@ void tags_cache_free(struct tags_cache *c)
   {
     c->db_env->lock_id_free(c->db_env, c->locker);
 #ifndef NDEBUG
-    c->db_env->set_errcall(c->db_env, NULL);
-    c->db_env->set_msgcall(c->db_env, NULL);
-    c->db_env->set_paniccall(c->db_env, NULL);
+    c->db_env->set_errcall(c->db_env, nullptr);
+    c->db_env->set_msgcall(c->db_env, nullptr);
+    c->db_env->set_paniccall(c->db_env, nullptr);
 #endif
     c->db_env->close(c->db_env, 0);
     c->db_env = nullptr;
@@ -908,8 +908,8 @@ void tags_cache_add_request(struct tags_cache *c, const char *file,
 {
   void *rc = nullptr;
 
-  assert(c != NULL);
-  assert(file != NULL);
+  assert(c != nullptr);
+  assert(file != nullptr);
 
   debug("Request for tags for '%s'", file);
 
@@ -931,7 +931,7 @@ void tags_cache_add_request(struct tags_cache *c, const char *file,
 
 void tags_cache_clear_queue(struct tags_cache *c)
 {
-  assert(c != NULL);
+  assert(c != nullptr);
 
   LOCK(c->mutex);
   request_queue_clear(&c->queue);
@@ -943,8 +943,8 @@ void tags_cache_clear_queue(struct tags_cache *c)
  * with the given file. */
 void tags_cache_clear_up_to(struct tags_cache *c, const char *file)
 {
-  assert(c != NULL);
-  assert(file != NULL);
+  assert(c != nullptr);
+  assert(file != nullptr);
 
   LOCK(c->mutex);
   debug("Removing requests up to file %s", file);
@@ -1212,8 +1212,8 @@ static int prepare_cache_dir(const char *cache_dir)
 void tags_cache_load(struct tags_cache *c DB_ONLY,
                      const char *cache_dir DB_ONLY)
 {
-  assert(c != NULL);
-  assert(cache_dir != NULL);
+  assert(c != nullptr);
+  assert(cache_dir != nullptr);
 
 #ifdef HAVE_DB_H
   int ret;
@@ -1293,9 +1293,9 @@ err:
   if (c->db)
   {
 #ifndef NDEBUG
-    c->db->set_errcall(c->db, NULL);
-    c->db->set_msgcall(c->db, NULL);
-    c->db->set_paniccall(c->db, NULL);
+    c->db->set_errcall(c->db, nullptr);
+    c->db->set_msgcall(c->db, nullptr);
+    c->db->set_paniccall(c->db, nullptr);
 #endif
     c->db->close(c->db, 0);
     c->db = nullptr;
@@ -1303,9 +1303,9 @@ err:
   if (c->db_env)
   {
 #ifndef NDEBUG
-    c->db_env->set_errcall(c->db_env, NULL);
-    c->db_env->set_msgcall(c->db_env, NULL);
-    c->db_env->set_paniccall(c->db_env, NULL);
+    c->db_env->set_errcall(c->db_env, nullptr);
+    c->db_env->set_msgcall(c->db_env, nullptr);
+    c->db_env->set_paniccall(c->db_env, nullptr);
 #endif
     c->db_env->close(c->db_env, 0);
     c->db_env = nullptr;
@@ -1321,8 +1321,8 @@ struct file_tags *tags_cache_get_immediate(struct tags_cache *c,
 {
   struct file_tags *tags;
 
-  assert(c != NULL);
-  assert(file != NULL);
+  assert(c != nullptr);
+  assert(file != nullptr);
 
   debug("Immediate tags read for %s", file);
 

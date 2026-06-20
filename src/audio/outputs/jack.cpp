@@ -151,8 +151,8 @@ static int moc_jack_init(struct output_driver_caps *caps)
   {
     options |= JackNoStartServer;
   }
-  client = jack_client_open(client_name, options, &status, NULL);
-  if (client == NULL)
+  client = jack_client_open(client_name, options, &status, nullptr);
+  if (client == nullptr)
   {
     error("jack_client_open() failed, status = 0x%2.0x", status);
     if (status & JackServerFailed)
@@ -203,9 +203,9 @@ static int moc_jack_init(struct output_driver_caps *caps)
   }
 
   /* connect ports
-   * a value of NULL in JackOut* gives no connection
+   * a value of nullptr in JackOut* gives no connection
    * */
-  if (strcmp(options_get_str("JackOutLeft"), "NULL"))
+  if (strcmp(options_get_str("JackOutLeft"), "nullptr"))
   {
     if (jack_connect(client, "mocf:output0", options_get_str("JackOutLeft")))
     {
@@ -213,7 +213,7 @@ static int moc_jack_init(struct output_driver_caps *caps)
               options_get_str("JackOutLeft"));
     }
   }
-  if (strcmp(options_get_str("JackOutRight"), "NULL"))
+  if (strcmp(options_get_str("JackOutRight"), "nullptr"))
   {
     if (jack_connect(client, "mocf:output1", options_get_str("JackOutRight")))
     {

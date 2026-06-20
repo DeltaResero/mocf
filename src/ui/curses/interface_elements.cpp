@@ -166,7 +166,7 @@ struct entry
   int cur_pos;                   /* cursor position */
   int display_from;              /* displaying from this char */
   struct entry_history *history; /* history to use with this entry or
-            NULL is history is not used */
+            nullptr is history is not used */
   int history_pos;               /* current position in the history */
 };
 
@@ -275,15 +275,15 @@ static struct
 
 static void entry_history_init(struct entry_history *h)
 {
-  assert(h != NULL);
+  assert(h != nullptr);
 
   h->items.clear();
 }
 
 static void entry_history_add(struct entry_history *h, const char *text)
 {
-  assert(h != NULL);
-  assert(text != NULL);
+  assert(h != nullptr);
+  assert(text != nullptr);
 
   if (strlen(text) != strspn(text, " "))
   {
@@ -301,9 +301,9 @@ static void entry_history_add(struct entry_history *h, const char *text)
 static void entry_history_replace(struct entry_history *h, int num,
                                   const char *text)
 {
-  assert(h != NULL);
+  assert(h != nullptr);
   assert(LIMIT(num, static_cast<int>(h->items.size())));
-  assert(text != NULL);
+  assert(text != nullptr);
 
   if (strlen(text) != strspn(text, " ") && h->items[num] != text)
   {
@@ -313,21 +313,21 @@ static void entry_history_replace(struct entry_history *h, int num,
 
 static void entry_history_clear(struct entry_history *h)
 {
-  assert(h != NULL);
+  assert(h != nullptr);
 
   h->items.clear();
 }
 
 static int entry_history_nitems(const struct entry_history *h)
 {
-  assert(h != NULL);
+  assert(h != nullptr);
 
   return static_cast<int>(h->items.size());
 }
 
 static char *entry_history_get(const struct entry_history *h, const int num)
 {
-  assert(h != NULL);
+  assert(h != nullptr);
   assert(LIMIT(num, static_cast<int>(h->items.size())));
 
   return xstrdup(h->items[num].c_str());
@@ -338,8 +338,8 @@ static char *entry_history_get(const struct entry_history *h, const int num)
 static void entry_draw(const struct entry *e, WINDOW *w, const int posx,
                        const int posy)
 {
-  assert(e != NULL);
-  assert(w != NULL);
+  assert(e != nullptr);
+  assert(w != nullptr);
   assert(posx >= 0);
   assert(posy >= 0);
 
@@ -374,7 +374,7 @@ static void entry_init(struct entry *e, const enum entry_type type,
 {
   const char *title;
 
-  assert(e != NULL);
+  assert(e != nullptr);
 
   switch (type)
   {
@@ -420,7 +420,7 @@ static void entry_init(struct entry *e, const enum entry_type type,
 
 static enum entry_type entry_get_type(const struct entry *e)
 {
-  assert(e != NULL);
+  assert(e != nullptr);
 
   return e->type;
 }
@@ -430,7 +430,7 @@ static void entry_set_text_ucs(struct entry *e, const wchar_t *text)
 {
   int width, len;
 
-  assert(e != NULL);
+  assert(e != nullptr);
 
   len = MIN(wcslen(text) + 1, ARRAY_SIZE(e->text_ucs));
   wmemcpy(e->text_ucs, text, len);
@@ -451,7 +451,7 @@ static void entry_set_text(struct entry *e, const char *text)
 {
   wchar_t text_ucs[ARRAY_SIZE(e->text_ucs)];
 
-  assert(e != NULL);
+  assert(e != nullptr);
 
   mbstowcs(text_ucs, text, ARRAY_SIZE(e->text_ucs));
   e->text_ucs[ARRAY_SIZE(e->text_ucs) - 1] = L'\0';
@@ -464,7 +464,7 @@ static void entry_add_char(struct entry *e, const wchar_t c)
 {
   size_t len;
 
-  assert(e != NULL);
+  assert(e != nullptr);
 
   len = wcslen(e->text_ucs);
   if (len >= ARRAY_SIZE(e->text_ucs) - sizeof(wchar_t))
@@ -486,7 +486,7 @@ static void entry_add_char(struct entry *e, const wchar_t c)
 /* Delete 'count' chars before the cursor. */
 static void entry_del_chars(struct entry *e, int count)
 {
-  assert(e != NULL);
+  assert(e != nullptr);
   assert(e->cur_pos > 0);
 
   int width = wcslen(e->text_ucs);
@@ -520,7 +520,7 @@ static void entry_del_chars(struct entry *e, int count)
 /* Delete the char before the cursor. */
 static void entry_back_space(struct entry *e)
 {
-  assert(e != NULL);
+  assert(e != nullptr);
 
   if (e->cur_pos > 0)
   {
@@ -533,7 +533,7 @@ static void entry_del_char(struct entry *e)
 {
   int len;
 
-  assert(e != NULL);
+  assert(e != nullptr);
 
   len = wcslen(e->text_ucs);
   if (e->cur_pos < len)
@@ -546,7 +546,7 @@ static void entry_del_char(struct entry *e)
 /* Delete the chars from cursor to start of line. */
 static void entry_del_to_start(struct entry *e)
 {
-  assert(e != NULL);
+  assert(e != nullptr);
 
   if (e->cur_pos > 0)
   {
@@ -559,7 +559,7 @@ static void entry_del_to_end(struct entry *e)
 {
   int len;
 
-  assert(e != NULL);
+  assert(e != nullptr);
 
   len = wcslen(e->text_ucs);
   if (e->cur_pos < len)
@@ -575,7 +575,7 @@ static void entry_del_to_end(struct entry *e)
 /* Move the cursor one char left. */
 static void entry_curs_left(struct entry *e)
 {
-  assert(e != NULL);
+  assert(e != nullptr);
 
   if (e->cur_pos > 0)
   {
@@ -593,7 +593,7 @@ static void entry_curs_right(struct entry *e)
 {
   int width;
 
-  assert(e != NULL);
+  assert(e != nullptr);
 
   width = wcslen(e->text_ucs);
 
@@ -613,7 +613,7 @@ static void entry_end(struct entry *e)
 {
   int width;
 
-  assert(e != NULL);
+  assert(e != nullptr);
 
   width = wcslen(e->text_ucs);
 
@@ -632,7 +632,7 @@ static void entry_end(struct entry *e)
 /* Move the cursor to the beginning of the entry field. */
 static void entry_home(struct entry *e)
 {
-  assert(e != NULL);
+  assert(e != nullptr);
 
   e->display_from = 0;
   e->cur_pos = 0;
@@ -640,7 +640,7 @@ static void entry_home(struct entry *e)
 
 static void entry_resize(struct entry *e, const int width)
 {
-  assert(e != NULL);
+  assert(e != nullptr);
   assert(width > 0);
 
   e->width = width - e->title.length();
@@ -652,7 +652,7 @@ static char *entry_get_text(const struct entry *e)
   char *text;
   int len;
 
-  assert(e != NULL);
+  assert(e != nullptr);
 
   len = wcstombs(nullptr, e->text_ucs, 0) + 1;
   assert(len >= 1);
@@ -666,8 +666,8 @@ static char *entry_get_text(const struct entry *e)
  * history position down. */
 static void entry_set_history_up(struct entry *e)
 {
-  assert(e != NULL);
-  assert(e->history != NULL);
+  assert(e != nullptr);
+  assert(e->history != nullptr);
 
   if (e->history_pos > 0)
   {
@@ -697,8 +697,8 @@ static void entry_set_history_up(struct entry *e)
  * position down. */
 static void entry_set_history_down(struct entry *e)
 {
-  assert(e != NULL);
-  assert(e->history != NULL);
+  assert(e != nullptr);
+  assert(e->history != nullptr);
 
   if (e->history_pos < entry_history_nitems(e->history))
   {
@@ -726,8 +726,8 @@ static void entry_set_history_down(struct entry *e)
 
 static void entry_set_file(struct entry *e, const char *file)
 {
-  assert(e != NULL);
-  assert(file != NULL);
+  assert(e != nullptr);
+  assert(file != nullptr);
 
   e->file = file;
 }
@@ -736,14 +736,14 @@ static char *entry_get_file(const struct entry *e) { return xstrdup(e->file.c_st
 
 static void entry_destroy(struct entry *e)
 {
-  assert(e != NULL);
+  assert(e != nullptr);
 }
 
 static void entry_add_text_to_history(struct entry *e)
 {
   char *text;
 
-  assert(e != NULL);
+  assert(e != nullptr);
   assert(e->history);
 
   text = entry_get_text(e);
@@ -763,7 +763,7 @@ static int side_menu_get_menu_height(const struct side_menu *m)
 
 static void side_menu_init_menu(struct side_menu *m)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
 
   m->menu.list.main = menu_new(m->win, m->posx + 1, m->posy + 1, m->width - 2,
                                side_menu_get_menu_height(m));
@@ -772,9 +772,9 @@ static void side_menu_init_menu(struct side_menu *m)
 static void side_menu_init(struct side_menu *m, const enum side_menu_type type,
                            WINDOW *parent_win, const struct window_params *wp)
 {
-  assert(m != NULL);
-  assert(parent_win != NULL);
-  assert(wp != NULL);
+  assert(m != nullptr);
+  assert(parent_win != nullptr);
+  assert(wp != nullptr);
   assert(wp->width >= 8);
   assert(wp->height >= 3);
 
@@ -824,7 +824,7 @@ static void side_menu_init(struct side_menu *m, const enum side_menu_type type,
 
 static void side_menu_destroy(struct side_menu *m)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
 
   if (m->visible)
   {
@@ -848,8 +848,8 @@ static void side_menu_destroy(struct side_menu *m)
 
 static void side_menu_set_title(struct side_menu *m, const char *title)
 {
-  assert(m != NULL);
-  assert(title != NULL);
+  assert(m != nullptr);
+  assert(title != nullptr);
 
   m->title = title;
 }
@@ -924,7 +924,7 @@ static bool parse_layout(struct main_win_layout *l, const std::vector<std::strin
   bool result = false;
   std::vector<std::string> format;
 
-  assert(l != NULL);
+  assert(l != nullptr);
 
   /* default values */
   l->menus[0].x = 0;
@@ -1026,7 +1026,7 @@ static void main_win_init(struct main_win *w, std::vector<std::string> &layout_f
   struct main_win_layout l;
   bool rc ASSERT_ONLY;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   w->win = newwin(LINES - 4, COLS, 0, 0);
   wbkgd(w->win, get_color(CLR_BACKGROUND));
@@ -1052,7 +1052,7 @@ static void main_win_init(struct main_win *w, std::vector<std::string> &layout_f
 
 static void main_win_destroy(struct main_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   side_menu_destroy(&w->menus[0]);
   side_menu_destroy(&w->menus[1]);
@@ -1151,11 +1151,11 @@ static int add_to_menu(struct menu *menu, const struct plist *plist,
 
 static void side_menu_clear(struct side_menu *m)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
-  assert(m->menu.list.main != NULL);
-  assert(m->menu.list.copy == NULL);
+  assert(m->menu.list.main != nullptr);
+  assert(m->menu.list.copy == nullptr);
 
   menu_free(m->menu.list.main);
   side_menu_init_menu(m);
@@ -1185,10 +1185,10 @@ static void side_menu_make_list_content(struct side_menu *m,
   struct menu_item *added;
   int i;
 
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
-  assert(m->menu.list.main != NULL);
-  assert(m->menu.list.copy == NULL);
+  assert(m->menu.list.main != nullptr);
+  assert(m->menu.list.copy == nullptr);
 
   side_menu_clear(m);
 
@@ -1270,7 +1270,7 @@ static void side_menu_draw_frame(const struct side_menu *m)
 {
   char *title;
 
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
 
   if (!m->title.empty())
@@ -1350,7 +1350,7 @@ static void side_menu_draw_frame(const struct side_menu *m)
 
 static void side_menu_draw(const struct side_menu *m, const int active)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
 
   clear_area(m->win, m->posx, m->posy, m->width, m->height);
@@ -1372,7 +1372,7 @@ static void side_menu_draw(const struct side_menu *m, const int active)
 
 static void side_menu_cmd(struct side_menu *m, const enum key_cmd cmd)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
 
   if (m->type == MENU_DIR || m->type == MENU_PLAYLIST || m->type == MENU_THEMES)
@@ -1411,7 +1411,7 @@ static enum file_type side_menu_curritem_get_type(const struct side_menu *m)
 {
   struct menu_item *mi;
 
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST ||
          m->type == MENU_THEMES);
@@ -1430,7 +1430,7 @@ static std::string side_menu_get_curr_file(const struct side_menu *m)
 {
   struct menu_item *mi;
 
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST ||
          m->type == MENU_THEMES);
@@ -1450,7 +1450,7 @@ static struct side_menu *find_side_menu(struct main_win *w,
 {
   size_t ix;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   for (ix = 0; ix < ARRAY_SIZE(w->menus); ix += 1)
   {
@@ -1468,9 +1468,9 @@ static struct side_menu *find_side_menu(struct main_win *w,
 static void side_menu_set_curr_item_title(struct side_menu *m,
                                           const char *title)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
-  assert(title != NULL);
+  assert(title != nullptr);
 
   menu_setcurritem_title(m->menu.list.main, title);
 }
@@ -1483,8 +1483,8 @@ static void update_menu_item(struct menu_item *mi, const struct plist *plist,
   char *title;
   const struct plist_item *item;
 
-  assert(mi != NULL);
-  assert(plist != NULL);
+  assert(mi != nullptr);
+  assert(plist != nullptr);
   assert(n >= 0);
 
   item = &plist->items[n];
@@ -1537,14 +1537,14 @@ static int side_menu_update_item(struct side_menu *m, const struct plist *plist,
   int visible = 0;
   char *file;
 
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
-  assert(plist != NULL);
+  assert(plist != nullptr);
   assert(LIMIT(n, plist->num));
 
   file = plist_get_file(plist, n);
-  assert(file != NULL);
+  assert(file != nullptr);
 
   if ((mi = menu_find(m->menu.list.main, file)))
   {
@@ -1570,7 +1570,7 @@ static int side_menu_update_item(struct side_menu *m, const struct plist *plist,
 
 static void side_menu_unmark_file(struct side_menu *m)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
@@ -1583,7 +1583,7 @@ static void side_menu_unmark_file(struct side_menu *m)
 
 static void side_menu_mark_file(struct side_menu *m, const char *file)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
@@ -1613,8 +1613,8 @@ static int side_menu_add_plist_item(struct side_menu *m,
 {
   int visible;
 
-  assert(m != NULL);
-  assert(plist != NULL);
+  assert(m != nullptr);
+  assert(plist != nullptr);
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
@@ -1628,7 +1628,7 @@ static int side_menu_add_plist_item(struct side_menu *m,
 
 static int side_menu_is_time_for_all(const struct side_menu *m)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
 
   return m->total_time_for_all;
@@ -1636,7 +1636,7 @@ static int side_menu_is_time_for_all(const struct side_menu *m)
 
 static int side_menu_get_files_time(const struct side_menu *m)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
 
   return m->total_time;
@@ -1644,7 +1644,7 @@ static int side_menu_get_files_time(const struct side_menu *m)
 
 static void side_menu_update_show_time(struct side_menu *m)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
@@ -1654,7 +1654,7 @@ static void side_menu_update_show_time(struct side_menu *m)
 
 static void side_menu_update_show_format(struct side_menu *m)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
@@ -1664,8 +1664,8 @@ static void side_menu_update_show_format(struct side_menu *m)
 static void side_menu_get_state(const struct side_menu *m,
                                 struct side_menu_state *st)
 {
-  assert(m != NULL);
-  assert(st != NULL);
+  assert(m != nullptr);
+  assert(st != nullptr);
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
@@ -1675,8 +1675,8 @@ static void side_menu_get_state(const struct side_menu *m,
 static void side_menu_set_state(struct side_menu *m,
                                 const struct side_menu_state *st)
 {
-  assert(m != NULL);
-  assert(st != NULL);
+  assert(m != nullptr);
+  assert(st != nullptr);
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
@@ -1685,7 +1685,7 @@ static void side_menu_set_state(struct side_menu *m,
 
 static void side_menu_del_item(struct side_menu *m, const char *file)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
@@ -1696,7 +1696,7 @@ static void side_menu_del_item(struct side_menu *m, const char *file)
 static void side_menu_set_plist_time(struct side_menu *m, const int time,
                                      const int time_for_all)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(time >= 0);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
@@ -1711,9 +1711,9 @@ static int side_menu_filter(struct side_menu *m, const char *pattern)
 {
   struct menu *filtered_menu;
 
-  assert(m != NULL);
-  assert(pattern != NULL);
-  assert(m->menu.list.main != NULL);
+  assert(m != nullptr);
+  assert(pattern != nullptr);
+  assert(m->menu.list.main != nullptr);
 
   filtered_menu = menu_filter_pattern(
       m->menu.list.copy ? m->menu.list.copy : m->menu.list.main, pattern);
@@ -1740,8 +1740,8 @@ static int side_menu_filter(struct side_menu *m, const char *pattern)
 
 static void side_menu_use_main(struct side_menu *m)
 {
-  assert(m != NULL);
-  assert(m->menu.list.main != NULL);
+  assert(m != nullptr);
+  assert(m->menu.list.main != nullptr);
 
   if (m->menu.list.copy)
   {
@@ -1753,10 +1753,10 @@ static void side_menu_use_main(struct side_menu *m)
 
 static void side_menu_make_visible(struct side_menu *m, const char *file)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
   assert(m->type == MENU_PLAYLIST || m->type == MENU_DIR);
-  assert(file != NULL);
+  assert(file != nullptr);
 
   if (!m->menu.list.copy)
   {
@@ -1767,21 +1767,21 @@ static void side_menu_make_visible(struct side_menu *m, const char *file)
 static void side_menu_swap_items(struct side_menu *m, const char *file1,
                                  const char *file2)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
   assert(m->visible);
   assert(m->type == MENU_PLAYLIST || m->type == MENU_DIR);
-  assert(file1 != NULL);
-  assert(file2 != NULL);
-  assert(m->menu.list.main != NULL);
-  assert(m->menu.list.copy == NULL);
+  assert(file1 != nullptr);
+  assert(file2 != nullptr);
+  assert(m->menu.list.main != nullptr);
+  assert(m->menu.list.copy == nullptr);
 
   menu_swap_items(m->menu.list.main, file1, file2);
 }
 
 static void side_menu_select_file(struct side_menu *m, const char *file)
 {
-  assert(m != NULL);
-  assert(file != NULL);
+  assert(m != nullptr);
+  assert(file != nullptr);
 
   if (m->type == MENU_DIR || m->type == MENU_PLAYLIST)
   {
@@ -1796,7 +1796,7 @@ static void side_menu_select_file(struct side_menu *m, const char *file)
 static void side_menu_resize(struct side_menu *m,
                              const struct window_params *wp)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
 
   m->posx = wp->x;
   m->posy = wp->y;
@@ -1821,7 +1821,7 @@ static void side_menu_resize(struct side_menu *m,
 
 static void main_win_draw_too_small_screen(const struct main_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(w->too_small);
 
   werase(w->win);
@@ -1841,7 +1841,7 @@ static void main_win_draw_help_screen(const struct main_win *w)
   int help_lines;
   char **help;
 
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(w->in_help);
 
   max_lines = w->help_screen_top + LINES - 6;
@@ -1923,7 +1923,7 @@ static void main_win_set_dir_content(struct main_win *w,
 {
   struct side_menu *m;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   m = find_side_menu(w, iface_to_side_menu(iface_menu));
 
@@ -1942,8 +1942,8 @@ static void main_win_set_title(struct main_win *w,
 {
   struct side_menu *m;
 
-  assert(w != NULL);
-  assert(title != NULL);
+  assert(w != nullptr);
+  assert(title != nullptr);
 
   m = find_side_menu(w, type);
   side_menu_set_title(m, title);
@@ -1959,7 +1959,7 @@ static void main_win_update_dir_content(struct main_win *w,
   struct side_menu *m;
   struct side_menu_state ms;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   m = find_side_menu(w,
                      iface_menu == IFACE_MENU_DIR ? MENU_DIR : MENU_PLAYLIST);
@@ -1979,7 +1979,7 @@ static void main_win_switch_to(struct main_win *w,
 {
   size_t ix;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   if (w->selected_menu == 2) /* if the themes menu is selected */
   {
@@ -2002,7 +2002,7 @@ static void main_win_switch_to(struct main_win *w,
 
 static void main_win_switch_to_help(struct main_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   w->in_help = 1;
   main_win_draw(w);
@@ -2012,7 +2012,7 @@ static void main_win_create_themes_menu(struct main_win *w)
 {
   struct window_params p;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   p.x = 0;
   p.y = 0;
@@ -2025,7 +2025,7 @@ static void main_win_create_themes_menu(struct main_win *w)
 
 static void main_win_menu_cmd(struct main_win *w, const enum key_cmd cmd)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   side_menu_cmd(&w->menus[w->selected_menu], cmd);
   main_win_draw(w);
@@ -2033,50 +2033,50 @@ static void main_win_menu_cmd(struct main_win *w, const enum key_cmd cmd)
 
 static enum file_type main_win_curritem_get_type(const struct main_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   return side_menu_curritem_get_type(&w->menus[w->selected_menu]);
 }
 
 static std::string main_win_get_curr_file(const struct main_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   return side_menu_get_curr_file(&w->menus[w->selected_menu]);
 }
 
 static int main_win_in_dir_menu(const struct main_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   return w->menus[w->selected_menu].type == MENU_DIR;
 }
 
 static int main_win_in_help(const struct main_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   return w->in_help;
 }
 
 static int main_win_in_plist_menu(const struct main_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   return w->menus[w->selected_menu].type == MENU_PLAYLIST;
 }
 
 static int main_win_in_theme_menu(const struct main_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   return w->menus[w->selected_menu].type == MENU_THEMES;
 }
 
 static void main_win_set_curr_item_title(struct main_win *w, const char *title)
 {
-  assert(w != NULL);
-  assert(title != NULL);
+  assert(w != nullptr);
+  assert(title != nullptr);
 
   side_menu_set_curr_item_title(&w->menus[w->selected_menu], title);
   main_win_draw(w);
@@ -2089,8 +2089,8 @@ static void main_win_update_item(struct main_win *w,
 {
   struct side_menu *m;
 
-  assert(w != NULL);
-  assert(plist != NULL);
+  assert(w != nullptr);
+  assert(plist != nullptr);
   assert(LIMIT(n, plist->num));
 
   m = find_side_menu(w, iface_to_side_menu(iface_menu));
@@ -2101,12 +2101,12 @@ static void main_win_update_item(struct main_win *w,
   }
 }
 
-/* Mark the played file on all lists of files or unmark it when file is NULL. */
+/* Mark the played file on all lists of files or unmark it when file is nullptr. */
 static void main_win_set_played_file(struct main_win *w, const char *file)
 {
   size_t ix;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   w->curr_file = file ? file : "";
 
@@ -2131,8 +2131,8 @@ static int main_win_menu_filter(struct main_win *w, const char *pattern)
 {
   int num;
 
-  assert(w != NULL);
-  assert(pattern != NULL);
+  assert(w != nullptr);
+  assert(pattern != nullptr);
 
   num = side_menu_filter(&w->menus[w->selected_menu], pattern);
 
@@ -2146,7 +2146,7 @@ static int main_win_menu_filter(struct main_win *w, const char *pattern)
 
 static void main_win_clear_filter_menu(struct main_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   side_menu_use_main(&w->menus[w->selected_menu]);
   main_win_draw(w);
@@ -2157,7 +2157,7 @@ static void main_win_set_plist_time(struct main_win *w, const int time,
 {
   struct side_menu *m;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   m = find_side_menu(w, MENU_PLAYLIST);
   side_menu_set_plist_time(m, time, time_for_all);
@@ -2169,7 +2169,7 @@ static void main_win_add_to_plist(struct main_win *w, const struct plist *plist,
   struct side_menu *m;
   int need_redraw;
 
-  assert(plist != NULL);
+  assert(plist != nullptr);
 
   m = find_side_menu(w, MENU_PLAYLIST);
   need_redraw = side_menu_add_plist_item(m, plist, num);
@@ -2186,9 +2186,9 @@ static void main_win_add_to_plist(struct main_win *w, const struct plist *plist,
 static void main_win_add_file(struct main_win *w, const char *file,
                               const char *title, const enum file_type type)
 {
-  assert(w != NULL);
-  assert(file != NULL);
-  assert(title != NULL);
+  assert(w != nullptr);
+  assert(file != nullptr);
+  assert(title != nullptr);
 
   side_menu_add_file(&w->menus[w->selected_menu], file, title, type);
   main_win_draw(w);
@@ -2199,7 +2199,7 @@ static int main_win_get_files_time(const struct main_win *w,
 {
   struct side_menu *m;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   m = find_side_menu(const_cast<struct main_win *>(w), iface_to_side_menu(menu));
 
@@ -2211,7 +2211,7 @@ static int main_win_is_time_for_all(const struct main_win *w,
 {
   struct side_menu *m;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   m = find_side_menu(const_cast<struct main_win *>(w), iface_to_side_menu(menu));
 
@@ -2220,14 +2220,14 @@ static int main_win_is_time_for_all(const struct main_win *w,
 
 static int main_win_get_curr_files_time(const struct main_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   return side_menu_get_files_time(&w->menus[w->selected_menu]);
 }
 
 static int main_win_is_curr_time_for_all(const struct main_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   return side_menu_is_time_for_all(&w->menus[w->selected_menu]);
 }
@@ -2237,7 +2237,7 @@ static void main_win_handle_help_key(struct main_win *w,
 {
   int help_lines;
 
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(w->in_help);
 
   get_keys_help(&help_lines);
@@ -2275,9 +2275,9 @@ static void main_win_swap_plist_items(struct main_win *w, const char *file1,
 {
   struct side_menu *m;
 
-  assert(w != NULL);
-  assert(file1 != NULL);
-  assert(file2 != NULL);
+  assert(w != nullptr);
+  assert(file1 != nullptr);
+  assert(file2 != nullptr);
 
   m = find_side_menu(w, MENU_PLAYLIST);
   side_menu_swap_items(m, file1, file2);
@@ -2289,7 +2289,7 @@ static void main_win_use_layout(struct main_win *w, std::vector<std::string> &la
   struct main_win_layout l;
   bool rc ASSERT_ONLY;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   w->layout_fmt = &layout_fmt;
 
@@ -2332,7 +2332,7 @@ static void main_win_resize(struct main_win *w)
   struct main_win_layout l;
   bool rc ASSERT_ONLY;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   keypad(w->win, TRUE);
   wresize(w->win, LINES - 4, COLS);
@@ -2365,8 +2365,8 @@ static void main_win_make_visible(struct main_win *w,
 {
   struct side_menu *m;
 
-  assert(w != NULL);
-  assert(file != NULL);
+  assert(w != nullptr);
+  assert(file != nullptr);
 
   m = find_side_menu(w, type);
   side_menu_make_visible(m, file);
@@ -2377,7 +2377,7 @@ static void main_win_update_show_time(struct main_win *w)
 {
   size_t ix;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   for (ix = 0; ix < ARRAY_SIZE(w->menus); ix += 1)
   {
@@ -2394,8 +2394,8 @@ static void main_win_update_show_time(struct main_win *w)
 
 static void main_win_select_file(struct main_win *w, const char *file)
 {
-  assert(w != NULL);
-  assert(file != NULL);
+  assert(w != nullptr);
+  assert(file != nullptr);
 
   side_menu_select_file(&w->menus[w->selected_menu], file);
   main_win_draw(w);
@@ -2405,7 +2405,7 @@ static void main_win_update_show_format(struct main_win *w)
 {
   size_t ix;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   for (ix = 0; ix < ARRAY_SIZE(w->menus); ix += 1)
   {
@@ -2424,8 +2424,8 @@ static void main_win_del_plist_item(struct main_win *w, const char *file)
 {
   struct side_menu *m;
 
-  assert(w != NULL);
-  assert(file != NULL);
+  assert(w != nullptr);
+  assert(file != nullptr);
 
   m = find_side_menu(w, MENU_PLAYLIST);
   side_menu_del_item(m, file);
@@ -2436,7 +2436,7 @@ static void main_win_clear_plist(struct main_win *w)
 {
   struct side_menu *m;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   m = find_side_menu(w, MENU_PLAYLIST);
   side_menu_clear(m);
@@ -2612,7 +2612,7 @@ static void bar_update_title(struct bar *b)
 {
   size_t maxsize, len, total_space, left_space, right_space;
   int margin = 0;
-  assert(b != NULL);
+  assert(b != nullptr);
   assert(b->show_val);
   assert(sizeof(b->title) > (size_t)b->width);
 
@@ -2648,9 +2648,9 @@ static void bar_update_title(struct bar *b)
 
 static void bar_set_title(struct bar *b, const char *title)
 {
-  assert(b != NULL);
+  assert(b != nullptr);
   assert(b->show_val);
-  assert(title != NULL);
+  assert(title != nullptr);
   assert(strlen(title) < sizeof(b->title) - 5);
 
   b->orig_title = title;
@@ -2661,9 +2661,9 @@ static void bar_init(struct bar *b, const int width, const char *title,
                      const int show_val, const int show_pct,
                      const int fill_color, const int empty_color)
 {
-  assert(b != NULL);
+  assert(b != nullptr);
   assert(width > 5 && width < ssizeof(b->title));
-  assert(title != NULL || !show_val);
+  assert(title != nullptr || !show_val);
 
   b->width = width;
   b->filled = 0.0;
@@ -2689,8 +2689,8 @@ static void bar_draw(const struct bar *b, WINDOW *win, const int pos_x,
 {
   int fill_chars; /* how many chars are "filled" */
 
-  assert(b != NULL);
-  assert(win != NULL);
+  assert(b != nullptr);
+  assert(win != nullptr);
   assert(LIMIT(pos_x, COLS - b->width));
   assert(LIMIT(pos_y, LINES));
 
@@ -2705,7 +2705,7 @@ static void bar_draw(const struct bar *b, WINDOW *win, const int pos_x,
 
 static void bar_set_fill(struct bar *b, const double fill)
 {
-  assert(b != NULL);
+  assert(b != nullptr);
   assert(fill >= 0.0);
 
   b->filled = MIN(fill, 100.0);
@@ -2718,7 +2718,7 @@ static void bar_set_fill(struct bar *b, const double fill)
 
 static void bar_resize(struct bar *b, const int width)
 {
-  assert(b != NULL);
+  assert(b != nullptr);
   assert(width > 5 && width < ssizeof(b->title));
 
   b->width = width;
@@ -2752,14 +2752,14 @@ static struct queued_message *queued_message_create(enum message_type type)
 
 static void queued_message_destroy(struct queued_message *msg)
 {
-  assert(msg != NULL);
+  assert(msg != nullptr);
 
   delete msg;
 }
 
 static void set_startup_message(struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   w->current_message = queued_message_create(NORMAL_MSG);
   w->current_message->msg = STARTUP_MESSAGE;
@@ -2782,7 +2782,7 @@ static void set_startup_message(struct info_win *w)
 
 static void info_win_init(struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   w->win = newwin(4, COLS, LINES - 4, 0);
   wbkgd(w->win, get_color(CLR_BACKGROUND));
@@ -2829,7 +2829,7 @@ static void info_win_init(struct info_win *w)
 
 static void info_win_destroy(struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   if (w->win)
   {
@@ -2847,7 +2847,7 @@ static void info_win_destroy(struct info_win *w)
 /* Set the cursor position in the right place if needed. */
 static void info_win_update_curs(const struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   if (w->in_entry && !w->too_small)
   {
@@ -2857,8 +2857,8 @@ static void info_win_update_curs(const struct info_win *w)
 
 static void info_win_set_mixer_name(struct info_win *w, const char *name)
 {
-  assert(w != NULL);
-  assert(name != NULL);
+  assert(w != nullptr);
+  assert(name != nullptr);
 
   bar_set_title(&w->mixer_bar, name);
   if (!w->in_entry && !w->too_small)
@@ -2871,7 +2871,7 @@ static void info_win_set_mixer_name(struct info_win *w, const char *name)
 
 static void info_win_draw_status(const struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   if (!w->in_entry && !w->too_small)
   {
@@ -2884,8 +2884,8 @@ static void info_win_draw_status(const struct info_win *w)
 
 static void info_win_set_status(struct info_win *w, const char *msg)
 {
-  assert(w != NULL);
-  assert(msg != NULL);
+  assert(w != nullptr);
+  assert(msg != nullptr);
   strncpy(w->status_msg, msg, sizeof(w->status_msg) - 1);
   w->status_msg[sizeof(w->status_msg) - 1] = '\0';
   info_win_draw_status(w);
@@ -2895,7 +2895,7 @@ static void info_win_draw_files_in_queue(const struct info_win *w)
 {
   const int hstart = 5 + sizeof(w->status_msg) + 2;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   if (!w->in_entry && !w->too_small)
   {
@@ -2918,7 +2918,7 @@ static void info_win_draw_files_in_queue(const struct info_win *w)
 
 static void info_win_set_files_in_queue(struct info_win *w, const int num)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(num >= 0);
 
   w->files_in_queue = num;
@@ -2929,7 +2929,7 @@ static void info_win_draw_state(const struct info_win *w)
 {
   const char *state_symbol;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   switch (w->state_play)
   {
@@ -2958,7 +2958,7 @@ static void info_win_draw_state(const struct info_win *w)
 /* Draw the title or the message (informative or error). */
 static void info_win_draw_title(const struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   if (!w->too_small)
   {
@@ -2984,7 +2984,7 @@ static void info_win_draw_title(const struct info_win *w)
 
 static void info_win_set_state(struct info_win *w, const int state)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(state == STATE_PLAY || state == STATE_STOP || state == STATE_PAUSE);
 
   w->state_play = state;
@@ -2997,7 +2997,7 @@ static void info_win_draw_time(const struct info_win *w)
 {
   char time_str[32];
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   if (!w->too_small)
   {
@@ -3032,7 +3032,7 @@ static void info_win_draw_time(const struct info_win *w)
 
 static void info_win_draw_block(const struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   if (!w->too_small)
   {
@@ -3043,7 +3043,7 @@ static void info_win_draw_block(const struct info_win *w)
 
 static void info_win_set_curr_time(struct info_win *w, const int time)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(time >= -1);
 
   w->curr_time = time;
@@ -3064,7 +3064,7 @@ static void info_win_set_curr_time(struct info_win *w, const int time)
 
 static void info_win_set_total_time(struct info_win *w, const int time)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(time >= -1);
 
   w->total_time = time;
@@ -3083,7 +3083,7 @@ static void info_win_set_total_time(struct info_win *w, const int time)
 
 static void info_win_set_block_title(struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   if (w->total_time == -1)
   {
@@ -3134,7 +3134,7 @@ static void info_win_set_block_title(struct info_win *w)
 static void info_win_set_block(struct info_win *w, const int block_start,
                                const int block_end)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(block_start == -1 || RANGE(0, block_start, w->total_time));
   assert(block_end == -1 || RANGE(0, block_end, w->total_time));
 
@@ -3147,7 +3147,7 @@ static void info_win_set_block(struct info_win *w, const int block_start,
 
 static void info_win_set_played_title(struct info_win *w, const char *title)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   if (w->title.empty() && !title)
   {
@@ -3167,7 +3167,7 @@ static void info_win_set_played_title(struct info_win *w, const char *title)
 
 static void info_win_draw_rate(const struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   wattrset(w->win, get_color(CLR_SOUND_PARAMS));
   wmove(w->win, 2, 22);
@@ -3183,7 +3183,7 @@ static void info_win_draw_rate(const struct info_win *w)
 
 static void info_win_draw_bitrate(const struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   if (!w->too_small)
   {
@@ -3203,7 +3203,7 @@ static void info_win_draw_bitrate(const struct info_win *w)
 
 static void info_win_set_bitrate(struct info_win *w, const int bitrate)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(bitrate >= -1);
 
   w->bitrate = bitrate > 0 ? bitrate : -1;
@@ -3212,7 +3212,7 @@ static void info_win_set_bitrate(struct info_win *w, const int bitrate)
 
 static void info_win_set_rate(struct info_win *w, const int rate)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(rate >= -1);
 
   w->rate = rate > 0 ? rate : -1;
@@ -3221,7 +3221,7 @@ static void info_win_set_rate(struct info_win *w, const int rate)
 
 static void info_win_set_mixer_value(struct info_win *w, const int value)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   bar_set_fill(&w->mixer_bar, static_cast<double>(value));
   if (!w->in_entry && !w->too_small)
@@ -3236,8 +3236,8 @@ static void info_win_draw_switch(const struct info_win *w, const int posx,
                                  const int posy, const char *title,
                                  const bool value)
 {
-  assert(w != NULL);
-  assert(title != NULL);
+  assert(w != nullptr);
+  assert(title != nullptr);
 
   if (!w->too_small)
   {
@@ -3250,7 +3250,7 @@ static void info_win_draw_switch(const struct info_win *w, const int posx,
 
 static void info_win_draw_options_state(const struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   info_win_draw_switch(w, 38, 2, "STEREO", w->state_stereo);
 
@@ -3264,7 +3264,7 @@ static void info_win_make_entry(struct info_win *w, const enum entry_type type)
   struct entry_history *history;
   const char *prompt;
 
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(!w->in_entry);
 
   prompt = nullptr;
@@ -3292,7 +3292,7 @@ static void info_win_display_msg(struct info_win *w)
 {
   int msg_changed;
 
-  assert(w != NULL);
+  assert(w != nullptr);
 
   msg_changed = 0;
   if (w->current_message && time(nullptr) > w->current_message->timeout)
@@ -3349,7 +3349,7 @@ static void info_win_display_msg(struct info_win *w)
 /* Force the next queued message to be displayed. */
 static void info_win_disable_msg(struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   if (w->current_message)
   {
@@ -3361,7 +3361,7 @@ static void info_win_disable_msg(struct info_win *w)
 /* Clear all queued messages. */
 static void info_win_clear_msg(struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   while (w->queued_message_head)
   {
@@ -3390,8 +3390,8 @@ static void info_win_msg(struct info_win *w, const char *msg,
 {
   struct queued_message *this_msg;
 
-  assert(w != NULL);
-  assert(msg != NULL || prompt != NULL);
+  assert(w != nullptr);
+  assert(msg != nullptr || prompt != nullptr);
 
   this_msg = queued_message_create(msg_type);
   if (msg)
@@ -3427,7 +3427,7 @@ static void info_win_msg(struct info_win *w, const char *msg,
 
 static void iface_win_user_reply(struct info_win *w, const char *reply)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   if (w->callback)
   {
@@ -3437,14 +3437,14 @@ static void iface_win_user_reply(struct info_win *w, const char *reply)
 
 static void info_win_user_history_add(struct info_win *w, const char *text)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   entry_history_add(&w->user_history, text);
 }
 
 static void info_win_set_channels(struct info_win *w, const int channels)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(channels == 1 || channels == 2);
 
   w->state_stereo = (channels == 2);
@@ -3453,14 +3453,14 @@ static void info_win_set_channels(struct info_win *w, const int channels)
 
 static int info_win_in_entry(const struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   return w->in_entry;
 }
 
 static enum entry_type info_win_get_entry_type(const struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(w->in_entry);
 
   return entry_get_type(&w->entry);
@@ -3469,8 +3469,8 @@ static enum entry_type info_win_get_entry_type(const struct info_win *w)
 static void info_win_set_option_state(struct info_win *w, const char *name,
                                       const bool value)
 {
-  assert(w != NULL);
-  assert(name != NULL);
+  assert(w != nullptr);
+  assert(name != nullptr);
 
   if (!strcasecmp(name, "Shuffle"))
   {
@@ -3516,7 +3516,7 @@ static void sec_to_min_plist(char *buff, const int seconds)
 
 static void info_win_draw_files_time(const struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   if (!w->in_entry && !w->too_small)
   {
@@ -3536,7 +3536,7 @@ static void info_win_draw_files_time(const struct info_win *w)
 static void info_win_set_files_time(struct info_win *w, const int time,
                                     const int time_for_all)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   w->plist_time = time;
   w->plist_time_for_all = time_for_all;
@@ -3550,7 +3550,7 @@ static void info_win_tick(struct info_win *w) { info_win_display_msg(w); }
 /* Draw static elements of info_win: frames, legend etc. */
 static void info_win_draw_static_elements(const struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   if (!w->too_small)
   {
@@ -3593,7 +3593,7 @@ static void info_win_draw_static_elements(const struct info_win *w)
 
 static void info_win_draw(const struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
 
   if (!w->too_small)
   {
@@ -3626,7 +3626,7 @@ static void info_win_draw(const struct info_win *w)
 
 static void info_win_entry_disable(struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(w->in_entry);
 
   entry_destroy(&w->entry);
@@ -3647,8 +3647,8 @@ static void info_win_entry_handle_key(struct info_win *iw, struct main_win *mw,
   enum key_cmd cmd;
   enum entry_type type;
 
-  assert(iw != NULL);
-  assert(mw != NULL);
+  assert(iw != nullptr);
+  assert(mw != nullptr);
   assert(iw->in_entry);
 
   cmd = get_key_cmd(CON_ENTRY, k);
@@ -3766,8 +3766,8 @@ static void info_win_entry_handle_key(struct info_win *iw, struct main_win *mw,
 
 static void info_win_entry_set_text(struct info_win *w, const char *text)
 {
-  assert(w != NULL);
-  assert(text != NULL);
+  assert(w != nullptr);
+  assert(text != nullptr);
   assert(w->in_entry);
 
   entry_set_text(&w->entry, text);
@@ -3776,7 +3776,7 @@ static void info_win_entry_set_text(struct info_win *w, const char *text)
 
 static char *info_win_entry_get_text(const struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(w->in_entry);
 
   return entry_get_text(&w->entry);
@@ -3784,7 +3784,7 @@ static char *info_win_entry_get_text(const struct info_win *w)
 
 static void info_win_entry_history_add(struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(w->in_entry);
 
   entry_add_text_to_history(&w->entry);
@@ -3792,16 +3792,16 @@ static void info_win_entry_history_add(struct info_win *w)
 
 static void info_win_entry_set_file(struct info_win *w, const char *file)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(w->in_entry);
-  assert(file != NULL);
+  assert(file != nullptr);
 
   entry_set_file(&w->entry, file);
 }
 
 static char *info_win_entry_get_file(const struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
   assert(w->in_entry);
 
   return entry_get_file(&w->entry);
@@ -3810,7 +3810,7 @@ static char *info_win_entry_get_file(const struct info_win *w)
 /* Handle terminal size change. */
 static void info_win_resize(struct info_win *w)
 {
-  assert(w != NULL);
+  assert(w != nullptr);
   keypad(w->win, TRUE);
   wresize(w->win, 4, COLS);
   mvwin(w->win, LINES - 4, 0);
@@ -3931,7 +3931,7 @@ static void iface_refresh_screen()
 /* Set state of the options displayed in the information window. */
 void iface_set_option_state(const char *name, const bool value)
 {
-  assert(name != NULL);
+  assert(name != nullptr);
 
   info_win_set_option_state(&info_win, name, value);
   iface_refresh_screen();
@@ -3940,7 +3940,7 @@ void iface_set_option_state(const char *name, const bool value)
 /* Set the mixer name. */
 void iface_set_mixer_name(const char *name)
 {
-  assert(name != NULL);
+  assert(name != nullptr);
 
   info_win_set_mixer_name(&info_win, name);
   iface_refresh_screen();
@@ -3949,7 +3949,7 @@ void iface_set_mixer_name(const char *name)
 /* Set the status message in the info window. */
 void iface_set_status(const char *msg)
 {
-  assert(msg != NULL);
+  assert(msg != nullptr);
 
   if (iface_initialized)
   {
@@ -4088,7 +4088,7 @@ void iface_update_dir_content(const enum iface_menu iface_menu,
 void iface_update_item(const enum iface_menu menu, const struct plist *plist,
                        const int n)
 {
-  assert(plist != NULL);
+  assert(plist != nullptr);
 
   main_win_update_item(&main_win, menu, plist, n);
   info_win_set_files_time(&info_win, main_win_get_curr_files_time(&main_win),
@@ -4099,7 +4099,7 @@ void iface_update_item(const enum iface_menu menu, const struct plist *plist,
 /* Change the current item in the directory menu to this item. */
 void iface_set_curr_item_title(const char *title)
 {
-  assert(title != NULL);
+  assert(title != nullptr);
 
   main_win_set_curr_item_title(&main_win, title);
   iface_refresh_screen();
@@ -4108,7 +4108,7 @@ void iface_set_curr_item_title(const char *title)
 /* Set the title for the directory menu. */
 void iface_set_title(const enum iface_menu menu, const char *title)
 {
-  assert(title != NULL);
+  assert(title != nullptr);
 
   if (options_get_bool("FileNamesIconv"))
   {
@@ -4283,7 +4283,7 @@ void iface_set_channels(const int channels)
   iface_refresh_screen();
 }
 
-/* Set the currently played file. If file is NULL, nothing is played. */
+/* Set the currently played file. If file is nullptr, nothing is played. */
 void iface_set_played_file(const char *file)
 {
   main_win_set_played_file(&main_win, file);
@@ -4304,7 +4304,7 @@ void iface_set_played_file(const char *file)
 /* Set the title for the currently played file. */
 void iface_set_played_file_title(const char *title)
 {
-  assert(title != NULL);
+  assert(title != nullptr);
 
   info_win_set_played_title(&info_win, title);
   iface_refresh_screen();
@@ -4349,7 +4349,7 @@ void iface_switch_to_dir()
 /* Add the item from the playlist to the playlist menu. */
 void iface_add_to_plist(const struct plist *plist, const int num)
 {
-  assert(plist != NULL);
+  assert(plist != nullptr);
 
   main_win_add_to_plist(&main_win, plist, num);
   info_win_set_files_time(&info_win, main_win_get_curr_files_time(&main_win),
@@ -4417,7 +4417,7 @@ void iface_clear_plist()
 
 void iface_del_plist_item(const char *file)
 {
-  assert(file != NULL);
+  assert(file != nullptr);
 
   main_win_del_plist_item(&main_win, file);
   info_win_set_files_time(&info_win, main_win_get_curr_files_time(&main_win),
@@ -4446,7 +4446,7 @@ void iface_entry_handle_key(const struct iface_key *k)
 
 void iface_entry_set_text(const char *text)
 {
-  assert(text != NULL);
+  assert(text != nullptr);
 
   info_win_entry_set_text(&info_win, text);
   iface_refresh_screen();
@@ -4469,7 +4469,7 @@ void iface_entry_disable()
 
 void iface_entry_set_file(const char *file)
 {
-  assert(file != NULL);
+  assert(file != nullptr);
 
   info_win_entry_set_file(&info_win, file);
 }
@@ -4479,7 +4479,7 @@ char *iface_entry_get_file() { return info_win_entry_get_file(&info_win); }
 
 void iface_message(const char *msg)
 {
-  assert(msg != NULL);
+  assert(msg != nullptr);
 
   info_win_msg(&info_win, msg, NORMAL_MSG, nullptr, nullptr, nullptr);
   iface_refresh_screen();
@@ -4494,7 +4494,7 @@ void iface_disable_message()
 void iface_user_query(const char *msg, const char *prompt,
                       t_user_reply_callback *callback, void *data)
 {
-  assert(prompt != NULL);
+  assert(prompt != nullptr);
 
   info_win_msg(&info_win, msg, QUERY_MSG, prompt, callback, data);
   iface_refresh_screen();
@@ -4523,7 +4523,7 @@ void iface_plist_set_total_time(const int time, const int for_all_files)
 
 void iface_select_file(const char *file)
 {
-  assert(file != NULL);
+  assert(file != nullptr);
 
   main_win_select_file(&main_win, file);
   iface_refresh_screen();
@@ -4583,7 +4583,7 @@ void iface_swap_plist_items(const char *file1, const char *file2)
 /* Make sure that this file in this menu is visible. */
 void iface_make_visible(const enum iface_menu menu, const char *file)
 {
-  assert(file != NULL);
+  assert(file != nullptr);
 
   main_win_make_visible(
       &main_win, menu == IFACE_MENU_DIR ? MENU_DIR : MENU_PLAYLIST, file);
@@ -4601,8 +4601,8 @@ void iface_switch_to_theme_menu()
 void iface_add_file(const char *file, const char *title,
                     const enum file_type type)
 {
-  assert(file != NULL);
-  assert(file != NULL);
+  assert(file != nullptr);
+  assert(file != nullptr);
 
   main_win_add_file(&main_win, file, title, type);
   iface_refresh_screen();
@@ -4627,7 +4627,7 @@ static void update_queue_position(struct plist *playlist,
 {
   int i;
 
-  assert(file != NULL);
+  assert(file != nullptr);
   assert(pos >= 0);
 
   if (playlist && (i = plist_find_fname(playlist, file)) != -1)
@@ -4655,7 +4655,7 @@ void iface_update_queue_positions(const struct plist *queue,
   int i;
   int pos = 1;
 
-  assert(queue != NULL);
+  assert(queue != nullptr);
 
   for (i = 0; i < queue->num; i++)
   {
@@ -4681,9 +4681,9 @@ void iface_clear_queue_positions(const struct plist *queue,
 {
   int i;
 
-  assert(queue != NULL);
-  assert(playlist != NULL);
-  assert(dir_list != NULL);
+  assert(queue != nullptr);
+  assert(playlist != nullptr);
+  assert(dir_list != nullptr);
 
   for (i = 0; i < queue->num; i++)
   {
@@ -4703,7 +4703,7 @@ void iface_update_queue_position_last(const struct plist *queue,
   int i;
   int pos;
 
-  assert(queue != NULL);
+  assert(queue != nullptr);
 
   i = plist_last(queue);
   pos = plist_get_position(queue, i);
@@ -4720,7 +4720,7 @@ void iface_mark_file_error(const char *file)
 {
   int i;
 
-  assert(file != NULL);
+  assert(file != nullptr);
 
   for (i = 0; i < 3; i++)
   {

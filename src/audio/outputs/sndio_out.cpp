@@ -40,7 +40,7 @@ static void volume_cb(void *unused ATTR_UNUSED, unsigned int vol)
 
 static int sndio_init(struct output_driver_caps *caps)
 {
-  assert(caps != NULL);
+  assert(caps != nullptr);
 
   caps->formats = SFMT_S8 | SFMT_U8 | SFMT_U16 | SFMT_S16 | SFMT_NE;
   caps->min_channels = 1;
@@ -64,9 +64,9 @@ static int sndio_open(struct sound_params *sound_params)
 {
   struct sio_par par;
 
-  assert(hdl == NULL);
+  assert(hdl == nullptr);
 
-  if ((hdl = sio_open(NULL, SIO_PLAY, 0)) == NULL)
+  if ((hdl = sio_open(nullptr, SIO_PLAY, 0)) == nullptr)
   {
     return 0;
   }
@@ -74,7 +74,7 @@ static int sndio_open(struct sound_params *sound_params)
   params = *sound_params;
   sio_initpar(&par);
   /* Add volume change callback. */
-  sio_onvol(hdl, volume_cb, NULL);
+  sio_onvol(hdl, volume_cb, nullptr);
   par.rate = sound_params->rate;
   par.pchan = sound_params->channels;
   par.bits =
@@ -106,7 +106,7 @@ static int sndio_play(const char *buff, const size_t size)
 {
   int count;
 
-  assert(hdl != NULL);
+  assert(hdl != nullptr);
 
   count = (int)sio_write(hdl, buff, size);
   if (!count && sio_eof(hdl))
@@ -119,7 +119,7 @@ static int sndio_play(const char *buff, const size_t size)
 
 static void sndio_close()
 {
-  assert(hdl != NULL);
+  assert(hdl != nullptr);
 
   sio_stop(hdl);
   sio_close(hdl);
@@ -138,7 +138,7 @@ static void sndio_set_mixer(int vol)
 
 static int sndio_get_buff_fill()
 {
-  assert(hdl != NULL);
+  assert(hdl != nullptr);
 
   /* Since we cannot stop SNDIO playing the samples already in
    * its buffer, there will never be anything left unheard. */
@@ -148,7 +148,7 @@ static int sndio_get_buff_fill()
 
 static int sndio_reset()
 {
-  assert(hdl != NULL);
+  assert(hdl != nullptr);
 
   /* SNDIO will continue to play the samples already in its buffer
    * regardless of what we do, so there's nothing we can do. */
@@ -158,12 +158,12 @@ static int sndio_reset()
 
 static int sndio_get_rate()
 {
-  assert(hdl != NULL);
+  assert(hdl != nullptr);
 
   return params.rate;
 }
 
-static void sndio_toggle_mixer_channel() { assert(hdl != NULL); }
+static void sndio_toggle_mixer_channel() { assert(hdl != nullptr); }
 
 static char *sndio_get_mixer_channel_name() { return xstrdup("mocf"); }
 

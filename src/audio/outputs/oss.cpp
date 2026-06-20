@@ -525,7 +525,7 @@ static int oss_reset()
 
   logit("Resetting audio device");
 
-  if (ioctl(dsp_fd, SNDCTL_DSP_RESET, NULL) == -1)
+  if (ioctl(dsp_fd, SNDCTL_DSP_RESET, nullptr) == -1)
   {
     error("Resetting audio device failed");
   }

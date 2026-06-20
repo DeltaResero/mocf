@@ -422,7 +422,7 @@ int out_buf_time_get(struct out_buf *buf)
 void out_buf_set_free_callback(struct out_buf *buf,
                                out_buf_free_callback callback)
 {
-  assert(buf != NULL);
+  assert(buf != nullptr);
 
   std::lock_guard<std::mutex> lock(buf->mutex);
   buf->free_callback = callback;
@@ -432,7 +432,7 @@ int out_buf_get_free(struct out_buf *buf)
 {
   int space;
 
-  assert(buf != NULL);
+  assert(buf != nullptr);
 
   std::lock_guard<std::mutex> lock(buf->mutex);
   space = fifo_buf_get_space(buf->buf);
@@ -444,7 +444,7 @@ int out_buf_get_fill(struct out_buf *buf)
 {
   int fill;
 
-  assert(buf != NULL);
+  assert(buf != nullptr);
 
   std::lock_guard<std::mutex> lock(buf->mutex);
   fill = fifo_buf_get_fill(buf->buf);
@@ -457,7 +457,7 @@ int out_buf_get_fill(struct out_buf *buf)
  * don't put anything in the buffer). */
 void out_buf_wait(struct out_buf *buf)
 {
-  assert(buf != NULL);
+  assert(buf != nullptr);
 
   logit("Waiting for read thread to suspend...");
 

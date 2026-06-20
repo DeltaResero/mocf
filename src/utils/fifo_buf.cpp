@@ -50,7 +50,7 @@ size_t fifo_buf_put(struct fifo_buf *b, const char *data, size_t size)
 {
   size_t written = 0;
 
-  assert(b != NULL);
+  assert(b != nullptr);
   assert(!b->buf.empty());
 
   while (b->fill < b->size && written < size)
@@ -89,7 +89,7 @@ size_t fifo_buf_peek(struct fifo_buf *b, char *user_buf, size_t user_buf_size)
   size_t user_buf_pos = 0, written = 0;
   ssize_t left, pos;
 
-  assert(b != NULL);
+  assert(b != nullptr);
   assert(!b->buf.empty());
 
   left = b->fill;
@@ -123,7 +123,7 @@ size_t fifo_buf_get(struct fifo_buf *b, char *user_buf, size_t user_buf_size)
 {
   size_t user_buf_pos = 0, written = 0;
 
-  assert(b != NULL);
+  assert(b != nullptr);
   assert(!b->buf.empty());
 
   while (b->fill && written < user_buf_size)
@@ -153,7 +153,7 @@ size_t fifo_buf_get(struct fifo_buf *b, char *user_buf, size_t user_buf_size)
 /* Get the amount of free space in the buffer. */
 size_t fifo_buf_get_space(const struct fifo_buf *b)
 {
-  assert(b != NULL);
+  assert(b != nullptr);
   assert(!b->buf.empty());
 
   return b->size - b->fill;
@@ -161,19 +161,19 @@ size_t fifo_buf_get_space(const struct fifo_buf *b)
 
 size_t fifo_buf_get_fill(const struct fifo_buf *b)
 {
-  assert(b != NULL);
+  assert(b != nullptr);
   return b->fill;
 }
 
 size_t fifo_buf_get_size(const struct fifo_buf *b)
 {
-  assert(b != NULL);
+  assert(b != nullptr);
   return b->size;
 }
 
 void fifo_buf_clear(struct fifo_buf *b)
 {
-  assert(b != NULL);
+  assert(b != nullptr);
   b->fill = 0;
 }
 

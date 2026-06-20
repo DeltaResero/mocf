@@ -224,7 +224,7 @@
 
     /** Pause the stream without closing it.
      *
-     * If non-NULL the backend supports pausing the stream in place
+     * If non-nullptr the backend supports pausing the stream in place
      * (e.g. PulseAudio cork).  Buffered audio is preserved so that
      * unpause resumes exactly where it left off.
      */

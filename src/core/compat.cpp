@@ -46,7 +46,7 @@ char *strcasestr(const char *haystack, const char *needle)
   res = strstr(haystack_i, needle_i);
   free(haystack_i);
   free(needle_i);
-  return res ? res - haystack_i + (char *)haystack : NULL;
+  return res ? res - haystack_i + (char *)haystack : nullptr;
 }
 #endif
 

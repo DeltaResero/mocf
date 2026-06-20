@@ -39,14 +39,14 @@
 
 void tags_free(struct file_tags *tags)
 {
-  assert(tags != NULL);
+  assert(tags != nullptr);
 
   delete tags;
 }
 
 void tags_clear(struct file_tags *tags)
 {
-  assert(tags != NULL);
+  assert(tags != nullptr);
 
   tags->title.clear();
   tags->artist.clear();
@@ -113,7 +113,7 @@ struct file_tags *tags_dup(const struct file_tags *tags)
 {
   struct file_tags *dtags;
 
-  assert(tags != NULL);
+  assert(tags != nullptr);
 
   dtags = tags_new();
   tags_copy(dtags, tags);
@@ -156,7 +156,7 @@ struct plist_item *plist_new_item()
 /* Add a file to the list. Return the index of the item. */
 int plist_add(struct plist *plist, const char *file_name)
 {
-  assert(plist != NULL);
+  assert(plist != nullptr);
 
   int new_idx = plist->num;
 
@@ -205,13 +205,13 @@ void plist_item_copy(struct plist_item *dst, const struct plist_item *src)
 }
 
 /* Get the pointer to the element on the playlist.
- * If the item number is not valid, return NULL.
+ * If the item number is not valid, return nullptr.
  * Returned memory is malloced.
  */
 char *plist_get_file(const struct plist *plist, int i)
 {
   assert(i >= 0);
-  assert(plist != NULL);
+  assert(plist != nullptr);
 
   if (i < plist->num)
   {
@@ -229,7 +229,7 @@ int plist_next(struct plist *plist, int num)
 {
   int i = num + 1;
 
-  assert(plist != NULL);
+  assert(plist != nullptr);
   assert(num >= -1);
 
   while (i < plist->num && plist->items[i].deleted)
@@ -248,7 +248,7 @@ int plist_prev(struct plist *plist, int num)
 {
   int i = num - 1;
 
-  assert(plist != NULL);
+  assert(plist != nullptr);
   assert(num >= -1);
 
   while (i >= 0 && plist->items[i].deleted)
@@ -273,7 +273,7 @@ void plist_free_item_fields(struct plist_item *item)
 /* Clear the list. */
 void plist_clear(struct plist *plist)
 {
-  assert(plist != NULL);
+  assert(plist != nullptr);
 
   plist->items.clear();
   plist->num = 0;
@@ -286,7 +286,7 @@ void plist_clear(struct plist *plist)
 /* Destroy the list freeing memory; the list can't be used after that. */
 void plist_free(struct plist *plist)
 {
-  assert(plist != NULL);
+  assert(plist != nullptr);
 
   plist_clear(plist);
   plist->items.shrink_to_fit();
@@ -330,8 +330,8 @@ void plist_sort_fname(struct plist *plist)
 /* Find an item in the list.  Return the index or -1 if not found. */
 int plist_find_fname(struct plist *plist, const char *file)
 {
-  assert(plist != NULL);
-  assert(file != NULL);
+  assert(plist != nullptr);
+  assert(file != nullptr);
 
   auto it = plist->search_tree.find(file);
 
@@ -351,7 +351,7 @@ int plist_find_del_fname(const struct plist *plist, const char *file)
   int i;
   int item = -1;
 
-  assert(plist != NULL);
+  assert(plist != nullptr);
 
   for (i = 0; i < plist->num; i++)
   {
@@ -367,7 +367,7 @@ int plist_find_del_fname(const struct plist *plist, const char *file)
   return item;
 }
 
-/* Returns the next filename that is a dead entry, or NULL if there are none
+/* Returns the next filename that is a dead entry, or nullptr if there are none
  * left.
  *
  * It will set the index on success.
@@ -377,8 +377,8 @@ const char *plist_get_next_dead_entry(const struct plist *plist,
 {
   int i;
 
-  assert(last_index != NULL);
-  assert(plist != NULL);
+  assert(last_index != nullptr);
+  assert(plist != nullptr);
 
   for (i = *last_index; i < plist->num; i++)
   {
@@ -601,7 +601,7 @@ int plist_add_from_item(struct plist *plist, const struct plist_item *item)
 
 void plist_delete(struct plist *plist, const int num)
 {
-  assert(plist != NULL);
+  assert(plist != nullptr);
   assert(!plist->items[num].deleted);
   assert(plist->not_deleted > 0);
 
@@ -628,7 +628,7 @@ void plist_delete(struct plist *plist, const int num)
 /* Count non-deleted items. */
 int plist_count(const struct plist *plist)
 {
-  assert(plist != NULL);
+  assert(plist != nullptr);
 
   return plist->not_deleted;
 }
@@ -653,7 +653,7 @@ void plist_set_title_file(struct plist *plist, const int num, const char *title)
 void plist_set_file(struct plist *plist, const int num, const char *file)
 {
   assert(LIMIT(num, plist->num));
-  assert(file != NULL);
+  assert(file != nullptr);
 
   if (!plist->items[num].file.empty())
   {
@@ -671,8 +671,8 @@ void plist_cat(struct plist *a, struct plist *b)
 {
   int i;
 
-  assert(a != NULL);
-  assert(b != NULL);
+  assert(a != nullptr);
+  assert(b != nullptr);
 
   for (i = 0; i < b->num; i++)
   {
@@ -695,7 +695,7 @@ void plist_set_item_time(struct plist *plist, const int num, const int time)
 {
   int old_time;
 
-  assert(plist != NULL);
+  assert(plist != nullptr);
   assert(LIMIT(num, plist->num));
 
   if (!plist->items[num].tags)
@@ -730,7 +730,7 @@ void plist_set_item_time(struct plist *plist, const int num, const int time)
 
 int get_item_time(const struct plist *plist, const int i)
 {
-  assert(plist != NULL);
+  assert(plist != nullptr);
 
   if (plist->items[i].tags)
   {
@@ -755,7 +755,7 @@ int plist_total_time(const struct plist *plist, int *all_files)
 /* Swap two items on the playlist. */
 static void plist_swap(struct plist *plist, const int a, const int b)
 {
-  assert(plist != NULL);
+  assert(plist != nullptr);
   assert(LIMIT(a, plist->num));
   assert(LIMIT(b, plist->num));
 
@@ -788,8 +788,8 @@ void plist_swap_first_fname(struct plist *plist, const char *fname)
 {
   int i;
 
-  assert(plist != NULL);
-  assert(fname != NULL);
+  assert(plist != nullptr);
+  assert(fname != nullptr);
 
   i = plist_find_fname(plist, fname);
 
@@ -821,7 +821,7 @@ int plist_last(const struct plist *plist)
 
 enum file_type plist_file_type(const struct plist *plist, const int num)
 {
-  assert(plist != NULL);
+  assert(plist != nullptr);
   assert(num < plist->num);
 
   return plist->items[num].type;
@@ -832,8 +832,8 @@ void plist_remove_common_items(struct plist *a, struct plist *b)
 {
   int i;
 
-  assert(a != NULL);
-  assert(b != NULL);
+  assert(a != nullptr);
+  assert(b != nullptr);
 
   for (i = 0; i < a->num; i += 1)
   {
@@ -855,7 +855,7 @@ void plist_discard_tags(struct plist *plist)
 {
   int i;
 
-  assert(plist != NULL);
+  assert(plist != nullptr);
 
   for (i = 0; i < plist->num; i++)
   {
@@ -874,9 +874,9 @@ void plist_set_tags(struct plist *plist, const int num,
 {
   int old_time;
 
-  assert(plist != NULL);
+  assert(plist != nullptr);
   assert(LIMIT(num, plist->num));
-  assert(tags != NULL);
+  assert(tags != nullptr);
 
   if (plist->items[num].tags && plist->items[num].tags->time != -1)
   {
@@ -904,7 +904,7 @@ void plist_set_tags(struct plist *plist, const int num,
 
 struct file_tags *plist_get_tags(const struct plist *plist, const int num)
 {
-  assert(plist != NULL);
+  assert(plist != nullptr);
   assert(LIMIT(num, plist->num));
 
   if (plist->items[num].tags)

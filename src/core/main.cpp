@@ -331,7 +331,7 @@ static struct parameters params;
 static struct poptOption general_opts[] = {
 #ifndef NDEBUG
     {"debug", 'D', POPT_ARG_NONE, &params.debug, CL_HANDLED,
-     "Turn on logging to a file", NULL},
+     "Turn on logging to a file", nullptr},
 #endif
     {"moc-dir", 'M', POPT_ARG_STRING, nullptr, CL_MOCDIR,
      "Use the specified MOC directory instead of the default", "DIR"},
@@ -871,7 +871,7 @@ static std::vector<std::string> process_command_line(std::vector<std::string> *d
   poptContext ctx;
   std::vector<std::string> result;
 
-  assert(deferred != NULL);
+  assert(deferred != nullptr);
 
   ctx = poptGetContext("mocf", mocf_argc, mocf_argv, mocf_opts, 0);
 
@@ -981,8 +981,8 @@ int main(int argc, const char *argv[])
   std::vector<std::string> deferred_overrides, args;
 
   assert(argc >= 0);
-  assert(argv != NULL);
-  assert(argv[argc] == NULL);
+  assert(argv != nullptr);
+  assert(argv[argc] == nullptr);
 
   mocf_argc = argc;
   mocf_argv = argv;

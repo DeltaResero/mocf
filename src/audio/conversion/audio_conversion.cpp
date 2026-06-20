@@ -39,8 +39,8 @@ static void float_to_u8(const float *in, unsigned char *out,
 {
   size_t i;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -65,8 +65,8 @@ static void float_to_s8(const float *in, char *out, const size_t samples)
 {
   size_t i;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -92,8 +92,8 @@ static void float_to_u16(const float *in, unsigned char *out,
 {
   size_t i;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -119,8 +119,8 @@ static void float_to_s16(const float *in, char *out, const size_t samples)
 {
   size_t i;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -147,8 +147,8 @@ static void float_to_u24(const float *in, unsigned char *out,
 {
   size_t i;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -174,8 +174,8 @@ static void float_to_s24(const float *in, char *out, const size_t samples)
 {
   size_t i;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -202,8 +202,8 @@ static void float_to_u24_3(const float *in, unsigned char *out,
 {
   size_t i;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -233,8 +233,8 @@ static void float_to_s24_3(const float *in, char *out, const size_t samples)
 {
   size_t i;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   int32_t out_i;
   for (i = 0; i < samples; i++)
@@ -265,8 +265,8 @@ static void float_to_u32(const float *in, unsigned char *out,
 {
   size_t i;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -292,8 +292,8 @@ static void float_to_s32(const float *in, char *out, const size_t samples)
 {
   size_t i;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -320,8 +320,8 @@ static void u8_to_float(const unsigned char *in, float *out,
 {
   size_t i;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -333,8 +333,8 @@ static void s8_to_float(const char *in, float *out, const size_t samples)
 {
   size_t i;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -348,8 +348,8 @@ static void u16_to_float(const unsigned char *in, float *out,
   size_t i;
   const uint16_t *in_16 = (uint16_t *)in;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -362,8 +362,8 @@ static void s16_to_float(const char *in, float *out, const size_t samples)
   size_t i;
   const int16_t *in_16 = (int16_t *)in;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -377,8 +377,8 @@ static void u24_to_float(const unsigned char *in, float *out,
   size_t i;
   const uint32_t *in_32 = (uint32_t *)in;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -391,8 +391,8 @@ static void s24_to_float(const char *in, float *out, const size_t samples)
   size_t i;
   const int32_t *in_32 = (int32_t *)in;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -405,8 +405,8 @@ static void s24_3_to_float(const char *in, float *out, const size_t samples)
   size_t i;
   const int8_t *in_8 = (int8_t *)in;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -426,8 +426,8 @@ static void u24_3_to_float(const char *in, float *out, const size_t samples)
   size_t i;
   const uint8_t *in_8 = (uint8_t *)in;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -450,8 +450,8 @@ static void u32_to_float(const unsigned char *in, float *out,
   size_t i;
   const uint32_t *in_32 = (uint32_t *)in;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -464,8 +464,8 @@ static void s32_to_float(const char *in, float *out, const size_t samples)
   size_t i;
   const int32_t *in_32 = (int32_t *)in;
 
-  assert(in != NULL);
-  assert(out != NULL);
+  assert(in != nullptr);
+  assert(out != nullptr);
 
   for (i = 0; i < samples; i++)
   {
@@ -1415,7 +1415,7 @@ char *audio_conv(struct audio_conversion *conv, const char *buf,
 
 void audio_conv_destroy(struct audio_conversion *conv ASSERT_ONLY)
 {
-  assert(conv != NULL);
+  assert(conv != nullptr);
 
 #ifdef HAVE_SAMPLERATE
   if (conv->resample_buf)

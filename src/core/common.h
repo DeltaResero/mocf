@@ -113,8 +113,8 @@ struct timespec;
 #endif
 
 #ifdef NDEBUG
-#define error(...) internal_error(NULL, 0, NULL, ##__VA_ARGS__)
-#define fatal(...) internal_fatal(NULL, 0, NULL, ##__VA_ARGS__)
+#define error(...) internal_error(nullptr, 0, nullptr, ##__VA_ARGS__)
+#define fatal(...) internal_fatal(nullptr, 0, nullptr, ##__VA_ARGS__)
 #define ASSERT_ONLY ATTR_UNUSED
 #else
 #define error(...) internal_error(__FILE__, __LINE__, __func__, ##__VA_ARGS__)

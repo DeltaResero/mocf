@@ -118,7 +118,7 @@ static std::vector<std::string> split_on_chars(const char *s, const char *delims
 }
 
 /* Find a preference entry matching the given filename extension and/or
- * MIME media type, or NULL. */
+ * MIME media type, or nullptr. */
 static decoder_t_preference *lookup_preference(const char *extn,
                                                const char *file, char **mime)
 {
@@ -271,7 +271,7 @@ static int find_type(const char *file)
 
 int is_sound_file(const char *name) { return find_type(name) != -1 ? 1 : 0; }
 
-/* Return short type name for the given file or NULL if not found.
+/* Return short type name for the given file or nullptr if not found.
  * Not thread safe! */
 char *file_type_name(const char *file)
 {
@@ -605,7 +605,7 @@ static void load_plugins(int debug_info)
     plugins[ix].decoder = decoder_table[ix].init();
     if (!plugins[ix].decoder)
     {
-      fatal("Decoder \"%s\" returned NULL from init", decoder_table[ix].name);
+      fatal("Decoder \"%s\" returned nullptr from init", decoder_table[ix].name);
     }
     if (plugins[ix].decoder->api_version != DECODER_API_VERSION)
     {

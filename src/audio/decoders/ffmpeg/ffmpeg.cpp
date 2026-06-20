@@ -337,7 +337,7 @@ static int locking_cb(void **mutex, enum AVLockOp op)
   {
     case AV_LOCK_CREATE:
       *mutex = new pthread_mutex_t;
-      result = pthread_mutex_init(*mutex, NULL);
+      result = pthread_mutex_init(*mutex, nullptr);
       break;
     case AV_LOCK_OBTAIN:
       result = pthread_mutex_lock(*mutex);
@@ -448,7 +448,7 @@ static void ffmpeg_init()
 static void ffmpeg_destroy()
 {
 #if HAVE_LIBAV || LIBAVCODEC_VERSION_INT < AV_VERSION_INT(58, 9, 100)
-  av_lockmgr_register(NULL);
+  av_lockmgr_register(nullptr);
 #endif
 
   av_log_set_level(AV_LOG_QUIET);
@@ -1015,7 +1015,7 @@ static inline AVPacket *new_packet(struct ffmpeg_data *data)
     fatal("av_malloc() failed to allocate memory");
   }
   av_init_packet(pkt);
-  pkt->data = NULL;
+  pkt->data = nullptr;
   pkt->size = 0;
 #endif
 

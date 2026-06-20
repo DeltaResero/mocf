@@ -1553,7 +1553,7 @@ public:
 #ifdef HAVE_SYS_INOTIFY_H
             ret = pselect(MAX(engine_event_queue_fd(g_engine_eq), inotify_fd) + 1, &fds, nullptr, nullptr, &timeout, nullptr);
 #else
-            ret = pselect(engine_event_queue_fd(g_engine_eq) + 1, &fds, NULL, NULL, &timeout, NULL);
+            ret = pselect(engine_event_queue_fd(g_engine_eq) + 1, &fds, nullptr, nullptr, &timeout, nullptr);
 #endif
             if (ret == -1 && want_quit_flag == NO_QUIT && errno != EINTR) {
                 interface_fatal("pselect() failed: %s", xstrerror(errno).c_str());

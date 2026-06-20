@@ -53,7 +53,7 @@ static char *cached_result = nullptr;
 void files_init()
 {
 #ifdef HAVE_LIBMAGIC
-  assert(cookie == NULL);
+  assert(cookie == nullptr);
 
   cookie = magic_open(MAGIC_SYMLINK | MAGIC_MIME | MAGIC_ERROR |
                       MAGIC_NO_CHECK_COMPRESS | MAGIC_NO_CHECK_ELF |
@@ -105,7 +105,7 @@ enum file_type file_type(const char *file)
 {
   struct stat file_stat;
 
-  assert(file != NULL);
+  assert(file != nullptr);
 
   if (stat(file, &file_stat) == -1)
   {
@@ -126,12 +126,12 @@ enum file_type file_type(const char *file)
   return F_OTHER;
 }
 
-/* Given a file name, return the mime type or NULL. */
+/* Given a file name, return the mime type or nullptr. */
 char *file_mime_type(const char *file ASSERT_ONLY)
 {
   char *result = nullptr;
 
-  assert(file != NULL);
+  assert(file != nullptr);
 
 #ifdef HAVE_LIBMAGIC
   static pthread_mutex_t magic_mtx = PTHREAD_MUTEX_INITIALIZER;
@@ -171,7 +171,7 @@ char *file_mime_type(const char *file ASSERT_ONLY)
 void make_file_title(struct plist *plist, const int num,
                      const bool hide_extension)
 {
-  assert(plist != NULL);
+  assert(plist != nullptr);
   assert(LIMIT(num, plist->num));
   assert(!plist_deleted(plist, num));
 
@@ -205,7 +205,7 @@ void make_tags_title(struct plist *plist, const int num)
   bool hide_extn;
   char *title;
 
-  assert(plist != NULL);
+  assert(plist != nullptr);
   assert(LIMIT(num, plist->num));
   assert(!plist_deleted(plist, num));
 
@@ -298,7 +298,7 @@ void resolve_path(char *buf, size_t size, const char *file)
     {
       char *slash = strrchr(buf, '/');
 
-      assert(slash != NULL);
+      assert(slash != nullptr);
 
       if (slash == buf)
       {
@@ -350,16 +350,16 @@ void resolve_path(char *buf, size_t size, const char *file)
   }
 }
 
-/* Read selected tags for a file into tags structure (or create it if NULL).
+/* Read selected tags for a file into tags structure (or create it if nullptr).
  * If some tags are already present, don't read them.
- * If present_tags is NULL, allocate new tags. */
+ * If present_tags is nullptr, allocate new tags. */
 struct file_tags *read_file_tags(const char *file, struct file_tags *tags,
                                  const int tags_sel)
 {
   AudioPlugin *df;
   int needed_tags;
 
-  assert(file != NULL);
+  assert(file != nullptr);
 
   if (tags == nullptr)
   {
@@ -402,9 +402,9 @@ int read_directory(const char *directory, std::vector<std::string> &dirs,
   bool show_hidden = options_get_bool("ShowHiddenFiles");
   int dir_is_root;
 
-  assert(directory != NULL);
+  assert(directory != nullptr);
   assert(*directory == '/');
-  assert(plist != NULL);
+  assert(plist != nullptr);
 
   if (!(dir = opendir(directory)))
   {
@@ -504,8 +504,8 @@ static int read_directory_recurr_internal(const char *directory,
     return 0;
   }
 
-  assert(plist != NULL);
-  assert(directory != NULL);
+  assert(plist != nullptr);
+  assert(directory != nullptr);
 
   if (*dir_stack && dir_symlink_loop(st.st_ino, *dir_stack, *depth))
   {
@@ -579,7 +579,7 @@ int read_directory_recurr(const char *directory, struct plist *plist)
   return ret;
 }
 
-/* Return the file extension position or NULL if the file has no extension. */
+/* Return the file extension position or nullptr if the file has no extension. */
 char *ext_pos(const char *file)
 {
   const char *ext = strrchr(file, '.');
@@ -599,7 +599,7 @@ char *ext_pos(const char *file)
 }
 
 /* Read one line from a file, strip trailing end of line chars.
- * Returned memory is malloc()ed.  Return NULL on error or EOF. */
+ * Returned memory is malloc()ed.  Return nullptr on error or EOF. */
 char *read_line(FILE *file)
 {
   int line_alloc = READ_LINE_INIT_SIZE;
@@ -651,7 +651,7 @@ static char *add_dir_file(const char *base, const char *name)
 }
 
 /* Find directories having a prefix of 'pattern'.
- * - If there are no matches, NULL is returned.
+ * - If there are no matches, nullptr is returned.
  * - If there is one such directory, it is returned with a trailing '/'.
  * - Otherwise the longest common prefix is returned (with no trailing '/').
  * (This is used for directory auto-completion.)

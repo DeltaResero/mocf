@@ -480,8 +480,8 @@ void status_msg(const char *msg) { add_event_all(EV_STATUS_MSG, msg); }
 
 void tags_response(const char *file, const struct file_tags *tags)
 {
-  assert(file != NULL);
-  assert(tags != NULL);
+  assert(file != nullptr);
+  assert(tags != nullptr);
 
   if (!g_eq) return;
 

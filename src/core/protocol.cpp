@@ -32,7 +32,7 @@
 
 void event_queue_init(struct event_queue *q)
 {
-  assert(q != NULL);
+  assert(q != nullptr);
   q->head = nullptr;
   q->tail = nullptr;
 }
@@ -40,7 +40,7 @@ void event_queue_init(struct event_queue *q)
 /* Push an event onto the tail of the queue. */
 void event_push(struct event_queue *q, const int event, void *data)
 {
-  assert(q != NULL);
+  assert(q != nullptr);
 
   struct event *e = new struct event;
   e->next = nullptr;
@@ -54,8 +54,8 @@ void event_push(struct event_queue *q, const int event, void *data)
   }
   else
   {
-    assert(q->tail != NULL);
-    assert(q->tail->next == NULL);
+    assert(q->tail != nullptr);
+    assert(q->tail->next == nullptr);
     q->tail->next = e;
     q->tail       = e;
   }
@@ -66,9 +66,9 @@ void event_pop(struct event_queue *q)
 {
   struct event *e;
 
-  assert(q != NULL);
-  assert(q->head != NULL);
-  assert(q->tail != NULL);
+  assert(q != nullptr);
+  assert(q->head != nullptr);
+  assert(q->tail != nullptr);
 
   e = q->head;
   q->head = e->next;
@@ -79,13 +79,13 @@ void event_pop(struct event_queue *q)
 
 struct event *event_get_first(struct event_queue *q)
 {
-  assert(q != NULL);
+  assert(q != nullptr);
   return q->head;
 }
 
 int event_queue_empty(const struct event_queue *q)
 {
-  assert(q != NULL);
+  assert(q != nullptr);
   return q->head == nullptr ? 1 : 0;
 }
 
@@ -121,7 +121,7 @@ void free_event_data(const int type, void *data)
   }
   else
   {
-    abort(); /* BUG: unknown event type with non-NULL data */
+    abort(); /* BUG: unknown event type with non-nullptr data */
   }
 }
 
@@ -130,7 +130,7 @@ void event_queue_free(struct event_queue *q)
 {
   struct event *e;
 
-  assert(q != NULL);
+  assert(q != nullptr);
 
   while ((e = event_get_first(q)))
   {
@@ -145,7 +145,7 @@ void event_queue_free(struct event_queue *q)
 
 void free_tag_ev_data(struct tag_ev_response *d)
 {
-  assert(d != NULL);
+  assert(d != nullptr);
   free(d->file);
   tags_free(d->tags);
   free(d);
@@ -153,8 +153,8 @@ void free_tag_ev_data(struct tag_ev_response *d)
 
 struct tag_ev_response *tag_ev_data_dup(const struct tag_ev_response *d)
 {
-  assert(d != NULL);
-  assert(d->file != NULL);
+  assert(d != nullptr);
+  assert(d->file != nullptr);
 
   struct tag_ev_response *n = new tag_ev_response;
   n->file = xstrdup(d->file);
@@ -168,7 +168,7 @@ struct tag_ev_response *tag_ev_data_dup(const struct tag_ev_response *d)
 
 void free_move_ev_data(struct move_ev_data *m)
 {
-  assert(m != NULL);
+  assert(m != nullptr);
   free(m->from);
   free(m->to);
   delete m;
@@ -176,9 +176,9 @@ void free_move_ev_data(struct move_ev_data *m)
 
 struct move_ev_data *move_ev_data_dup(const struct move_ev_data *m)
 {
-  assert(m != NULL);
-  assert(m->from != NULL);
-  assert(m->to != NULL);
+  assert(m != nullptr);
+  assert(m->from != nullptr);
+  assert(m->to != nullptr);
 
   struct move_ev_data *n = new move_ev_data;
   n->from = xstrdup(m->from);

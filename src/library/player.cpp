@@ -116,7 +116,7 @@ static struct bitrate_list bitrate_list;
 
 static void bitrate_list_init(struct bitrate_list *b)
 {
-  assert(b != NULL);
+  assert(b != nullptr);
 
   b->head = nullptr;
   b->tail = nullptr;
@@ -125,7 +125,7 @@ static void bitrate_list_init(struct bitrate_list *b)
 
 static void bitrate_list_empty(struct bitrate_list *b)
 {
-  assert(b != NULL);
+  assert(b != nullptr);
 
   LOCK(b->mtx);
   if (b->head)
@@ -150,7 +150,7 @@ static void bitrate_list_destroy(struct bitrate_list *b)
 {
   int rc;
 
-  assert(b != NULL);
+  assert(b != nullptr);
 
   bitrate_list_empty(b);
 
@@ -164,7 +164,7 @@ static void bitrate_list_destroy(struct bitrate_list *b)
 static void bitrate_list_add(struct bitrate_list *b, const int time,
                              const int bitrate)
 {
-  assert(b != NULL);
+  assert(b != nullptr);
 
   LOCK(b->mtx);
   if (!b->tail)
@@ -207,7 +207,7 @@ static int bitrate_list_get(struct bitrate_list *b, const int time)
 {
   int bitrate = -1;
 
-  assert(b != NULL);
+  assert(b != nullptr);
 
   LOCK(b->mtx);
   if (b->head)
@@ -259,7 +259,7 @@ static void *precache_thread(void *data)
             yet filled. */
   precache->decoded_time = 0.0;
   precache->f = get_decoder(precache->file.c_str());
-  assert(precache->f != NULL);
+  assert(precache->f != nullptr);
 
   precache->decoder_data = precache->f->open(precache->file.c_str());
   precache->decoder_data->get_error(&err);
@@ -340,7 +340,7 @@ static void start_precache(struct precache *precache, const char *file)
   int rc;
 
   assert(!precache->running);
-  assert(file != NULL);
+  assert(file != nullptr);
 
   precache->file = file;
   bitrate_list_init(&precache->bitrate_list);

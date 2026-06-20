@@ -303,7 +303,7 @@ static int pulse_open(struct sound_params *sound_params)
   assert(!stream);
   /* Initialize everything to -1, which in practice gets us
    * about 2 seconds of latency (which is fine). This is not the
-   * same as passing NULL for this struct, which gets us an
+   * same as passing nullptr for this struct, which gets us an
    * unnecessarily short alsa-like latency.
    */
   ba.fragsize = static_cast<uint32_t>(-1);
@@ -665,7 +665,7 @@ static int pulse_get_buff_fill()
    * it (pulse does not have the requested data yet). We ignore
    * that and just return 0.
    *
-   * Deal with stream being NULL too, just in case this is
+   * Deal with stream being nullptr too, just in case this is
    * called in a racy fashion similar to how reset() is.
    */
   if (stream && pa_stream_get_latency(stream, &buffered_usecs, nullptr) >= 0)

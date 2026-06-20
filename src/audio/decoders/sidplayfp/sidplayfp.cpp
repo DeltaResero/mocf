@@ -93,7 +93,7 @@ static int song_length_ms(SidTune &tune)
 // Engine / builder construction
 // ---------------------------------------------------------------------------
 
-// Create and sanity-check an ReSIDBuilder.  Returns NULL on failure.
+// Create and sanity-check an ReSIDBuilder.  Returns nullptr on failure.
 static ReSIDBuilder *make_builder(unsigned int n_chips)
 {
     ReSIDBuilder *b = new ReSIDBuilder("ReSID");
@@ -114,7 +114,7 @@ static ReSIDBuilder *make_builder(unsigned int n_chips)
     return b;
 }
 
-// Create and configure a sidplayfp engine.  Returns NULL on failure.
+// Create and configure a sidplayfp engine.  Returns nullptr on failure.
 static sidplayfp *make_engine(ReSIDBuilder *builder, int frequency)
 {
     sidplayfp *engine = new sidplayfp();

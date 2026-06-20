@@ -362,7 +362,7 @@ static int vorbis_decode(void *prv_data, char *buf, int buf_len,
     }
 
     info = ov_info(&data->vf, -1);
-    assert(info != NULL);
+    assert(info != nullptr);
     sound_params->channels = info->channels;
     sound_params->rate = info->rate;
 #ifdef INTERNAL_FLOAT

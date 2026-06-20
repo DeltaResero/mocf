@@ -29,7 +29,7 @@
 #include "core/options.h"
 
 #ifndef NDEBUG
-static FILE *logfp = NULL; /* logging file stream */
+static FILE *logfp = nullptr; /* logging file stream */
 
 static enum { UNINITIALISED, BUFFERING, LOGGING } logging_state = UNINITIALISED;
 
@@ -119,7 +119,7 @@ static void locked_logit(const char *file, const int line, const char *function,
     return;
   }
 
-  len = snprintf(NULL, 0, fmt, time_str, utc_time.tv_nsec / 1000L, file, line,
+  len = snprintf(nullptr, 0, fmt, time_str, utc_time.tv_nsec / 1000L, file, line,
                  function, msg);
   std::string log_str(len + 1, '\0');
   snprintf(&log_str[0], len + 1, fmt, time_str, utc_time.tv_nsec / 1000L, file, line,
@@ -384,10 +384,10 @@ void log_close()
 #ifndef NDEBUG
   LOCK(logging_mtx);
 
-  if (!(logfp == stdout || logfp == stderr || logfp == NULL))
+  if (!(logfp == stdout || logfp == stderr || logfp == nullptr))
   {
     fclose(logfp);
-    logfp = NULL;
+    logfp = nullptr;
   }
 
   buffered_log.clear();

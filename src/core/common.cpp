@@ -342,7 +342,7 @@ int get_realtime(struct timespec *ts)
 #else
   struct timeval tv;
 
-  result = gettimeofday(&tv, NULL);
+  result = gettimeofday(&tv, nullptr);
   if (result == 0)
   {
     ts->tv_sec = tv.tv_sec;

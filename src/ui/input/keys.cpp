@@ -594,7 +594,7 @@ enum key_cmd get_key_cmd(const enum key_context context,
   return KEY_CMD_WRONG;
 }
 
-/* Return the path to the keymap file or NULL if none was specified. */
+/* Return the path to the keymap file or nullptr if none was specified. */
 static char *find_keymap_file()
 {
   const char *file;

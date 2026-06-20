@@ -75,7 +75,7 @@ static ssize_t io_read_mmap(struct io_stream *s, const int dont_move, void *buf,
   struct stat file_stat;
   size_t to_read;
 
-  assert(s->mem != NULL);
+  assert(s->mem != nullptr);
 
   if (fstat(s->fd, &file_stat) == -1)
   {
@@ -150,8 +150,8 @@ static ssize_t io_internal_read(struct io_stream *s, const int dont_move,
 {
   ssize_t res = 0;
 
-  assert(s != NULL);
-  assert(buf != NULL);
+  assert(s != nullptr);
+  assert(buf != nullptr);
 
   switch (s->source)
   {
@@ -237,7 +237,7 @@ off_t io_seek(struct io_stream *s, off_t offset, int whence)
 {
   off_t res, new_pos = 0;
 
-  assert(s != NULL);
+  assert(s != nullptr);
   assert(s->opened);
 
   if (!io_ok(s))
@@ -298,7 +298,7 @@ static void io_wake_up(struct io_stream *s ATTR_UNUSED)
 /* Abort an IO operation from another thread. */
 void io_abort(struct io_stream *s)
 {
-  assert(s != NULL);
+  assert(s != nullptr);
 
   if (s->buffered && !s->stop_read_thread)
   {
@@ -318,7 +318,7 @@ void io_close(struct io_stream *s)
 {
   int rc;
 
-  assert(s != NULL);
+  assert(s != nullptr);
 
   logit("Closing stream...");
 
@@ -542,7 +542,7 @@ struct io_stream *io_open(const char *file, const int buffered)
   int rc;
   struct io_stream *s;
 
-  assert(file != NULL);
+  assert(file != nullptr);
 
   s = new io_stream;
   s->errno_val = 0;
@@ -689,8 +689,8 @@ ssize_t io_read(struct io_stream *s, void *buf, size_t count)
 {
   ssize_t received;
 
-  assert(s != NULL);
-  assert(buf != NULL);
+  assert(s != nullptr);
+  assert(buf != nullptr);
   assert(s->opened);
 
   debug("Reading...");
@@ -718,8 +718,8 @@ ssize_t io_peek(struct io_stream *s, void *buf, size_t count)
 {
   ssize_t received;
 
-  assert(s != NULL);
-  assert(buf != NULL);
+  assert(s != nullptr);
+  assert(buf != nullptr);
 
   debug("Reading...");
 
@@ -748,7 +748,7 @@ const char *io_strerror(struct io_stream *s)
 /* Get the file size if available or -1. */
 off_t io_file_size(const struct io_stream *s)
 {
-  assert(s != NULL);
+  assert(s != nullptr);
 
   return s->size;
 }
@@ -758,7 +758,7 @@ off_t io_tell(struct io_stream *s)
 {
   off_t res = -1;
 
-  assert(s != NULL);
+  assert(s != nullptr);
 
   if (s->buffered)
   {
@@ -781,7 +781,7 @@ int io_eof(struct io_stream *s)
 {
   int eof;
 
-  assert(s != NULL);
+  assert(s != nullptr);
 
   LOCK(s->buf_mtx);
   eof = (s->eof && (!s->buffered || !fifo_buf_get_fill(s->buf))) ||
@@ -805,8 +805,8 @@ void io_cleanup()
 void io_set_buf_fill_callback(struct io_stream *s, buf_fill_callback_t callback,
                               void *data_ptr)
 {
-  assert(s != NULL);
-  assert(callback != NULL);
+  assert(s != nullptr);
+  assert(callback != nullptr);
 
   LOCK(s->buf_mtx);
   s->buf_fill_callback = callback;

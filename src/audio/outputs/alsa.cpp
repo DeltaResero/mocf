@@ -417,7 +417,7 @@ static int alsa_read_mixer_raw(snd_mixer_elem_t *elem, bool raw)
     int i;
     int rc;
 
-    assert(elem != NULL);
+    assert(elem != nullptr);
 
     handle_mixer_events(mixer_handle);
 
@@ -650,7 +650,7 @@ static void alsa_shutdown()
   alsa_close_mixer();
 
 #ifndef NDEBUG
-  snd_lib_error_set_handler(NULL);
+  snd_lib_error_set_handler(nullptr);
 #endif
 }
 
@@ -937,7 +937,7 @@ static void alsa_close()
 {
   snd_pcm_sframes_t delay;
 
-  assert(handle != NULL);
+  assert(handle != nullptr);
 
   /* play what remained in the buffer */
   if (alsa_buf_fill > 0)

@@ -57,7 +57,7 @@ static iconv_t xterm_iconv_desc = (iconv_t)(-1);
 
 /* Return a malloc()ed string converted using iconv().
  * If for_file_name is not 0, use the conversion defined for file names.
- * For NULL returns NULL. */
+ * For nullptr returns nullptr. */
 char *iconv_str(const iconv_t desc, const char *str)
 {
   char buf[512];
@@ -154,8 +154,8 @@ int xwaddstr(WINDOW *win, const char *str)
 }
 
 /* Convert multi-byte sequence to wide characters.  Change invalid UTF-8
- * sequences to '?'.  'dest' can be NULL as in mbstowcs().
- * If 'invalid_char' is not NULL it will be set to 1 if an invalid character
+ * sequences to '?'.  'dest' can be nullptr as in mbstowcs().
+ * If 'invalid_char' is not nullptr it will be set to 1 if an invalid character
  * appears in the string, otherwise 0. */
 static size_t xmbstowcs(wchar_t *dest, const char *src, size_t len,
                         int *invalid_char)
@@ -163,7 +163,7 @@ static size_t xmbstowcs(wchar_t *dest, const char *src, size_t len,
   mbstate_t ps;
   size_t count = 0;
 
-  assert(src != NULL);
+  assert(src != nullptr);
   assert(!dest || len > 0);
 
   memset(&ps, 0, sizeof(ps));
@@ -235,7 +235,7 @@ int xwaddnstr(WINDOW *win, const char *str, const int n)
   size_t size, num_chars;
 
   assert(n > 0);
-  assert(str != NULL);
+  assert(str != nullptr);
 
   mstr = iconv_str(iconv_desc, str);
 
@@ -362,7 +362,7 @@ void utf8_init()
 #ifdef HAVE_NL_LANGINFO_CODESET
 #ifdef HAVE_NL_LANGINFO
   terminal_charset = xstrdup(nl_langinfo(CODESET));
-  assert(terminal_charset != NULL);
+  assert(terminal_charset != nullptr);
 
   if (!strcmp(terminal_charset, "UTF-8"))
   {
@@ -419,7 +419,7 @@ size_t strwidth(const char *s)
   size_t size;
   size_t width;
 
-  assert(s != NULL);
+  assert(s != nullptr);
 
   size = xmbstowcs(nullptr, s, -1, nullptr) + 1;
   std::vector<wchar_t> ucs(size);
@@ -436,7 +436,7 @@ char *xstrtail(const char *str, const int len)
   size_t size;
   int width;
 
-  assert(str != NULL);
+  assert(str != nullptr);
   assert(len > 0);
 
   size = xmbstowcs(nullptr, str, -1, nullptr) + 1;

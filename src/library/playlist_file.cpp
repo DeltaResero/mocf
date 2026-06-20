@@ -217,7 +217,7 @@ static int is_blank_line(const char *l)
 }
 
 /* Read a value from the given section from .INI file.  File should be opened
- * and seeking will be performed on it.  Return the malloc()ed value or NULL
+ * and seeking will be performed on it.  Return the malloc()ed value or nullptr
  * if not present or error occurred. */
 static char *read_ini_value(FILE *file, const char *section, const char *key)
 {
@@ -548,7 +548,7 @@ err:
   return result;
 }
 
-/* Save the playlist into the file. Return 0 on error. If cwd is NULL, use
+/* Save the playlist into the file. Return 0 on error. If cwd is nullptr, use
  * absolute paths. */
 int plist_save(struct plist *plist, const char *file, const bool save_tags)
 {
