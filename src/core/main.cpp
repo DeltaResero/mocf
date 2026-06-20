@@ -66,30 +66,32 @@ struct parameters
 /* Check if a directory ./.moc exists and create if needed. */
 static void check_moc_dir()
 {
-  char *dir_name = create_file_name("");
+  std::string dir_name = create_file_name("");
   struct stat file_stat;
 
   /* strip trailing slash */
-  dir_name[strlen(dir_name) - 1] = 0;
+  if (!dir_name.empty() && dir_name.back() == '/')
+    dir_name.pop_back();
 
-  if (stat(dir_name, &file_stat) == -1)
+  if (stat(dir_name.c_str(), &file_stat) == -1)
   {
     if (errno != ENOENT)
     {
       fatal("Error trying to check for " CONFIG_DIR " directory: %s",
-            xstrerror(errno));
+            xstrerror(errno).c_str());
     }
 
-    if (mkdir(dir_name, 0700) == -1)
+    if (mkdir(dir_name.c_str(), 0700) == -1)
     {
-      fatal("Can't create directory %s: %s", dir_name, xstrerror(errno));
+      fatal("Can't create directory %s: %s", dir_name.c_str(),
+            xstrerror(errno).c_str());
     }
   }
   else
   {
-    if (!S_ISDIR(file_stat.st_mode) || access(dir_name, W_OK))
+    if (!S_ISDIR(file_stat.st_mode) || access(dir_name.c_str(), W_OK))
     {
-      fatal("%s is not a writable directory!", dir_name);
+      fatal("%s is not a writable directory!", dir_name.c_str());
     }
   }
 }
@@ -121,10 +123,10 @@ static void start_moc(const struct parameters *params, const std::vector<std::st
 
   if (params->debug)
   {
-    FILE *logfp = fopen(create_file_name("mocf.log"), "a");
+    FILE *logfp = fopen(create_file_name("mocf.log").c_str(), "a");
     if (!logfp)
     {
-      fatal("Can't open log file: %s", xstrerror(errno));
+      fatal("Can't open log file: %s", xstrerror(errno).c_str());
     }
     log_init_stream(logfp, "mocf.log");
   }
@@ -741,77 +743,53 @@ err:
 
 static void override_config_option(const char *arg, std::vector<std::string> *deferred)
 {
-  int len;
-  bool append;
-  const char *ptr;
-  char *name, *value;
-  enum option_type type;
+  assert(arg != nullptr);
 
-  assert(arg != NULL);
-
-  ptr = strchr(arg, '=');
+  const char *ptr = strchr(arg, '=');
   if (ptr == nullptr)
-  {
-    goto error;
-  }
+    fatal("Malformed override option: %s", arg);
 
   /* Allow for list append operator ("+="). */
-  append = (ptr > arg && *(ptr - 1) == '+');
+  bool append = (ptr > arg && *(ptr - 1) == '+');
 
-  name = trim(arg, ptr - arg - (append ? 1 : 0));
-  if (!name || !name[0])
-  {
-    goto error;
-  }
-  type = options_get_type(name);
+  auto name_opt = trim(arg, static_cast<size_t>(ptr - arg - (append ? 1 : 0)));
+  if (!name_opt || name_opt->empty())
+    fatal("Malformed override option: %s", arg);
+
+  const std::string &name = *name_opt;
+  enum option_type type = options_get_type(name.c_str());
 
   if (type == OPTION_LIST)
   {
     if (deferred)
     {
       deferred->push_back(arg);
-      free(name);
       return;
     }
   }
   else if (append)
   {
-    goto error;
+    fatal("Malformed override option: %s", arg);
   }
 
-  value = trim(ptr + 1, strlen(ptr + 1));
-  if (!value || !value[0])
+  auto value_opt = trim(ptr + 1, strlen(ptr + 1));
+  if (!value_opt || value_opt->empty())
+    fatal("Malformed override option: %s", arg);
+
+  std::string value = std::move(*value_opt);
+
+  if (value.front() == '\'' || value.front() == '"')
   {
-    goto error;
+    size_t len = value.size();
+    if (value.front() != value.back() || len < 2)
+      fatal("Malformed override option: %s", arg);
+    value = value.substr(1, len - 2);
   }
 
-  if (value[0] == '\'' || value[0] == '"')
-  {
-    len = strlen(value);
-    if (value[0] != value[len - 1])
-    {
-      goto error;
-    }
-    if (strlen(value) < 2)
-    {
-      goto error;
-    }
-    memmove(value, value + 1, len - 2);
-    value[len - 2] = 0x00;
-  }
+  if (!options_set_pair(name.c_str(), value.c_str(), append))
+    fatal("Malformed override option: %s", arg);
 
-  if (!options_set_pair(name, value, append))
-  {
-    goto error;
-  }
-  options_ignore_config(name);
-
-  free(name);
-  free(value);
-  return;
-
-error:
-  fatal("Malformed override option: %s", arg);
+  options_ignore_config(name.c_str());
 }
 
 /* Process the command line options. */
@@ -1055,18 +1033,22 @@ int main(int argc, const char *argv[])
 
   if (!params.no_config_file)
   {
+    std::string default_config_path;
+    const char *config_path;
     if (params.config_file)
     {
       if (!can_read_file(params.config_file))
       {
         fatal("Configuration file is not readable: %s", params.config_file);
       }
+      config_path = params.config_file;
     }
     else
     {
-      params.config_file = create_file_name("config");
+      default_config_path = create_file_name("config");
+      config_path = default_config_path.c_str();
     }
-    options_parse(params.config_file);
+    options_parse(config_path);
   }
 
   process_deferred_overrides(deferred_overrides);

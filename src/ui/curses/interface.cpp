@@ -268,7 +268,7 @@ private:
     }
 
     int read_last_dir() {
-        FILE *dir_file = fopen(create_file_name("last_directory"), "r");
+        FILE *dir_file = fopen(create_file_name("last_directory").c_str(), "r");
         if (!dir_file) return 0;
         int read_bytes = fread(cwd, sizeof(char), sizeof(cwd) - 1, dir_file);
         if (read_bytes == 0) {
@@ -760,8 +760,8 @@ private:
     }
 
     void load_playlist() {
-        char *plist_file = create_file_name(PLAYLIST_FILE);
-        if (file_type(plist_file) == F_PLAYLIST) go_to_playlist(plist_file, true);
+        std::string plist_file = create_file_name(PLAYLIST_FILE);
+        if (file_type(plist_file.c_str()) == F_PLAYLIST) go_to_playlist(plist_file.c_str(), true);
     }
 
     void do_resize() {
@@ -1284,7 +1284,7 @@ private:
 
     void make_theme_menu() {
         iface_switch_to_theme_menu();
-        if (add_themes_to_menu(create_file_name("themes"), SYSTEM_THEMES_DIR) == 0) {
+        if (add_themes_to_menu(create_file_name("themes").c_str(), SYSTEM_THEMES_DIR) == 0) {
             if (!cwd[0]) enter_first_dir();
             else iface_switch_to_dir();
             iface_error("No themes found.");
@@ -1473,16 +1473,16 @@ private:
     }
 
     void save_curr_dir() {
-        FILE *dir_file = fopen(create_file_name("last_directory"), "w");
+        FILE *dir_file = fopen(create_file_name("last_directory").c_str(), "w");
         if (!dir_file) return;
         fprintf(dir_file, "%s", cwd);
         fclose(dir_file);
     }
 
     void save_playlist_in_moc() {
-        char *plist_file = create_file_name(PLAYLIST_FILE);
-        if (plist_count(&playlist) && options_get_bool("SavePlaylist")) save_playlist(plist_file);
-        else unlink(plist_file);
+        std::string plist_file = create_file_name(PLAYLIST_FILE);
+        if (plist_count(&playlist) && options_get_bool("SavePlaylist")) save_playlist(plist_file.c_str());
+        else unlink(plist_file.c_str());
     }
 
 public:

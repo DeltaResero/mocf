@@ -159,9 +159,9 @@ static int sample_rate, equ_active, equ_channels;
 static float mixin_rate, r_mixin_rate;
 static float preamp, preampf;
 
-static char *eqsetdir;
+static std::string eqsetdir;
 
-static char *config_preset_name;
+static std::string config_preset_name;
 
 /* public functions */
 int equalizer_is_active() { return equ_active ? 1 : 0; }
@@ -351,11 +351,9 @@ static void equalizer_read_config()
   char *curloc = xstrdup(setlocale(LC_NUMERIC, nullptr));
   setlocale(LC_NUMERIC, "C"); // posix decimal point
 
-  char *sfile = xstrdup(create_file_name("equalizer"));
+  std::string sfile = create_file_name("equalizer");
 
-  FILE *cf = fopen(sfile, "r");
-
-  free(sfile);
+  FILE *cf = fopen(sfile.c_str(), "r");
 
   if (cf == nullptr)
   {
@@ -410,11 +408,7 @@ static void equalizer_read_config()
         /* ignore too large strings... */
         if (strlen(presetbuf) < 127)
         {
-          if (config_preset_name)
-          {
-            free(config_preset_name);
-          }
-          config_preset_name = xstrdup(presetbuf);
+          config_preset_name = presetbuf;
         }
       }
     }
@@ -435,9 +429,9 @@ static void equalizer_write_config()
   char *curloc = xstrdup(setlocale(LC_NUMERIC, nullptr));
   setlocale(LC_NUMERIC, "C"); /* posix decimal point */
 
-  char *cfname = create_file_name(EQUALIZER_SAVE_FILE);
+  std::string cfname = create_file_name(EQUALIZER_SAVE_FILE);
 
-  FILE *cf = fopen(cfname, "w");
+  FILE *cf = fopen(cfname.c_str(), "w");
 
   if (cf == nullptr)
   {
@@ -483,9 +477,9 @@ void equalizer_init()
 
   preampf = powf(10.0f, preamp / 20.0f);
 
-  eqsetdir = xstrdup(create_file_name("eqsets"));
+  eqsetdir = create_file_name("eqsets");
 
-  config_preset_name = nullptr;
+  config_preset_name.clear();
 
   mixin_rate = 0.25f;
 
@@ -523,9 +517,9 @@ void equalizer_refresh()
   }
   else
   {
-    if (config_preset_name)
+    if (!config_preset_name.empty())
     {
-      current_set_name = xstrdup(config_preset_name);
+      current_set_name = xstrdup(config_preset_name.c_str());
     }
   }
 
@@ -533,7 +527,7 @@ void equalizer_refresh()
 
   current_equ = nullptr;
 
-  DIR *d = opendir(eqsetdir);
+  DIR *d = opendir(eqsetdir.c_str());
 
   if (!d)
   {
@@ -551,13 +545,13 @@ void equalizer_refresh()
   {
     snprintf(buf, sizeof(buf), "eqsets/%s", de->d_name);
 
-    char *filename = xstrdup(create_file_name(buf));
+    std::string filename = create_file_name(buf);
 
-    stat(filename, &st);
+    stat(filename.c_str(), &st);
 
     if (S_ISREG(st.st_mode))
     {
-      FILE *f = fopen(filename, "r");
+      FILE *f = fopen(filename.c_str(), "r");
 
       if (f)
       {
@@ -616,19 +610,19 @@ void equalizer_refresh()
             case 0:
               logit("This should not happen: No error but no EQSET was parsed: "
                     "%s",
-                    filename);
+                    filename.c_str());
               break;
             case -1:
-              logit("Not an EQSET (empty file): %s", filename);
+              logit("Not an EQSET (empty file): %s", filename.c_str());
               break;
             case -2:
-              logit("Not an EQSET (invalid header): %s", filename);
+              logit("Not an EQSET (invalid header): %s", filename.c_str());
               break;
             case -3:
-              logit("Error while parsing settings from EQSET: %s", filename);
+              logit("Error while parsing settings from EQSET: %s", filename.c_str());
               break;
             default:
-              logit("Unknown error while parsing EQSET: %s", filename);
+              logit("Unknown error while parsing EQSET: %s", filename.c_str());
               break;
           }
         }
@@ -641,8 +635,6 @@ void equalizer_refresh()
         eqs = nullptr;
       }
     }
-
-    free(filename);
 
     de = readdir(d);
   }

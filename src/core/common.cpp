@@ -22,6 +22,7 @@
 #include <strings.h>
 #include <cctype>
 #include <cassert>
+#include <optional>
 #include <unistd.h>
 #include <ctime>
 #include <sys/types.h>
@@ -230,71 +231,40 @@ void xsignal(int signum, void (*func)(int))
   }
 }
 
-char *str_repl(char *target, const char *oldstr, const char *newstr)
-{
-  size_t oldstr_len = strlen(oldstr);
-  size_t newstr_len = strlen(newstr);
-  size_t target_len = strlen(target);
-  size_t target_max = target_len;
-  size_t s, p;
-  char *needle;
-
-  for (s = 0; (needle = strstr(target + s, oldstr)) != nullptr; s = p + newstr_len)
-  {
-    target_len += newstr_len - oldstr_len;
-    p = needle - target;
-    if (target_len + 1 > target_max)
-    {
-      target_max = MAX(target_len + 1, target_max * 2);
-      target = static_cast<char *>(xrealloc(target, target_max));
-    }
-    memmove(target + p + newstr_len, target + p + oldstr_len,
-            target_len - p - newstr_len + 1);
-    memcpy(target + p, newstr, newstr_len);
-  }
-
-  target = static_cast<char *>(xrealloc(target, target_len + 1));
-
-  return target;
-}
+/* str_repl removed — had no call sites outside this translation unit. */
 
 /* Extract a substring starting at 'src' for length 'len' and remove
- * any leading and trailing whitespace.  Return NULL if unable.  */
-char *trim(const char *src, size_t len)
+ * any leading and trailing whitespace.  Return nullopt if unable.  */
+std::optional<std::string> trim(const char *src, size_t len)
 {
   const char *first, *last;
 
   for (last = &src[len - 1]; last >= src; last -= 1)
   {
-    if (!isspace(*last))
+    if (!isspace(static_cast<unsigned char>(*last)))
     {
       break;
     }
   }
   if (last < src)
   {
-    return nullptr;
+    return std::nullopt;
   }
 
   for (first = src; first <= last; first += 1)
   {
-    if (!isspace(*first))
+    if (!isspace(static_cast<unsigned char>(*first)))
     {
       break;
     }
   }
   if (first > last)
   {
-    return nullptr;
+    return std::nullopt;
   }
 
   last += 1;
-  size_t result_len = static_cast<size_t>(last - first);
-  char *result = static_cast<char *>(xmalloc(result_len + 1));
-  memcpy(result, first, result_len);
-  result[result_len] = '\0';
-
-  return result;
+  return std::string(first, static_cast<size_t>(last - first));
 }
 
 /* Format argument values according to 'format' and return it as a std::string. */
@@ -350,21 +320,18 @@ bool is_valid_symbol(const char *candidate)
   return result;
 }
 
-/* Return path to a file in MOC config directory. NOT THREAD SAFE */
-char *create_file_name(const char *file)
+/* Return path to a file in MOC config directory. */
+std::string create_file_name(const char *file)
 {
-  int rc;
-  static char fname[PATH_MAX];
   const char *moc_dir = options_get_str("MOCDir");
+  std::string result = std::string(moc_dir) + "/" + file;
 
-  rc = snprintf(fname, sizeof(fname), "%s/%s", moc_dir, file);
-
-  if (rc >= ssizeof(fname))
+  if (result.size() >= PATH_MAX)
   {
     fatal("Path too long!");
   }
 
-  return fname;
+  return result;
 }
 
 int get_realtime(struct timespec *ts)

@@ -392,7 +392,7 @@ void server_init(struct engine_event_queue *eq)
 
   audio_initialize();
   tags_cache = tags_cache_new(options_get_int("TagsCacheSize"));
-  tags_cache_load(tags_cache, create_file_name("cache"));
+  tags_cache_load(tags_cache, create_file_name("cache").c_str());
 
   server_tid = pthread_self();
   xsignal(SIGTERM, sig_exit);

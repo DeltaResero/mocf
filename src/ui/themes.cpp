@@ -345,7 +345,7 @@ static char *find_theme_file(const char *name)
   }
 
   /* Try the user directory */
-  rc = snprintf(path, sizeof(path), "%s/%s", create_file_name("themes"), name);
+  rc = snprintf(path, sizeof(path), "%s/%s", create_file_name("themes").c_str(), name);
   if (rc >= ssizeof(path))
   {
     interface_fatal("Theme path too long!");

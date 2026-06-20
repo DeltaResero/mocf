@@ -136,9 +136,9 @@ static void mix_mono_float(float *buf, int channels, size_t samples);
 
 static void softmixer_read_config()
 {
-  char *cfname = create_file_name(SOFTMIXER_SAVE_FILE);
+  std::string cfname = create_file_name(SOFTMIXER_SAVE_FILE);
 
-  FILE *cf = fopen(cfname, "r");
+  FILE *cf = fopen(cfname.c_str(), "r");
 
   if (cf == nullptr)
   {
@@ -221,9 +221,9 @@ static void softmixer_read_config()
 
 static void softmixer_write_config()
 {
-  char *cfname = create_file_name(SOFTMIXER_SAVE_FILE);
+  std::string cfname = create_file_name(SOFTMIXER_SAVE_FILE);
 
-  FILE *cf = fopen(cfname, "w");
+  FILE *cf = fopen(cfname.c_str(), "w");
 
   if (cf == nullptr)
   {

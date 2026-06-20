@@ -607,7 +607,7 @@ static char *find_keymap_file()
       /* Absolute path */
       return pathstrcpy(path, file);
     }
-    return pathstrcpy(path, create_file_name(file));
+    return pathstrcpy(path, create_file_name(file).c_str());
   }
 
   return nullptr;

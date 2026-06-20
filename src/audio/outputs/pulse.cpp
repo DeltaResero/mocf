@@ -100,8 +100,8 @@ static void flush_callback(pa_stream *s, int success, void *userdata);
  * exist yet (first run). */
 static void pulse_load_volume()
 {
-  char *cfname = create_file_name(PULSE_VOLUME_SAVE_FILE);
-  FILE *cf = fopen(cfname, "r");
+  std::string cfname = create_file_name(PULSE_VOLUME_SAVE_FILE);
+  FILE *cf = fopen(cfname.c_str(), "r");
 
   if (!cf)
   {
@@ -121,8 +121,8 @@ static void pulse_load_volume()
 /* Save stream_volume to disk so it survives across sessions. */
 static void pulse_save_volume()
 {
-  char *cfname = create_file_name(PULSE_VOLUME_SAVE_FILE);
-  FILE *cf = fopen(cfname, "w");
+  std::string cfname = create_file_name(PULSE_VOLUME_SAVE_FILE);
+  FILE *cf = fopen(cfname.c_str(), "w");
 
   if (!cf)
   {

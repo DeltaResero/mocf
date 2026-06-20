@@ -295,11 +295,8 @@ extern "C" void sidplayfp_info(const char *file_name, struct file_tags *info,
         if (ti->numberOfInfoStrings() > idx
                 && ti->infoString(idx)
                 && ti->infoString(idx)[0]) {
-            char *tmp = trim(ti->infoString(idx),
-                             strlen(ti->infoString(idx)));
-            if (tmp) {
-                *dst = tmp;
-                free(tmp);
+            if (auto tmp = trim(ti->infoString(idx), strlen(ti->infoString(idx)))) {
+                *dst = std::move(*tmp);
                 info->filled |= flag;
             }
         }

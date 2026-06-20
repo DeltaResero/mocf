@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <cstdarg>
 #include <climits>
+#include <optional>
 #include <string>
 
 #include "core/compat.h"
@@ -148,10 +149,7 @@ extern "C"
                       const char *format, ...) ATTR_PRINTF(4, 5);
   void internal_fatal(const char *file, int line, const char *function,
                       const char *format, ...) ATTR_NORETURN ATTR_PRINTF(4, 5);
-  char *str_repl(char *target, const char *oldstr, const char *newstr);
-  char *trim(const char *src, size_t len);
   bool is_valid_symbol(const char *candidate);
-  char *create_file_name(const char *file);
   int get_realtime(struct timespec *ts);
   void sec_to_min(char *buff, const int seconds);
   const char *get_home();
@@ -163,6 +161,8 @@ extern "C"
 #endif
 
 std::string xstrerror(int errnum);
+std::string create_file_name(const char *file);
+std::optional<std::string> trim(const char *src, size_t len);
 std::string format_msg(const char *format, ...) ATTR_PRINTF(1, 2);
 std::string format_msg_va(const char *format, va_list va);
 
