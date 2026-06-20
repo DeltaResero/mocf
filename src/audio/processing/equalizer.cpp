@@ -365,19 +365,18 @@ static void equalizer_read_config()
     return;
   }
 
-  char *linebuffer = nullptr;
   char presetbuf[128];
   presetbuf[0] = 0;
 
   int tmp;
   float ftmp;
 
-  while ((linebuffer = read_line(cf)))
+  while (auto linebuffer = read_line(cf))
   {
-    if (strncasecmp(linebuffer, EQUALIZER_CFG_ACTIVE,
+    if (strncasecmp(linebuffer->c_str(), EQUALIZER_CFG_ACTIVE,
                     strlen(EQUALIZER_CFG_ACTIVE)) == 0)
     {
-      if (sscanf(linebuffer, "%*s %i", &tmp) > 0)
+      if (sscanf(linebuffer->c_str(), "%*s %i", &tmp) > 0)
       {
         if (tmp > 0)
         {
@@ -389,10 +388,10 @@ static void equalizer_read_config()
         }
       }
     }
-    if (strncasecmp(linebuffer, EQUALIZER_CFG_MIXIN,
+    if (strncasecmp(linebuffer->c_str(), EQUALIZER_CFG_MIXIN,
                     strlen(EQUALIZER_CFG_MIXIN)) == 0)
     {
-      if (sscanf(linebuffer, "%*s %f", &ftmp) > 0)
+      if (sscanf(linebuffer->c_str(), "%*s %f", &ftmp) > 0)
       {
         if (RANGE(0.0f, ftmp, 1.0f))
         {
@@ -400,10 +399,10 @@ static void equalizer_read_config()
         }
       }
     }
-    if (strncasecmp(linebuffer, EQUALIZER_CFG_PRESET,
+    if (strncasecmp(linebuffer->c_str(), EQUALIZER_CFG_PRESET,
                     strlen(EQUALIZER_CFG_PRESET)) == 0)
     {
-      if (sscanf(linebuffer, "%*s %127s", presetbuf) > 0)
+      if (sscanf(linebuffer->c_str(), "%*s %127s", presetbuf) > 0)
       {
         /* ignore too large strings... */
         if (strlen(presetbuf) < 127)
@@ -412,7 +411,6 @@ static void equalizer_read_config()
         }
       }
     }
-    free(linebuffer);
   }
 
   fclose(cf);

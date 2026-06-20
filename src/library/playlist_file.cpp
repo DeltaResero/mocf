@@ -85,7 +85,6 @@ static int plist_load_m3u(struct plist *plist, const char *fname,
                           const char *cwd)
 {
   FILE *file;
-  char *line = nullptr;
   int last_added = -1;
   int after_extinf = 0;
   int added = 0;
@@ -104,9 +103,10 @@ static int plist_load_m3u(struct plist *plist, const char *fname,
     log_errno("Can't lock the playlist file", errno);
   }
 
-  while ((line = read_line(file)))
+  while (auto line_opt = read_line(file))
   {
-    if (!strncmp(line, "#EXTINF:", sizeof("#EXTINF:") - 1))
+    std::string line = std::move(*line_opt);
+    if (!strncmp(line.c_str(), "#EXTINF:", sizeof("#EXTINF:") - 1))
     {
       if (!options_get_bool("SavePlaylistTags"))
       {
@@ -125,7 +125,7 @@ static int plist_load_m3u(struct plist *plist, const char *fname,
       }
 
       /* Find the comma */
-      comma = strchr(line + (sizeof("#EXTINF:") - 1), ',');
+      comma = strchr(line.data() + (sizeof("#EXTINF:") - 1), ',');
       if (!comma)
       {
         error("Broken M3U file: no comma in #EXTINF!");
@@ -134,8 +134,8 @@ static int plist_load_m3u(struct plist *plist, const char *fname,
 
       /* Get the time string */
       time_text[sizeof(time_text) - 1] = 0;
-      strncpy(time_text, line + sizeof("#EXTINF:") - 1,
-              MIN(comma - line - (sizeof("#EXTINF:") - 1), sizeof(time_text)));
+      strncpy(time_text, line.data() + sizeof("#EXTINF:") - 1,
+              MIN(comma - line.data() - (sizeof("#EXTINF:") - 1), sizeof(time_text)));
       if (time_text[sizeof(time_text) - 1])
       {
         error("Broken M3U file: wrong time!");
@@ -163,10 +163,10 @@ static int plist_load_m3u(struct plist *plist, const char *fname,
     {
       char path[2 * PATH_MAX];
 
-      strip_string(line);
-      if (strlen(line) <= PATH_MAX)
+      strip_string(line.data());
+      if (line.size() <= PATH_MAX)
       {
-        make_path(path, sizeof(path), cwd, line);
+        make_path(path, sizeof(path), cwd, line.data());
 
         if (plist_find_fname(plist, path) == -1)
         {
@@ -192,11 +192,9 @@ static int plist_load_m3u(struct plist *plist, const char *fname,
 
       after_extinf = 0;
     }
-    free(line);
   }
 
 err:
-  free(line);
   fclose(file);
   return added;
 }
@@ -221,7 +219,6 @@ static int is_blank_line(const char *l)
  * if not present or error occurred. */
 static char *read_ini_value(FILE *file, const char *section, const char *key)
 {
-  char *line = nullptr;
   int in_section = 0;
   char *value = nullptr;
   int key_len;
@@ -234,43 +231,41 @@ static char *read_ini_value(FILE *file, const char *section, const char *key)
 
   key_len = strlen(key);
 
-  while ((line = read_line(file)))
+  while (auto line_opt = read_line(file))
   {
+    std::string line = std::move(*line_opt);
     if (line[0] == '[')
     {
       if (in_section)
       {
         /* we are outside of the interesting section */
-        free(line);
         break;
       }
       else
       {
-        char *close = strchr(line, ']');
+        char *close = strchr(line.data(), ']');
 
         if (!close)
         {
           error("Parse error in the INI file");
-          free(line);
           break;
         }
 
-        if (!strncasecmp(line + 1, section, close - line - 1))
+        if (!strncasecmp(line.data() + 1, section, close - line.data() - 1))
         {
           in_section = 1;
         }
       }
     }
-    else if (in_section && line[0] != '#' && !is_blank_line(line))
+    else if (in_section && line[0] != '#' && !is_blank_line(line.c_str()))
     {
       char *t, *t2;
 
-      t2 = t = strchr(line, '=');
+      t2 = t = strchr(line.data(), '=');
 
       if (!t)
       {
         error("Parse error in the INI file");
-        free(line);
         break;
       }
 
@@ -283,11 +278,10 @@ static char *read_ini_value(FILE *file, const char *section, const char *key)
       if (t2 == t)
       {
         error("Parse error in the INI file");
-        free(line);
         break;
       }
 
-      if (!strncasecmp(line, key, MAX(t2 - line + 1, key_len)))
+      if (!strncasecmp(line.data(), key, MAX(t2 - line.data() + 1, key_len)))
       {
         value = t + 1;
 
@@ -303,7 +297,6 @@ static char *read_ini_value(FILE *file, const char *section, const char *key)
           if (!q)
           {
             error("Parse error in the INI file");
-            free(line);
             break;
           }
 
@@ -311,12 +304,10 @@ static char *read_ini_value(FILE *file, const char *section, const char *key)
         }
 
         value = xstrdup(value);
-        free(line);
         break;
       }
     }
 
-    free(line);
   }
 
   return value;

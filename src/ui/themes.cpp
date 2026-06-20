@@ -670,7 +670,6 @@ static int parse_theme_line(const int line_num, char *line,
 static int load_color_theme(const char *name, const int errors_are_fatal)
 {
   FILE *file;
-  char *line;
   int result = 1;
   int line_num = 0;
   char *theme_file = find_theme_file(name);
@@ -684,11 +683,13 @@ static int load_color_theme(const char *name, const int errors_are_fatal)
     return 0;
   }
 
-  while (result && (line = read_line(file)))
+  while (result)
   {
+    auto line = read_line(file);
+    if (!line)
+      break;
     line_num++;
-    result = parse_theme_line(line_num, line, errors_are_fatal);
-    free(line);
+    result = parse_theme_line(line_num, line->data(), errors_are_fatal);
   }
 
   fclose(file);

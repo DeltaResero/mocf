@@ -761,7 +761,6 @@ static size_t find_command_name(const char *command)
 static void load_key_map(const char *file_name)
 {
   FILE *file;
-  char *line;
   int line_num = 0;
   size_t cmd_ix;
 
@@ -773,15 +772,15 @@ static void load_key_map(const char *file_name)
   /* Read lines in format:
    * COMMAND = KEY [KEY ...]
    * Blank lines and beginning with # are ignored, see example_keymap. */
-  while ((line = read_line(file)))
+  while (auto line_opt = read_line(file))
   {
+    std::string line = std::move(*line_opt);
     char *command, *tmp, *key;
 
     line_num++;
-    if (line[0] == '#' || !(command = strtok(line, " \t")))
+    if (line[0] == '#' || !(command = strtok(line.data(), " \t")))
     {
       /* empty line or a comment */
-      free(line);
       continue;
     }
 
@@ -810,8 +809,6 @@ static void load_key_map(const char *file_name)
     {
       add_key(line_num, cmd_ix, key);
     }
-
-    free(line);
   }
 
   fclose(file);

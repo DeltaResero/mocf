@@ -13,6 +13,7 @@
 
 #include <cstdio>
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -30,7 +31,7 @@
   char *ext_pos(const char *file);
   enum file_type file_type(const char *file);
   char *file_mime_type(const char *file);
-  char *read_line(FILE *file);
+  std::optional<std::string> read_line(FILE *file);
   char *find_match_dir(char *dir);
   int file_exists(const char *file);
   time_t get_mtime(const char *file);

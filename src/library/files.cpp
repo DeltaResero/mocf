@@ -18,6 +18,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <optional>
 #include <dirent.h>
 #include <string>
 #include <vector>
@@ -598,46 +599,34 @@ char *ext_pos(const char *file)
   return const_cast<char *>(ext);
 }
 
-/* Read one line from a file, strip trailing end of line chars.
- * Returned memory is malloc()ed.  Return nullptr on error or EOF. */
-char *read_line(FILE *file)
+/* Read one line from a file, stripping the trailing newline.
+ * Returns nullopt on EOF or error with no data read. */
+std::optional<std::string> read_line(FILE *file)
 {
-  int line_alloc = READ_LINE_INIT_SIZE;
-  int len = 0;
-  char *line = static_cast<char *>(xmalloc(sizeof(char) * line_alloc));
+  std::string line;
+  char buf[READ_LINE_INIT_SIZE];
+  bool got_data = false;
 
-  while (true)
+  while (fgets(buf, sizeof(buf), file) != nullptr)
   {
-    if (!fgets(line + len, line_alloc - len, file))
+    got_data = true;
+    size_t chunk = strlen(buf);
+
+    if (chunk > 0 && buf[chunk - 1] == '\n')
     {
+      line.append(buf, chunk - 1);  /* append without the newline */
       break;
     }
-    len = strlen(line);
 
-    if (line[len - 1] == '\n')
-    {
-      break;
-    }
-
-    /* If we are here, it means that line is longer than the buffer. */
-    line_alloc *= 2;
-    line = static_cast<char *>(xrealloc(line, sizeof(char) * line_alloc));
+    line.append(buf, chunk);
   }
 
-  if (len == 0)
-  {
-    free(line);
-    return nullptr;
-  }
+  if (!got_data)
+    return std::nullopt;
 
-  if (line[len - 1] == '\n')
-  {
-    line[--len] = 0;
-  }
-  if (len > 0 && line[len - 1] == '\r')
-  {
-    line[--len] = 0;
-  }
+  /* strip Windows-style trailing \r if present */
+  if (!line.empty() && line.back() == '\r')
+    line.pop_back();
 
   return line;
 }

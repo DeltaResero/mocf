@@ -146,16 +146,14 @@ static void softmixer_read_config()
     return;
   }
 
-  char *linebuffer = nullptr;
-
   int tmp;
 
-  while ((linebuffer = read_line(cf)))
+  while (auto linebuffer = read_line(cf))
   {
-    if (strncasecmp(linebuffer, SOFTMIXER_CFG_ACTIVE,
+    if (strncasecmp(linebuffer->c_str(), SOFTMIXER_CFG_ACTIVE,
                     sizeof(SOFTMIXER_CFG_ACTIVE) - 1) == 0)
     {
-      if (sscanf(linebuffer + sizeof(SOFTMIXER_CFG_ACTIVE) - 1, " %i", &tmp) == 1)
+      if (sscanf(linebuffer->c_str() + sizeof(SOFTMIXER_CFG_ACTIVE) - 1, " %i", &tmp) == 1)
       {
         if (tmp > 0)
         {
@@ -167,10 +165,10 @@ static void softmixer_read_config()
         }
       }
     }
-    if (strncasecmp(linebuffer, SOFTMIXER_CFG_AMP, sizeof(SOFTMIXER_CFG_AMP) - 1) ==
+    if (strncasecmp(linebuffer->c_str(), SOFTMIXER_CFG_AMP, sizeof(SOFTMIXER_CFG_AMP) - 1) ==
         0)
     {
-      if (sscanf(linebuffer + sizeof(SOFTMIXER_CFG_AMP) - 1, " %i", &tmp) == 1)
+      if (sscanf(linebuffer->c_str() + sizeof(SOFTMIXER_CFG_AMP) - 1, " %i", &tmp) == 1)
       {
         if (RANGE(SOFTMIXER_MIN, tmp, SOFTMIXER_MAX))
         {
@@ -182,10 +180,10 @@ static void softmixer_read_config()
         }
       }
     }
-    if (strncasecmp(linebuffer, SOFTMIXER_CFG_VALUE,
+    if (strncasecmp(linebuffer->c_str(), SOFTMIXER_CFG_VALUE,
                     sizeof(SOFTMIXER_CFG_VALUE) - 1) == 0)
     {
-      if (sscanf(linebuffer + sizeof(SOFTMIXER_CFG_VALUE) - 1, " %i", &tmp) == 1)
+      if (sscanf(linebuffer->c_str() + sizeof(SOFTMIXER_CFG_VALUE) - 1, " %i", &tmp) == 1)
       {
         if (RANGE(0, tmp, 100))
         {
@@ -197,10 +195,10 @@ static void softmixer_read_config()
         }
       }
     }
-    if (strncasecmp(linebuffer, SOFTMIXER_CFG_MONO,
+    if (strncasecmp(linebuffer->c_str(), SOFTMIXER_CFG_MONO,
                     sizeof(SOFTMIXER_CFG_MONO) - 1) == 0)
     {
-      if (sscanf(linebuffer + sizeof(SOFTMIXER_CFG_MONO) - 1, " %i", &tmp) == 1)
+      if (sscanf(linebuffer->c_str() + sizeof(SOFTMIXER_CFG_MONO) - 1, " %i", &tmp) == 1)
       {
         if (tmp > 0)
         {
@@ -213,7 +211,6 @@ static void softmixer_read_config()
       }
     }
 
-    free(linebuffer);
   }
 
   fclose(cf);
