@@ -13,13 +13,13 @@
 
 #include "core/protocol.h"
 #include "library/playlist.h"
-
+#include <queue>
 
   /* -----------------------------------------------------------------------
    * Engine event queue — thread-safe push (engine threads) / drain (UI thread)
    * The UI thread watches engine_event_queue_fd() in its pselect() and calls
    * engine_event_queue_flush() when it fires to move pending events into its
-   * own local event_queue for processing.
+   * own local std::queue for processing.
    * ----------------------------------------------------------------------- */
   struct engine_event_queue; /* opaque */
 
@@ -29,16 +29,16 @@
   /* File descriptor the UI thread should add to its select/pselect fd_set. */
   int  engine_event_queue_fd(const struct engine_event_queue *eq);
 
-  /* Drain all pending events from the engine queue into *dest and consume any
+  /* Drain all pending events from the engine queue into dest and consume any
    * pending wakeup bytes from the pipe.  Non-blocking — call after pselect. */
   void engine_event_queue_flush(struct engine_event_queue *eq,
-                                struct event_queue *dest);
+                                std::queue<Event> &dest);
 
   /* Blocking variant: block until at least one event is available, then drain.
    * Used by the UI in contexts that must wait for a specific event
    * (e.g. fill_tags). */
   void engine_event_queue_wait_flush(struct engine_event_queue *eq,
-                                     struct event_queue *dest);
+                                     std::queue<Event> &dest);
 
   /* -----------------------------------------------------------------------
    * Engine lifecycle

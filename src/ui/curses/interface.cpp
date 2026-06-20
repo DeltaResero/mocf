@@ -186,7 +186,7 @@ private:
     plist playlist;
     plist queue;
     plist dir_plist;
-    event_queue events;
+    std::queue<Event> events;
     char cwd[PATH_MAX] = "";
     bool playlist_dirty = false;
     plist *engine_plist = nullptr;
@@ -200,11 +200,11 @@ private:
 #endif
 
     void drain_engine_events() {
-        engine_event_queue_flush(g_engine_eq, &events);
+        engine_event_queue_flush(g_engine_eq, events);
     }
 
     void wait_and_drain_engine_events() {
-        engine_event_queue_wait_flush(g_engine_eq, &events);
+        engine_event_queue_wait_flush(g_engine_eq, events);
     }
 
     int send_tags_request(const char *file, const int tags_sel) {
@@ -529,18 +529,18 @@ private:
         while (files && !user_wants_interrupt()) {
             int type;
             void *data;
-            if (!no_iface && !event_queue_empty(&events)) {
-                struct event e = *event_get_first(&events);
+            if (!no_iface && !events.empty()) {
+                Event e = events.front();
                 type = e.type;
                 data = e.data;
-                event_pop(&events);
+                events.pop();
             } else {
                 wait_and_drain_engine_events();
-                if (event_queue_empty(&events)) continue;
-                struct event e = *event_get_first(&events);
+                if (events.empty()) continue;
+                Event e = events.front();
                 type = e.type;
                 data = e.data;
-                event_pop(&events);
+                events.pop();
             }
 
             if (type == EV_FILE_TAGS) {
@@ -1461,10 +1461,10 @@ private:
     }
 
     void dequeue_events() {
-        struct event *e;
-        while ((e = event_get_first(&events))) {
-            server_event(e->type, e->data);
-            event_pop(&events);
+        while (!events.empty()) {
+            Event e = events.front();
+            events.pop();
+            server_event(e.type, e.data);
         }
     }
 
@@ -1500,7 +1500,6 @@ public:
         plist_init(&dir_plist);
         plist_init(&playlist);
         plist_init(&queue);
-        event_queue_init(&events);
         keys_init();
         windows_init();
         get_engine_options();
@@ -1615,7 +1614,10 @@ public:
         plist_free(&playlist);
         plist_free(&queue);
 
-        event_queue_free(&events);
+        while (!events.empty()) {
+            free_event_data(events.front().type, events.front().data);
+            events.pop();
+        }
         log_close();
     }
 

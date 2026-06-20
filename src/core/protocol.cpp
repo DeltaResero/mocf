@@ -26,68 +26,6 @@
 #include "core/protocol.h"
 #include "library/playlist.h"
 
-/* -----------------------------------------------------------------------
- * event_queue
- * ----------------------------------------------------------------------- */
-
-void event_queue_init(struct event_queue *q)
-{
-  assert(q != nullptr);
-  q->head = nullptr;
-  q->tail = nullptr;
-}
-
-/* Push an event onto the tail of the queue. */
-void event_push(struct event_queue *q, const int event, void *data)
-{
-  assert(q != nullptr);
-
-  struct event *e = new struct event;
-  e->next = nullptr;
-  e->type = event;
-  e->data = data;
-
-  if (!q->head)
-  {
-    q->head = e;
-    q->tail = e;
-  }
-  else
-  {
-    assert(q->tail != nullptr);
-    assert(q->tail->next == nullptr);
-    q->tail->next = e;
-    q->tail       = e;
-  }
-}
-
-/* Remove the first event from the queue (does NOT free data). */
-void event_pop(struct event_queue *q)
-{
-  struct event *e;
-
-  assert(q != nullptr);
-  assert(q->head != nullptr);
-  assert(q->tail != nullptr);
-
-  e = q->head;
-  q->head = e->next;
-  if (q->tail == e)
-    q->tail = nullptr;
-  delete e;
-}
-
-struct event *event_get_first(struct event_queue *q)
-{
-  assert(q != nullptr);
-  return q->head;
-}
-
-int event_queue_empty(const struct event_queue *q)
-{
-  assert(q != nullptr);
-  return q->head == nullptr ? 1 : 0;
-}
 
 /* Free data associated with an event. */
 void free_event_data(const int type, void *data)
@@ -122,20 +60,6 @@ void free_event_data(const int type, void *data)
   else
   {
     abort(); /* BUG: unknown event type with non-nullptr data */
-  }
-}
-
-/* Free all events in the queue (including their data). */
-void event_queue_free(struct event_queue *q)
-{
-  struct event *e;
-
-  assert(q != nullptr);
-
-  while ((e = event_get_first(q)))
-  {
-    free_event_data(e->type, e->data);
-    event_pop(q);
   }
 }
 

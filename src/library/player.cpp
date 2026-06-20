@@ -23,6 +23,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
+#include <map>
 
 #define DEBUG
 
@@ -50,22 +51,6 @@ enum request
   REQ_UNPAUSE
 };
 
-struct bitrate_list_node
-{
-  struct bitrate_list_node *next;
-  int time;
-  int bitrate;
-};
-
-/* List of points where bitrate has changed. We use it to show bitrate at the
- * right time when playing, because the output buffer may be big and decoding
- * may be many seconds ahead of what the user can hear. */
-struct bitrate_list
-{
-  struct bitrate_list_node *head;
-  struct bitrate_list_node *tail;
-  std::mutex mtx;
-};
 
 struct md5_data
 {
@@ -85,7 +70,7 @@ struct precache
   std::unique_ptr<AudioDecoder> decoder_data;
   int running;   /* if the precache thread is running */
   std::thread tid; /* tid of the precache thread */
-  struct bitrate_list bitrate_list;
+  std::map<int, int> bitrate_list;
   int decoded_time; /* how much sound we decoded in seconds */
 };
 
@@ -114,111 +99,49 @@ static std::mutex curr_tags_mtx;
 static struct io_stream *decoder_stream = nullptr;
 static std::mutex decoder_stream_mtx;
 
-static struct bitrate_list bitrate_list;
+static std::map<int, int> bitrate_list;
+static std::mutex bitrate_list_mtx;
 
-static void bitrate_list_init(struct bitrate_list *b)
+static void bitrate_list_add(std::map<int, int>& b, std::mutex* mtx, const int time, const int bitrate)
 {
-  assert(b != nullptr);
-
-  b->head = nullptr;
-  b->tail = nullptr;
-}
-
-static void bitrate_list_empty(struct bitrate_list *b)
-{
-  assert(b != nullptr);
-
-  std::lock_guard<std::mutex> lock(b->mtx);
-  if (b->head)
+  if (mtx) mtx->lock();
+  if (b.empty() || b.rbegin()->second != bitrate)
   {
-    while (b->head)
-    {
-      struct bitrate_list_node *t = b->head->next;
-
-      delete b->head;
-      b->head = t;
-    }
-
-    b->tail = nullptr;
-  }
-
-  debug("Bitrate list elements removed.");
-}
-
-static void bitrate_list_destroy(struct bitrate_list *b)
-{
-  assert(b != nullptr);
-
-  bitrate_list_empty(b);
-}
-
-static void bitrate_list_add(struct bitrate_list *b, const int time,
-                             const int bitrate)
-{
-  assert(b != nullptr);
-
-  std::lock_guard<std::mutex> lock(b->mtx);
-  if (!b->tail)
-  {
-    b->head = b->tail = new bitrate_list_node;
-    b->tail->next = nullptr;
-    b->tail->time = time;
-    b->tail->bitrate = bitrate;
-
+    b[time] = bitrate;
     debug("Adding bitrate %d at time %d", bitrate, time);
-  }
-  else if (b->tail->bitrate != bitrate && b->tail->time != time)
-  {
-    assert(b->tail->time < time);
-
-    b->tail->next = new bitrate_list_node;
-    b->tail = b->tail->next;
-    b->tail->next = nullptr;
-    b->tail->time = time;
-    b->tail->bitrate = bitrate;
-
-    debug("Appending bitrate %d at time %d", bitrate, time);
-  }
-  else if (b->tail->bitrate == bitrate)
-  {
-    debug("Not adding bitrate %d at time %d because the bitrate"
-          " hasn't changed",
-          bitrate, time);
   }
   else
   {
-    debug("Not adding bitrate %d at time %d because it is for"
-          " the same time as the last bitrate",
-          bitrate, time);
+    debug("Not adding bitrate %d at time %d because the bitrate hasn't changed", bitrate, time);
   }
+  if (mtx) mtx->unlock();
 }
 
-static int bitrate_list_get(struct bitrate_list *b, const int time)
+static int bitrate_list_get(std::map<int, int>& b, std::mutex* mtx, const int time)
 {
   int bitrate = -1;
 
-  assert(b != nullptr);
-
-  std::lock_guard<std::mutex> lock(b->mtx);
-  if (b->head)
+  if (mtx) mtx->lock();
+  if (!b.empty())
   {
-    while (b->head->next && b->head->next->time <= time)
+    auto it = b.upper_bound(time);
+    if (it != b.begin())
     {
-      struct bitrate_list_node *o = b->head;
-
-      b->head = o->next;
-      debug("Removing old bitrate %d for time %d", o->bitrate, o->time);
-      delete o;
+      --it;
+      bitrate = it->second;
+      b.erase(b.begin(), it);
+      debug("Getting bitrate for time %d (%d)", time, bitrate);
     }
-
-    bitrate = b->head->bitrate /*b->head->time + 1000*/;
-    debug("Getting bitrate for time %d (%d)", time, bitrate);
+    else
+    {
+      debug("Getting bitrate for time %d (no bitrate information yet)", time);
+    }
   }
   else
   {
     debug("Getting bitrate for time %d (no bitrate information)", time);
-    bitrate = -1;
   }
+  if (mtx) mtx->unlock();
 
   return bitrate;
 }
@@ -232,7 +155,7 @@ static void update_time()
   {
     last_time = ctime;
     ctime_change();
-    set_info_bitrate(bitrate_list_get(&bitrate_list, ctime));
+    set_info_bitrate(bitrate_list_get(bitrate_list, &bitrate_list_mtx, ctime));
   }
 }
 
@@ -303,7 +226,7 @@ static void precache_thread(struct precache *precache)
       return;
     }
 
-    bitrate_list_add(&precache->bitrate_list, precache->decoded_time,
+    bitrate_list_add(precache->bitrate_list, nullptr, precache->decoded_time,
                      precache->decoder_data->get_bitrate());
 
     precache->buf_fill += decoded;
@@ -328,7 +251,7 @@ static void start_precache(struct precache *precache, const char *file)
   assert(file != nullptr);
 
   precache->file = file;
-  bitrate_list_init(&precache->bitrate_list);
+  precache->bitrate_list.clear();
   logit("Precaching file %s", file);
   precache->ok = 0;
   precache->tid = std::thread(precache_thread, precache);
@@ -363,7 +286,7 @@ static void precache_reset(struct precache *precache)
   if (!precache->file.empty())
   {
     precache->file = "";
-    bitrate_list_destroy(&precache->bitrate_list);
+    precache->bitrate_list.clear();
   }
 }
 
@@ -493,7 +416,7 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
           sound_params_change = true;
         }
 
-        bitrate_list_add(&bitrate_list, decode_time,
+        bitrate_list_add(bitrate_list, &bitrate_list_mtx, decode_time,
                          decoder_data->get_bitrate());
         update_tags(decoder_data.get(), decoder_stream);
       }
@@ -554,7 +477,10 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
         out_buf_stop(out_buf);
         out_buf_reset(out_buf);
         out_buf_time_set(out_buf, decoder_seek);
-        bitrate_list_empty(&bitrate_list);
+        {
+          std::lock_guard<std::mutex> lck(bitrate_list_mtx);
+          bitrate_list.clear();
+        }
         decode_time = decoder_seek;
         eof = false;
         decoded = 0;
@@ -610,7 +536,10 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
     decoder_data.reset();
   }
 
-  bitrate_list_destroy(&bitrate_list);
+  {
+    std::lock_guard<std::mutex> lck(bitrate_list_mtx);
+    bitrate_list.clear();
+  }
 
   {
     std::lock_guard<std::mutex> lock(curr_tags_mtx);
@@ -764,13 +693,13 @@ static void play_file(const char *file, AudioPlugin *f,
       set_info_avg_bitrate(avg != -1 ? avg : 0);
     }
 
-    bitrate_list_init(&bitrate_list);
-    bitrate_list.head = precache.bitrate_list.head;
-    bitrate_list.tail = precache.bitrate_list.tail;
+    {
+      std::lock_guard<std::mutex> lck(bitrate_list_mtx);
+      bitrate_list = std::move(precache.bitrate_list);
+    }
 
     /* don't free list elements when resetting precache */
-    precache.bitrate_list.head = nullptr;
-    precache.bitrate_list.tail = nullptr;
+    precache.bitrate_list.clear();
   }
   else
   {
@@ -794,7 +723,8 @@ static void play_file(const char *file, AudioPlugin *f,
       int avg = decoder_data->get_avg_bitrate();
       set_info_avg_bitrate(avg != -1 ? avg : 0);
     }
-    bitrate_list_init(&bitrate_list);
+    std::lock_guard<std::mutex> lck(bitrate_list_mtx);
+    bitrate_list.clear();
   }
 
   audio_plist_set_time(file, decoder_data->get_duration());

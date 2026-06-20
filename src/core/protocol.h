@@ -12,6 +12,7 @@
 #define PROTOCOL_H
 
 #include "library/playlist.h"
+#include <queue>
 
 
   /* -----------------------------------------------------------------------
@@ -19,17 +20,10 @@
    * as the storage inside struct engine_event_queue.
    * ----------------------------------------------------------------------- */
 
-  struct event
+  struct Event
   {
     int type;           /* type of the event (one of EV_*) */
     void *data;         /* optional data associated with the event */
-    struct event *next;
-  };
-
-  struct event_queue
-  {
-    struct event *head;
-    struct event *tail;
   };
 
   /* Used as data field in the event queue for EV_FILE_TAGS. */
@@ -82,15 +76,9 @@
 #define STATE_PAUSE 0x03
 
   /* -----------------------------------------------------------------------
-   * Event queue API
+   * Event data API
    * ----------------------------------------------------------------------- */
-  void event_queue_init(struct event_queue *q);
-  void event_queue_free(struct event_queue *q);
   void free_event_data(const int type, void *data);
-  struct event *event_get_first(struct event_queue *q);
-  void event_pop(struct event_queue *q);
-  void event_push(struct event_queue *q, const int event, void *data);
-  int event_queue_empty(const struct event_queue *q);
 
   struct tag_ev_response *tag_ev_data_dup(const struct tag_ev_response *d);
   void free_tag_ev_data(struct tag_ev_response *d);

@@ -25,6 +25,7 @@
 #include <condition_variable>
 #include <thread>
 #include <string>
+#include <deque>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -80,17 +81,9 @@ typedef unsigned long int u_long;
 #define DB_SYNC_COUNT 5
 
 /* Element of a requests queue. */
-struct request_queue_node
-{
-  struct request_queue_node *next;
-  std::string file; /* file that this request is for */
-  int tags_sel; /* which tags to read (TAGS_*) */
-};
-
-struct request_queue
-{
-  struct request_queue_node *head;
-  struct request_queue_node *tail;
+struct TagRequest {
+    std::string file;
+    int tags_sel;
 };
 
 struct tags_cache
@@ -103,7 +96,7 @@ struct tags_cache
 #endif
 
   int max_items; /* maximum number of items in the cache. */
-  struct request_queue queue; /* pending tag requests */
+  std::deque<TagRequest> queue; /* pending tag requests */
   int stop_reader_thread;      /* request for stopping read thread (if
                 non-zero) */
   std::condition_variable request_cond; /* condition for signalizing new
@@ -139,115 +132,6 @@ static inline char *bdb_strerror(int errnum)
 }
 #endif
 
-static void request_queue_init(struct request_queue *q)
-{
-  assert(q != nullptr);
-
-  q->head = nullptr;
-  q->tail = nullptr;
-}
-
-static void request_queue_clear(struct request_queue *q)
-{
-  assert(q != nullptr);
-
-  while (q->head)
-  {
-    struct request_queue_node *o = q->head;
-
-    q->head = q->head->next;
-
-    delete o;
-  }
-
-  q->tail = nullptr;
-}
-
-/* Remove items from the queue from the beginning to the specified file. */
-static void request_queue_clear_up_to(struct request_queue *q, const char *file)
-{
-  int stop = 0;
-
-  assert(q != nullptr);
-
-  while (q->head && !stop)
-  {
-    struct request_queue_node *o = q->head;
-
-    q->head = q->head->next;
-
-    if (o->file == file)
-    {
-      stop = 1;
-    }
-
-    delete o;
-  }
-
-  if (!q->head)
-  {
-    q->tail = nullptr;
-  }
-}
-
-static void request_queue_add(struct request_queue *q, const char *file,
-                              int tags_sel)
-{
-  assert(q != nullptr);
-
-  if (!q->head)
-  {
-    q->head = new request_queue_node;
-    q->tail = q->head;
-  }
-  else
-  {
-    assert(q->tail != nullptr);
-    assert(q->tail->next == nullptr);
-
-    q->tail->next = new request_queue_node;
-    q->tail = q->tail->next;
-  }
-
-  q->tail->file = file;
-  q->tail->tags_sel = tags_sel;
-  q->tail->next = nullptr;
-}
-
-static int request_queue_empty(const struct request_queue *q)
-{
-  assert(q != nullptr);
-
-  return q->head == nullptr;
-}
-
-/* Get the file name of the first element in the queue or an empty string if
- * the queue is empty. Put tags to be read in *tags_sel. */
-static std::string request_queue_pop(struct request_queue *q, int *tags_sel)
-{
-  struct request_queue_node *n;
-  std::string file;
-
-  assert(q != nullptr);
-
-  if (q->head == nullptr)
-  {
-    return "";
-  }
-
-  n = q->head;
-  q->head = n->next;
-  file = std::move(n->file);
-  *tags_sel = n->tags_sel;
-  delete n;
-
-  if (q->tail == n)
-  {
-    q->tail = nullptr; /* the queue is empty */
-  }
-
-  return file;
-}
 
 #ifdef HAVE_DB_H
 static char *cache_record_serialize(const struct cache_record *rec, int *len)
@@ -736,14 +620,16 @@ static void reader_thread(struct tags_cache *c)
     std::string request_file;
     int tags_sel = 0;
 
-    if (request_queue_empty(&c->queue))
+    if (c->queue.empty())
     {
       debug("Queue empty, waiting");
       c->request_cond.wait(lock);
       continue;
     }
 
-    request_file = request_queue_pop(&c->queue, &tags_sel);
+    request_file = c->queue.front().file;
+    tags_sel = c->queue.front().tags_sel;
+    c->queue.pop_front();
     lock.unlock();
 
     if (!request_file.empty())
@@ -766,7 +652,6 @@ struct tags_cache *tags_cache_new(size_t max_size)
   result->db = nullptr;
 #endif
 
-  request_queue_init(&result->queue);
 
 #if CACHE_DB_FORMAT_VERSION
   result->max_items = max_size;
@@ -819,7 +704,7 @@ void tags_cache_free(struct tags_cache *c)
 
   if (c->reader_thread.joinable()) c->reader_thread.join();
 
-  request_queue_clear(&c->queue);
+  c->queue.clear();
 
   delete c;
 }
@@ -887,7 +772,7 @@ void tags_cache_add_request(struct tags_cache *c, const char *file,
   if (!rc)
   {
     std::lock_guard<std::mutex> lock(c->mutex);
-    request_queue_add(&c->queue, file, tags_sel);
+    c->queue.push_back({file, tags_sel});
     c->request_cond.notify_one();
   }
 }
@@ -897,7 +782,7 @@ void tags_cache_clear_queue(struct tags_cache *c)
   assert(c != nullptr);
 
   std::lock_guard<std::mutex> lock(c->mutex);
-  request_queue_clear(&c->queue);
+  c->queue.clear();
   debug("Cleared tags request queue");
 }
 
@@ -910,7 +795,12 @@ void tags_cache_clear_up_to(struct tags_cache *c, const char *file)
 
   std::lock_guard<std::mutex> lock(c->mutex);
   debug("Removing requests up to file %s", file);
-  request_queue_clear_up_to(&c->queue, file);
+  while (!c->queue.empty())
+  {
+    std::string f = c->queue.front().file;
+    c->queue.pop_front();
+    if (f == file) break;
+  }
 }
 
 #if defined(HAVE_DB_H) && !defined(NDEBUG)

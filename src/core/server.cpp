@@ -31,6 +31,7 @@
 #include <condition_variable>
 #include <atomic>
 #include <chrono>
+#include <queue>
 
 #define DEBUG
 
@@ -48,12 +49,12 @@
 #include "audio/processing/equalizer.h"
 
 /* -----------------------------------------------------------------------
- * Engine event queue — thread-safe linked-list + pipe wakeup
+ * Engine event queue — thread-safe queue + pipe wakeup
  * ----------------------------------------------------------------------- */
 
 struct engine_event_queue
 {
-  struct event_queue q;
+  std::queue<Event>  q;
   std::mutex         mtx;
   int                pipe_fd[2]; /* [0] = read (UI), [1] = write (engine) */
 };
@@ -61,7 +62,6 @@ struct engine_event_queue
 struct engine_event_queue *engine_event_queue_new(void)
 {
   auto *eq = new engine_event_queue;
-  event_queue_init(&eq->q);
 
   if (pipe(eq->pipe_fd) < 0)
     fatal("pipe() failed for engine event queue: %s", xstrerror(errno).c_str());
@@ -84,7 +84,11 @@ void engine_event_queue_free(struct engine_event_queue *eq)
   if (!eq) return;
   {
     std::lock_guard<std::mutex> lock(eq->mtx);
-    event_queue_free(&eq->q);
+    while (!eq->q.empty())
+    {
+      free_event_data(eq->q.front().type, eq->q.front().data);
+      eq->q.pop();
+    }
   }
   close(eq->pipe_fd[0]);
   close(eq->pipe_fd[1]);
@@ -102,7 +106,7 @@ static void eq_push(struct engine_event_queue *eq, int type, void *data)
   char w = 1;
   {
     std::lock_guard<std::mutex> lock(eq->mtx);
-    event_push(&eq->q, type, data);
+    eq->q.push({type, data});
   }
   /* Best-effort wakeup; non-blocking pipe so this never stalls. */
   if (write(eq->pipe_fd[1], &w, 1) < 0 && errno != EAGAIN)
@@ -111,7 +115,7 @@ static void eq_push(struct engine_event_queue *eq, int type, void *data)
 
 /* Drain all pending events + consume wakeup bytes.  Non-blocking. */
 void engine_event_queue_flush(struct engine_event_queue *eq,
-                              struct event_queue *dest)
+                              std::queue<Event> &dest)
 {
   char buf[64];
   /* Consume any wakeup bytes (non-blocking, so returns when pipe is empty). */
@@ -120,28 +124,20 @@ void engine_event_queue_flush(struct engine_event_queue *eq,
 
   /* Splice the shared queue onto the tail of dest. */
   std::lock_guard<std::mutex> lock(eq->mtx);
-  if (!event_queue_empty(&eq->q))
+  while (!eq->q.empty())
   {
-    if (event_queue_empty(dest))
-    {
-      *dest = eq->q;
-    }
-    else
-    {
-      dest->tail->next = eq->q.head;
-      dest->tail       = eq->q.tail;
-    }
-    event_queue_init(&eq->q);
+    dest.push(eq->q.front());
+    eq->q.pop();
   }
 }
 
 /* Blocking variant: wait until at least one event arrives, then drain. */
 void engine_event_queue_wait_flush(struct engine_event_queue *eq,
-                                   struct event_queue *dest)
+                                   std::queue<Event> &dest)
 {
   /* First drain without blocking in case there is already something. */
   engine_event_queue_flush(eq, dest);
-  if (!event_queue_empty(dest))
+  if (!dest.empty())
     return;
 
   /* Nothing yet — block on the read end of the pipe. */
