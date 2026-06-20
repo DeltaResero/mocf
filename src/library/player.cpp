@@ -20,7 +20,9 @@
 #include <cstring>
 #include <memory>
 #include <string>
-#include <pthread.h>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
 
 #define DEBUG
 
@@ -62,7 +64,7 @@ struct bitrate_list
 {
   struct bitrate_list_node *head;
   struct bitrate_list_node *tail;
-  pthread_mutex_t mtx;
+  std::mutex mtx;
 };
 
 struct md5_data
@@ -82,7 +84,7 @@ struct precache
   AudioPlugin *f;                /* decoder functions for precached file */
   std::unique_ptr<AudioDecoder> decoder_data;
   int running;   /* if the precache thread is running */
-  pthread_t tid; /* tid of the precache thread */
+  std::thread tid; /* tid of the precache thread */
   struct bitrate_list bitrate_list;
   int decoded_time; /* how much sound we decoded in seconds */
 };
@@ -90,8 +92,8 @@ struct precache
 struct precache precache;
 
 /* Request conditional and mutex. */
-static pthread_cond_t request_cond = PTHREAD_COND_INITIALIZER;
-static pthread_mutex_t request_cond_mtx = PTHREAD_MUTEX_INITIALIZER;
+static std::condition_variable request_cond;
+static std::mutex request_cond_mtx;
 
 static enum request request = REQ_NOTHING;
 static int req_seek;
@@ -106,11 +108,11 @@ static enum {
 static struct file_tags *curr_tags = nullptr;
 
 /* Mutex for curr_tags and tags_source. */
-static pthread_mutex_t curr_tags_mtx = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex curr_tags_mtx;
 
 /* Stream associated with the currently playing decoder. */
 static struct io_stream *decoder_stream = nullptr;
-static pthread_mutex_t decoder_stream_mtx = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex decoder_stream_mtx;
 
 static struct bitrate_list bitrate_list;
 
@@ -120,14 +122,13 @@ static void bitrate_list_init(struct bitrate_list *b)
 
   b->head = nullptr;
   b->tail = nullptr;
-  pthread_mutex_init(&b->mtx, nullptr);
 }
 
 static void bitrate_list_empty(struct bitrate_list *b)
 {
   assert(b != nullptr);
 
-  LOCK(b->mtx);
+  std::lock_guard<std::mutex> lock(b->mtx);
   if (b->head)
   {
     while (b->head)
@@ -142,23 +143,13 @@ static void bitrate_list_empty(struct bitrate_list *b)
   }
 
   debug("Bitrate list elements removed.");
-
-  UNLOCK(b->mtx);
 }
 
 static void bitrate_list_destroy(struct bitrate_list *b)
 {
-  int rc;
-
   assert(b != nullptr);
 
   bitrate_list_empty(b);
-
-  rc = pthread_mutex_destroy(&b->mtx);
-  if (rc != 0)
-  {
-    log_errno("Can't destroy bitrate list mutex", rc);
-  }
 }
 
 static void bitrate_list_add(struct bitrate_list *b, const int time,
@@ -166,7 +157,7 @@ static void bitrate_list_add(struct bitrate_list *b, const int time,
 {
   assert(b != nullptr);
 
-  LOCK(b->mtx);
+  std::lock_guard<std::mutex> lock(b->mtx);
   if (!b->tail)
   {
     b->head = b->tail = new bitrate_list_node;
@@ -200,7 +191,6 @@ static void bitrate_list_add(struct bitrate_list *b, const int time,
           " the same time as the last bitrate",
           bitrate, time);
   }
-  UNLOCK(b->mtx);
 }
 
 static int bitrate_list_get(struct bitrate_list *b, const int time)
@@ -209,7 +199,7 @@ static int bitrate_list_get(struct bitrate_list *b, const int time)
 
   assert(b != nullptr);
 
-  LOCK(b->mtx);
+  std::lock_guard<std::mutex> lock(b->mtx);
   if (b->head)
   {
     while (b->head->next && b->head->next->time <= time)
@@ -229,7 +219,6 @@ static int bitrate_list_get(struct bitrate_list *b, const int time)
     debug("Getting bitrate for time %d (no bitrate information)", time);
     bitrate = -1;
   }
-  UNLOCK(b->mtx);
 
   return bitrate;
 }
@@ -247,9 +236,8 @@ static void update_time()
   }
 }
 
-static void *precache_thread(void *data)
+static void precache_thread(struct precache *precache)
 {
-  struct precache *precache = static_cast<struct precache *>(data);
   int decoded;
   struct sound_params new_sound_params;
   struct decoder_error err;
@@ -268,7 +256,7 @@ static void *precache_thread(void *data)
     logit("Failed to open the file for precache: %s", err.err.c_str());
     decoder_error_clear(&err);
     precache->decoder_data.reset();
-    return nullptr;
+    return;
   }
 
   audio_plist_set_time(precache->file.c_str(),
@@ -287,7 +275,7 @@ static void *precache_thread(void *data)
        * in precache, so give up. */
       logit("EOF when precaching.");
       precache->decoder_data.reset();
-      return nullptr;
+      return;
     }
 
     precache->decoder_data->get_error(&err);
@@ -297,7 +285,7 @@ static void *precache_thread(void *data)
       logit("Error reading file for precache: %s", err.err.c_str());
       decoder_error_clear(&err);
       precache->decoder_data.reset();
-      return nullptr;
+      return;
     }
 
     if (!precache->sound_params.channels)
@@ -312,7 +300,7 @@ static void *precache_thread(void *data)
       logit("Sound parameters have changed when precaching.");
       decoder_error_clear(&err);
       precache->decoder_data.reset();
-      return nullptr;
+      return;
     }
 
     bitrate_list_add(&precache->bitrate_list, precache->decoded_time,
@@ -332,13 +320,10 @@ static void *precache_thread(void *data)
 
   precache->ok = 1;
   logit("Successfully precached file (%d bytes)", precache->buf_fill);
-  return nullptr;
 }
 
 static void start_precache(struct precache *precache, const char *file)
 {
-  int rc;
-
   assert(!precache->running);
   assert(file != nullptr);
 
@@ -346,29 +331,16 @@ static void start_precache(struct precache *precache, const char *file)
   bitrate_list_init(&precache->bitrate_list);
   logit("Precaching file %s", file);
   precache->ok = 0;
-  rc = pthread_create(&precache->tid, nullptr, precache_thread, precache);
-  if (rc != 0)
-  {
-    log_errno("Could not run precache thread", rc);
-  }
-  else
-  {
-    precache->running = 1;
-  }
+  precache->tid = std::thread(precache_thread, precache);
+  precache->running = 1;
 }
 
 static void precache_wait(struct precache *precache)
 {
-  int rc;
-
   if (precache->running)
   {
     debug("Waiting for precache thread...");
-    rc = pthread_join(precache->tid, nullptr);
-    if (rc != 0)
-    {
-      fatal("pthread_join() for precache thread failed: %s", xstrerror(rc));
-    }
+    if (precache->tid.joinable()) precache->tid.join();
     precache->running = 0;
     debug("done");
   }
@@ -419,7 +391,7 @@ static void update_tags(AudioDecoder *decoder_data,
 
   new_tags = tags_new();
 
-  LOCK(curr_tags_mtx);
+  std::lock_guard<std::mutex> lock(curr_tags_mtx);
   if (decoder_data->current_tags(new_tags) &&
       !new_tags->title.empty())
   {
@@ -436,16 +408,13 @@ static void update_tags(AudioDecoder *decoder_data,
   }
 
   tags_free(new_tags);
-
-  UNLOCK(curr_tags_mtx);
 }
 
 /* Called when some free space in the output buffer appears. */
 static void buf_free_cb()
 {
-  LOCK(request_cond_mtx);
-  pthread_cond_broadcast(&request_cond);
-  UNLOCK(request_cond_mtx);
+  std::lock_guard<std::mutex> lock(request_cond_mtx);
+  request_cond.notify_all();
 
   update_time();
 }
@@ -468,13 +437,15 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
 
   out_buf_set_free_callback(out_buf, buf_free_cb);
 
-  LOCK(curr_tags_mtx);
-  curr_tags = tags_new();
-  UNLOCK(curr_tags_mtx);
+  {
+    std::lock_guard<std::mutex> lock(curr_tags_mtx);
+    curr_tags = tags_new();
+  }
 
-  LOCK(decoder_stream_mtx);
-  decoder_stream = decoder_data->get_stream();
-  UNLOCK(decoder_stream_mtx);
+  {
+    std::lock_guard<std::mutex> lock(decoder_stream_mtx);
+    decoder_stream = decoder_data->get_stream();
+  }
 
   status_msg("Playing...");
 
@@ -482,12 +453,12 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
   {
     debug("loop...");
 
-    LOCK(request_cond_mtx);
+    std::unique_lock<std::mutex> lock(request_cond_mtx);
     if (!eof && !decoded)
     {
       struct decoder_error err;
 
-      UNLOCK(request_cond_mtx);
+      lock.unlock();
 
       decoded = decoder_data->decode(buf, sizeof(buf), &new_sound_params);
 
@@ -540,12 +511,12 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
       {
         start_precache(&precache, next_file);
       }
-      pthread_cond_wait(&request_cond, &request_cond_mtx);
-      UNLOCK(request_cond_mtx);
+      request_cond.wait(lock);
+      lock.unlock();
     }
     else
     {
-      UNLOCK(request_cond_mtx);
+      lock.unlock();
     }
 
     /* When clearing request, we must make sure, that another
@@ -558,12 +529,12 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
       md5->okay = false;
       out_buf_stop(out_buf);
 
-      LOCK(request_cond_mtx);
+      lock.lock();
       if (request == REQ_STOP)
       {
         request = REQ_NOTHING;
       }
-      UNLOCK(request_cond_mtx);
+      lock.unlock();
 
       break;
     }
@@ -589,12 +560,12 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
         decoded = 0;
       }
 
-      LOCK(request_cond_mtx);
+      lock.lock();
       if (request == REQ_SEEK)
       {
         request = REQ_NOTHING;
       }
-      UNLOCK(request_cond_mtx);
+      lock.unlock();
     }
     else if (!eof && decoded <= out_buf_get_free(out_buf) &&
              !sound_params_change)
@@ -633,20 +604,22 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
 
   status_msg("");
 
-  LOCK(decoder_stream_mtx);
-  decoder_stream = nullptr;
-  decoder_data.reset();
-  UNLOCK(decoder_stream_mtx);
+  {
+    std::lock_guard<std::mutex> lock(decoder_stream_mtx);
+    decoder_stream = nullptr;
+    decoder_data.reset();
+  }
 
   bitrate_list_destroy(&bitrate_list);
 
-  LOCK(curr_tags_mtx);
-  if (curr_tags)
   {
-    tags_free(curr_tags);
-    curr_tags = nullptr;
+    std::lock_guard<std::mutex> lock(curr_tags_mtx);
+    if (curr_tags)
+    {
+      tags_free(curr_tags);
+      curr_tags = nullptr;
+    }
   }
-  UNLOCK(curr_tags_mtx);
 
   out_buf_wait(out_buf);
 
@@ -849,9 +822,10 @@ void player(const char *file, const char *next_file, struct out_buf *out_buf)
   AudioPlugin *f;
 
   f = get_decoder(file);
-  LOCK(decoder_stream_mtx);
-  decoder_stream = nullptr;
-  UNLOCK(decoder_stream_mtx);
+  {
+    std::lock_guard<std::mutex> lock(decoder_stream_mtx);
+    decoder_stream = nullptr;
+  }
 
   if (!f)
   {
@@ -868,29 +842,6 @@ void player(const char *file, const char *next_file, struct out_buf *out_buf)
 
 void player_cleanup()
 {
-  int rc;
-
-  rc = pthread_mutex_destroy(&request_cond_mtx);
-  if (rc != 0)
-  {
-    log_errno("Can't destroy request mutex", rc);
-  }
-  rc = pthread_mutex_destroy(&curr_tags_mtx);
-  if (rc != 0)
-  {
-    log_errno("Can't destroy tags mutex", rc);
-  }
-  rc = pthread_mutex_destroy(&decoder_stream_mtx);
-  if (rc != 0)
-  {
-    log_errno("Can't destroy decoder_stream mutex", rc);
-  }
-  rc = pthread_cond_destroy(&request_cond);
-  if (rc != 0)
-  {
-    log_errno("Can't destroy request condition", rc);
-  }
-
   precache_wait(&precache);
   precache_reset(&precache);
 }
@@ -902,17 +853,17 @@ void player_stop()
   logit("requesting stop");
   request = REQ_STOP;
 
-  LOCK(decoder_stream_mtx);
-  if (decoder_stream)
   {
-    logit("decoder_stream present, aborting...");
-    io_abort(decoder_stream);
+    std::lock_guard<std::mutex> lock(decoder_stream_mtx);
+    if (decoder_stream)
+    {
+      logit("decoder_stream present, aborting...");
+      io_abort(decoder_stream);
+    }
   }
-  UNLOCK(decoder_stream_mtx);
 
-  LOCK(request_cond_mtx);
-  pthread_cond_signal(&request_cond);
-  UNLOCK(request_cond_mtx);
+  std::lock_guard<std::mutex> lock(request_cond_mtx);
+  request_cond.notify_one();
 }
 
 void player_seek(const int sec)
@@ -924,9 +875,8 @@ void player_seek(const int sec)
   {
     request = REQ_SEEK;
     req_seek = sec + time;
-    LOCK(request_cond_mtx);
-    pthread_cond_signal(&request_cond);
-    UNLOCK(request_cond_mtx);
+    std::lock_guard<std::mutex> lock(request_cond_mtx);
+    request_cond.notify_one();
   }
 }
 
@@ -934,9 +884,8 @@ void player_jump_to(const int sec)
 {
   request = REQ_SEEK;
   req_seek = sec;
-  LOCK(request_cond_mtx);
-  pthread_cond_signal(&request_cond);
-  UNLOCK(request_cond_mtx);
+  std::lock_guard<std::mutex> lock(request_cond_mtx);
+  request_cond.notify_one();
 }
 
 /* Stop playing, clear the output buffer, but allow to unpause by starting
@@ -945,17 +894,15 @@ void player_jump_to(const int sec)
 void player_pause()
 {
   request = REQ_PAUSE;
-  LOCK(request_cond_mtx);
-  pthread_cond_signal(&request_cond);
-  UNLOCK(request_cond_mtx);
+  std::lock_guard<std::mutex> lock(request_cond_mtx);
+  request_cond.notify_one();
 }
 
 void player_unpause()
 {
   request = REQ_UNPAUSE;
-  LOCK(request_cond_mtx);
-  pthread_cond_signal(&request_cond);
-  UNLOCK(request_cond_mtx);
+  std::lock_guard<std::mutex> lock(request_cond_mtx);
+  request_cond.notify_one();
 }
 
 // EOF

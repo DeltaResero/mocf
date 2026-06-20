@@ -27,10 +27,10 @@
 #include <ctime>
 #include <sys/types.h>
 #include <pwd.h>
-#include <pthread.h>
 #include <csignal>
 #include <cerrno>
 #include <string>
+#include <mutex>
 #include "core/common.h"
 #include "core/server.h"
 #include "ui/curses/interface.h"
@@ -169,7 +169,7 @@ void xsleep(size_t ticks, size_t ticks_per_sec)
 }
 
 #if !HAVE_DECL_STRERROR_R
-static pthread_mutex_t xstrerror_mtx = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex xstrerror_mtx;
 #endif
 
 #if !HAVE_DECL_STRERROR_R
@@ -178,11 +178,9 @@ std::string xstrerror(int errnum)
 {
   std::string result;
 
-  LOCK(xstrerror_mtx);
+  std::lock_guard<std::mutex> lock(xstrerror_mtx);
 
   result = strerror(errnum);
-
-  UNLOCK(xstrerror_mtx);
 
   return result;
 }
@@ -426,15 +424,6 @@ char *pathstrcpy(char *restrict dst, const char *restrict src)
 
 void common_cleanup()
 {
-#if !HAVE_DECL_STRERROR_R
-  int rc;
-
-  rc = pthread_mutex_destroy(&xstrerror_mtx);
-  if (rc != 0)
-  {
-    logit("Can't destroy xstrerror_mtx: %s", strerror(rc));
-  }
-#endif
 }
 
 // EOF

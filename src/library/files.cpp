@@ -25,10 +25,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <mutex>
 
 #ifdef HAVE_LIBMAGIC
 #include <magic.h>
-#include <pthread.h>
 #endif
 
 #define DEBUG
@@ -135,11 +135,11 @@ char *file_mime_type(const char *file ASSERT_ONLY)
   assert(file != nullptr);
 
 #ifdef HAVE_LIBMAGIC
-  static pthread_mutex_t magic_mtx = PTHREAD_MUTEX_INITIALIZER;
+  static std::mutex magic_mtx;
 
   if (cookie != nullptr)
   {
-    LOCK(magic_mtx);
+    std::lock_guard<std::mutex> lock(magic_mtx);
     if (cached_file && !strcmp(cached_file, file))
     {
       result = xstrdup(cached_result);
@@ -160,7 +160,6 @@ char *file_mime_type(const char *file ASSERT_ONLY)
         cached_result = xstrdup(result);
       }
     }
-    UNLOCK(magic_mtx);
   }
 #endif
 

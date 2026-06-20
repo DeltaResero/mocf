@@ -21,7 +21,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
-#include <pthread.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -202,12 +201,11 @@ static off_t io_seek_buffered(struct io_stream *s, const off_t where)
       fatal("Unknown io_stream->source: %d", s->source);
   }
 
-  LOCK(s->buf_mtx);
+  std::lock_guard<std::mutex> lock(s->buf_mtx);
   fifo_buf_clear(s->buf);
-  pthread_cond_signal(&s->buf_free_cond);
+  s->buf_free_cond.notify_one();
   s->after_seek = 1;
   s->eof = 0;
-  UNLOCK(s->buf_mtx);
 
   return res;
 }
@@ -245,7 +243,7 @@ off_t io_seek(struct io_stream *s, off_t offset, int whence)
     return -1;
   }
 
-  LOCK(s->io_mtx);
+  std::unique_lock<std::mutex> lock(s->io_mtx);
   switch (whence)
   {
     case SEEK_SET:
@@ -276,7 +274,7 @@ off_t io_seek(struct io_stream *s, off_t offset, int whence)
   {
     s->pos = res;
   }
-  UNLOCK(s->io_mtx);
+  lock.unlock();
 
   if (res != -1)
   {
@@ -303,12 +301,11 @@ void io_abort(struct io_stream *s)
   if (s->buffered && !s->stop_read_thread)
   {
     logit("Aborting...");
-    LOCK(s->buf_mtx);
+    std::lock_guard<std::mutex> lock(s->buf_mtx);
     s->stop_read_thread = 1;
     io_wake_up(s);
-    pthread_cond_broadcast(&s->buf_fill_cond);
-    pthread_cond_broadcast(&s->buf_free_cond);
-    UNLOCK(s->buf_mtx);
+    s->buf_fill_cond.notify_all();
+    s->buf_free_cond.notify_all();
     logit("done");
   }
 }
@@ -316,8 +313,6 @@ void io_abort(struct io_stream *s)
 /* Close the stream and free all resources associated with it. */
 void io_close(struct io_stream *s)
 {
-  int rc;
-
   assert(s != nullptr);
 
   logit("Closing stream...");
@@ -329,7 +324,7 @@ void io_close(struct io_stream *s)
       io_abort(s);
 
       logit("Waiting for io_read_thread()...");
-      pthread_join(s->read_thread, nullptr);
+      if (s->read_thread.joinable()) s->read_thread.join();
       logit("IO read thread exited");
     }
 
@@ -357,28 +352,7 @@ void io_close(struct io_stream *s)
     {
       fifo_buf_free(s->buf);
       s->buf = nullptr;
-      rc = pthread_cond_destroy(&s->buf_free_cond);
-      if (rc != 0)
-      {
-        log_errno("Destroying buf_free_cond failed", rc);
-      }
-      rc = pthread_cond_destroy(&s->buf_fill_cond);
-      if (rc != 0)
-      {
-        log_errno("Destroying buf_fill_cond failed", rc);
-      }
     }
-  }
-
-  rc = pthread_mutex_destroy(&s->buf_mtx);
-  if (rc != 0)
-  {
-    log_errno("Destroying buf_mtx failed", rc);
-  }
-  rc = pthread_mutex_destroy(&s->io_mtx);
-  if (rc != 0)
-  {
-    log_errno("Destroying io_mtx failed", rc);
   }
 
   delete s;
@@ -386,10 +360,8 @@ void io_close(struct io_stream *s)
   logit("done");
 }
 
-static void *io_read_thread(void *data)
+static void io_read_thread(struct io_stream *s)
 {
-  struct io_stream *s = static_cast<struct io_stream *>(data);
-
   logit("IO read thread created");
 
   while (!s->stop_read_thread)
@@ -398,25 +370,24 @@ static void *io_read_thread(void *data)
     int read_buf_fill = 0;
     int read_buf_pos = 0;
 
-    LOCK(s->io_mtx);
+    s->io_mtx.lock();
     debug("Reading...");
 
-    LOCK(s->buf_mtx);
+    s->buf_mtx.lock();
     s->after_seek = 0;
-    UNLOCK(s->buf_mtx);
+    s->buf_mtx.unlock();
 
     read_buf_fill = io_internal_read(s, 0, read_buf, sizeof(read_buf));
-    UNLOCK(s->io_mtx);
+    s->io_mtx.unlock();
     if (read_buf_fill > 0)
     {
       debug("Read %d bytes", read_buf_fill);
     }
 
-    LOCK(s->buf_mtx);
+    std::unique_lock<std::mutex> buf_lock(s->buf_mtx);
 
     if (s->stop_read_thread)
     {
-      UNLOCK(s->buf_mtx);
       break;
     }
 
@@ -425,8 +396,7 @@ static void *io_read_thread(void *data)
       s->errno_val = errno;
       s->read_error = 1;
       logit("Exiting due to read error.");
-      pthread_cond_broadcast(&s->buf_fill_cond);
-      UNLOCK(s->buf_mtx);
+      s->buf_fill_cond.notify_all();
       break;
     }
 
@@ -434,10 +404,9 @@ static void *io_read_thread(void *data)
     {
       s->eof = 1;
       debug("EOF, waiting");
-      pthread_cond_broadcast(&s->buf_fill_cond);
-      pthread_cond_wait(&s->buf_free_cond, &s->buf_mtx);
+      s->buf_fill_cond.notify_all();
+      s->buf_free_cond.wait(buf_lock);
       debug("Got signal");
-      UNLOCK(s->buf_mtx);
       continue;
     }
 
@@ -462,23 +431,21 @@ static void *io_read_thread(void *data)
         debug("Put %zu bytes into the buffer", put);
         if (s->buf_fill_callback)
         {
-          UNLOCK(s->buf_mtx);
+          buf_lock.unlock();
           s->buf_fill_callback(s, fifo_buf_get_fill(s->buf),
                                fifo_buf_get_size(s->buf),
                                s->buf_fill_callback_data);
-          LOCK(s->buf_mtx);
+          buf_lock.lock();
         }
-        pthread_cond_broadcast(&s->buf_fill_cond);
+        s->buf_fill_cond.notify_all();
         read_buf_pos += put;
         continue;
       }
 
       debug("The buffer is full, waiting.");
-      pthread_cond_wait(&s->buf_free_cond, &s->buf_mtx);
+      s->buf_free_cond.wait(buf_lock);
       debug("Some space in the buffer was freed");
     }
-
-    UNLOCK(s->buf_mtx);
   }
 
   if (s->stop_read_thread)
@@ -487,8 +454,6 @@ static void *io_read_thread(void *data)
   }
 
   logit("Exiting IO read thread");
-
-  return nullptr;
 }
 
 static void io_open_file(struct io_stream *s, const char *file)
@@ -539,7 +504,6 @@ static void io_open_file(struct io_stream *s, const char *file)
 /* Open the file. */
 struct io_stream *io_open(const char *file, const int buffered)
 {
-  int rc;
   struct io_stream *s;
 
   assert(file != nullptr);
@@ -553,9 +517,6 @@ struct io_stream *io_open(const char *file, const int buffered)
   s->buf_fill_callback = nullptr;
 
   io_open_file(s, file);
-
-  pthread_mutex_init(&s->buf_mtx, nullptr);
-  pthread_mutex_init(&s->io_mtx, nullptr);
 
   if (!s->opened)
   {
@@ -571,15 +532,7 @@ struct io_stream *io_open(const char *file, const int buffered)
   if (buffered)
   {
     s->buf = fifo_buf_new(options_get_int("InputBuffer") * 1024);
-
-    pthread_cond_init(&s->buf_free_cond, nullptr);
-    pthread_cond_init(&s->buf_fill_cond, nullptr);
-
-    rc = pthread_create(&s->read_thread, nullptr, io_read_thread, s);
-    if (rc != 0)
-    {
-      fatal("Can't create read thread: %s", xstrerror(errno));
-    }
+    s->read_thread = std::thread(io_read_thread, s);
   }
 
   return s;
@@ -596,9 +549,8 @@ int io_ok(struct io_stream *s)
 {
   int res;
 
-  LOCK(s->buf_mtx);
+  std::lock_guard<std::mutex> lock(s->buf_mtx);
   res = io_ok_nolock(s);
-  UNLOCK(s->buf_mtx);
 
   return res;
 }
@@ -611,7 +563,7 @@ static ssize_t io_peek_internal(struct io_stream *s, void *buf, size_t count)
 
   debug("Peeking data...");
 
-  LOCK(s->buf_mtx);
+  std::unique_lock<std::mutex> lock(s->buf_mtx);
 
   /* Wait until enough data will be available */
   while (io_ok_nolock(s) && !s->stop_read_thread &&
@@ -619,13 +571,13 @@ static ssize_t io_peek_internal(struct io_stream *s, void *buf, size_t count)
          !s->eof)
   {
     debug("waiting...");
-    pthread_cond_wait(&s->buf_fill_cond, &s->buf_mtx);
+    s->buf_fill_cond.wait(lock);
   }
 
   received = fifo_buf_peek(s->buf, static_cast<char *>(buf), count);
   debug("Read %zd bytes", received);
 
-  UNLOCK(s->buf_mtx);
+  lock.unlock();
 
   return io_ok(s) ? received : -1;
 }
@@ -634,7 +586,7 @@ static ssize_t io_read_buffered(struct io_stream *s, void *buf, size_t count)
 {
   ssize_t received = 0;
 
-  LOCK(s->buf_mtx);
+  std::unique_lock<std::mutex> lock(s->buf_mtx);
 
   while (received < static_cast<ssize_t>(count) && !s->stop_read_thread &&
          ((!s->eof && !s->read_error) || fifo_buf_get_fill(s->buf)))
@@ -644,18 +596,16 @@ static ssize_t io_read_buffered(struct io_stream *s, void *buf, size_t count)
       received +=
           fifo_buf_get(s->buf, static_cast<char *>(buf) + received, count - received);
       debug("Read %zd bytes so far", received);
-      pthread_cond_signal(&s->buf_free_cond);
+      s->buf_free_cond.notify_one();
       continue;
     }
 
     debug("Buffer empty, waiting...");
-    pthread_cond_wait(&s->buf_fill_cond, &s->buf_mtx);
+    s->buf_fill_cond.wait(lock);
   }
 
   debug("done");
   s->pos += received;
-
-  UNLOCK(s->buf_mtx);
 
   return received ? received : (s->read_error ? -1 : 0);
 }
@@ -762,9 +712,8 @@ off_t io_tell(struct io_stream *s)
 
   if (s->buffered)
   {
-    LOCK(s->buf_mtx);
+    std::lock_guard<std::mutex> lock(s->buf_mtx);
     res = s->pos;
-    UNLOCK(s->buf_mtx);
   }
   else
   {
@@ -783,10 +732,9 @@ int io_eof(struct io_stream *s)
 
   assert(s != nullptr);
 
-  LOCK(s->buf_mtx);
+  std::lock_guard<std::mutex> lock(s->buf_mtx);
   eof = (s->eof && (!s->buffered || !fifo_buf_get_fill(s->buf))) ||
         s->stop_read_thread;
-  UNLOCK(s->buf_mtx);
 
   return eof;
 }
@@ -808,10 +756,9 @@ void io_set_buf_fill_callback(struct io_stream *s, buf_fill_callback_t callback,
   assert(s != nullptr);
   assert(callback != nullptr);
 
-  LOCK(s->buf_mtx);
+  std::lock_guard<std::mutex> lock(s->buf_mtx);
   s->buf_fill_callback = callback;
   s->buf_fill_callback_data = data_ptr;
-  UNLOCK(s->buf_mtx);
 }
 
 /* Return a non-zero value if the stream is seekable. */

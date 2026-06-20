@@ -12,7 +12,9 @@
 #define IO_H
 
 #include <sys/types.h>
-#include <pthread.h>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
 
 #include "utils/fifo_buf.h"
 
@@ -43,7 +45,7 @@
     int after_seek; /* are we after seek and need to do fresh read()? */
     int buffered;   /* are we using the buffer? */
     off_t pos; /* current position in the file from the user point of view */
-    pthread_mutex_t io_mtx; /* mutex for IO operations */
+    std::mutex io_mtx; /* mutex for IO operations */
 
 #ifdef HAVE_MMAP
     void *mem;
@@ -51,11 +53,11 @@
 #endif
 
     struct fifo_buf *buf;
-    pthread_mutex_t buf_mtx;
-    pthread_cond_t buf_free_cond; /* some space became available in the
+    std::mutex buf_mtx;
+    std::condition_variable buf_free_cond; /* some space became available in the
              buffer */
-    pthread_cond_t buf_fill_cond; /* the buffer was filled with some data */
-    pthread_t read_thread;
+    std::condition_variable buf_fill_cond; /* the buffer was filled with some data */
+    std::thread read_thread;
     int stop_read_thread; /* request for stopping the read
              thread */
 

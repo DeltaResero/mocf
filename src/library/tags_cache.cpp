@@ -21,7 +21,9 @@
 #include <ctime>
 #include <dirent.h>
 #include <optional>
-#include <pthread.h>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
 #include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -104,11 +106,11 @@ struct tags_cache
   struct request_queue queue; /* pending tag requests */
   int stop_reader_thread;      /* request for stopping read thread (if
                 non-zero) */
-  pthread_cond_t request_cond; /* condition for signalizing new
+  std::condition_variable request_cond; /* condition for signalizing new
           requests */
-  pthread_mutex_t mutex;       /* mutex for all above data (except db because
+  std::mutex mutex;       /* mutex for all above data (except db because
                 it's thread-safe) */
-  pthread_t reader_thread;     /* tid of the reading thread */
+  std::thread reader_thread;     /* tid of the reading thread */
 };
 
 struct cache_record
@@ -723,17 +725,11 @@ static struct file_tags *tags_cache_read_add(struct tags_cache *c DB_ONLY,
   return tags;
 }
 
-static void *reader_thread(void *cache_ptr)
+static void reader_thread(struct tags_cache *c)
 {
-  struct tags_cache *c;
-
   logit("Tags reader thread started");
 
-  assert(cache_ptr != nullptr);
-
-  c = static_cast<struct tags_cache *>(cache_ptr);
-
-  LOCK(c->mutex);
+  std::unique_lock<std::mutex> lock(c->mutex);
 
   while (!c->stop_reader_thread)
   {
@@ -743,29 +739,24 @@ static void *reader_thread(void *cache_ptr)
     if (request_queue_empty(&c->queue))
     {
       debug("Queue empty, waiting");
-      pthread_cond_wait(&c->request_cond, &c->mutex);
+      c->request_cond.wait(lock);
       continue;
     }
 
     request_file = request_queue_pop(&c->queue, &tags_sel);
-    UNLOCK(c->mutex);
+    lock.unlock();
 
     if (!request_file.empty())
       tags_cache_read_add(c, request_file.c_str(), tags_sel, 1);
 
-    LOCK(c->mutex);
+    lock.lock();
   }
 
-  UNLOCK(c->mutex);
-
   logit("Exiting tags reader thread");
-
-  return nullptr;
 }
 
 struct tags_cache *tags_cache_new(size_t max_size)
 {
-  int rc;
   struct tags_cache *result;
 
   result = new tags_cache;
@@ -783,33 +774,21 @@ struct tags_cache *tags_cache_new(size_t max_size)
   result->max_items = 0;
 #endif
   result->stop_reader_thread = 0;
-  pthread_mutex_init(&result->mutex, nullptr);
 
-  rc = pthread_cond_init(&result->request_cond, nullptr);
-  if (rc != 0)
-  {
-    fatal("Can't create request_cond: %s", xstrerror(rc));
-  }
-
-  rc = pthread_create(&result->reader_thread, nullptr, reader_thread, result);
-  if (rc != 0)
-  {
-    fatal("Can't create tags cache thread: %s", xstrerror(rc));
-  }
+  result->reader_thread = std::thread(reader_thread, result);
 
   return result;
 }
 
 void tags_cache_free(struct tags_cache *c)
 {
-  int rc;
-
   assert(c != nullptr);
 
-  LOCK(c->mutex);
-  c->stop_reader_thread = 1;
-  pthread_cond_signal(&c->request_cond);
-  UNLOCK(c->mutex);
+  {
+    std::lock_guard<std::mutex> lock(c->mutex);
+    c->stop_reader_thread = 1;
+    c->request_cond.notify_one();
+  }
 
 #ifdef HAVE_DB_H
   if (c->db)
@@ -838,24 +817,9 @@ void tags_cache_free(struct tags_cache *c)
   }
 #endif
 
-  rc = pthread_join(c->reader_thread, nullptr);
-  if (rc != 0)
-  {
-    fatal("pthread_join() on cache reader thread failed: %s", xstrerror(rc));
-  }
+  if (c->reader_thread.joinable()) c->reader_thread.join();
 
   request_queue_clear(&c->queue);
-
-  rc = pthread_mutex_destroy(&c->mutex);
-  if (rc != 0)
-  {
-    log_errno("Can't destroy mutex", rc);
-  }
-  rc = pthread_cond_destroy(&c->request_cond);
-  if (rc != 0)
-  {
-    log_errno("Can't destroy request_cond", rc);
-  }
 
   delete c;
 }
@@ -922,10 +886,9 @@ void tags_cache_add_request(struct tags_cache *c, const char *file,
 
   if (!rc)
   {
-    LOCK(c->mutex);
+    std::lock_guard<std::mutex> lock(c->mutex);
     request_queue_add(&c->queue, file, tags_sel);
-    pthread_cond_signal(&c->request_cond);
-    UNLOCK(c->mutex);
+    c->request_cond.notify_one();
   }
 }
 
@@ -933,10 +896,9 @@ void tags_cache_clear_queue(struct tags_cache *c)
 {
   assert(c != nullptr);
 
-  LOCK(c->mutex);
+  std::lock_guard<std::mutex> lock(c->mutex);
   request_queue_clear(&c->queue);
   debug("Cleared tags request queue");
-  UNLOCK(c->mutex);
 }
 
 /* Remove all pending requests from the queue up to the request associated
@@ -946,10 +908,9 @@ void tags_cache_clear_up_to(struct tags_cache *c, const char *file)
   assert(c != nullptr);
   assert(file != nullptr);
 
-  LOCK(c->mutex);
+  std::lock_guard<std::mutex> lock(c->mutex);
   debug("Removing requests up to file %s", file);
   request_queue_clear_up_to(&c->queue, file);
-  UNLOCK(c->mutex);
 }
 
 #if defined(HAVE_DB_H) && !defined(NDEBUG)

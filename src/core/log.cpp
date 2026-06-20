@@ -17,7 +17,7 @@
 #include <cstdarg>
 #include <cstdint>
 #include <cassert>
-#include <pthread.h>
+#include <mutex>
 #include <ctime>
 #include <cerrno>
 #include <csignal>
@@ -40,7 +40,7 @@ static std::vector<std::string> circular_log;
 static bool circular_log_enabled = false;
 static int circular_ptr = 0;
 
-static pthread_mutex_t logging_mtx = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex logging_mtx;
 
 static struct
 {
@@ -178,7 +178,7 @@ void internal_logit(const char *file LOGIT_ONLY, const int line LOGIT_ONLY,
   std::string msg;
   va_list va;
 
-  LOCK(logging_mtx);
+  std::lock_guard<std::mutex> lock(logging_mtx);
 
   if (!logfp)
   {
@@ -196,7 +196,8 @@ void internal_logit(const char *file LOGIT_ONLY, const int line LOGIT_ONLY,
         }
         log_records_spilt += 1;
       case LOGGING:
-        goto end;
+        errno = saved_errno;
+        return;
     }
   }
 
@@ -211,9 +212,6 @@ void internal_logit(const char *file LOGIT_ONLY, const int line LOGIT_ONLY,
 
   log_signals_raised();
 
-end:
-  UNLOCK(logging_mtx);
-
   errno = saved_errno;
 #endif
 }
@@ -223,7 +221,7 @@ void log_init_stream(FILE *f LOGIT_ONLY, const char *fn LOGIT_ONLY)
 #ifndef NDEBUG
   std::string msg;
 
-  LOCK(logging_mtx);
+  std::lock_guard<std::mutex> lock(logging_mtx);
 
   logfp = f;
 
@@ -243,7 +241,7 @@ void log_init_stream(FILE *f LOGIT_ONLY, const char *fn LOGIT_ONLY)
   logging_state = LOGGING;
   if (!logfp)
   {
-    goto end;
+    return;
   }
 
   msg = format_msg("Writing log to: %s", fn);
@@ -256,9 +254,6 @@ void log_init_stream(FILE *f LOGIT_ONLY, const char *fn LOGIT_ONLY)
   }
 
   flush_log();
-
-end:
-  UNLOCK(logging_mtx);
 #endif
 }
 
@@ -279,13 +274,11 @@ void log_circular_start()
   circular_size = options_get_int("CircularLogSize");
   if (circular_size > 0)
   {
-    LOCK(logging_mtx);
+    std::lock_guard<std::mutex> lock(logging_mtx);
 
     circular_log.reserve(circular_size);
     circular_log_enabled = true;
     circular_ptr = 0;
-
-    UNLOCK(logging_mtx);
   }
 #endif
 }
@@ -310,11 +303,9 @@ void log_circular_reset()
     return;
   }
 
-  LOCK(logging_mtx);
+  std::lock_guard<std::mutex> lock(logging_mtx);
 
   locked_circular_reset();
-
-  UNLOCK(logging_mtx);
 #endif
 }
 
@@ -331,7 +322,7 @@ void log_circular_log()
     return;
   }
 
-  LOCK(logging_mtx);
+  std::lock_guard<std::mutex> lock(logging_mtx);
 
   fprintf(logfp, "\n* Circular Log Starts *\n\n");
 
@@ -352,8 +343,6 @@ void log_circular_log()
   fflush(logfp);
 
   locked_circular_reset();
-
-  UNLOCK(logging_mtx);
 #endif
 }
 
@@ -368,21 +357,19 @@ void log_circular_stop()
     return;
   }
 
-  LOCK(logging_mtx);
+  std::lock_guard<std::mutex> lock(logging_mtx);
 
   circular_log.clear();
   circular_log.shrink_to_fit();
   circular_log_enabled = false;
   circular_ptr = 0;
-
-  UNLOCK(logging_mtx);
 #endif
 }
 
 void log_close()
 {
 #ifndef NDEBUG
-  LOCK(logging_mtx);
+  std::lock_guard<std::mutex> lock(logging_mtx);
 
   if (!(logfp == stdout || logfp == stderr || logfp == nullptr))
   {
@@ -394,8 +381,6 @@ void log_close()
   buffered_log.shrink_to_fit();
 
   log_records_spilt = 0;
-
-  UNLOCK(logging_mtx);
 #endif
 }
 
