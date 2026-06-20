@@ -2108,7 +2108,7 @@ static void main_win_set_played_file(struct main_win *w, const char *file)
 
   assert(w != NULL);
 
-  w->curr_file = file;
+  w->curr_file = file ? file : "";
 
   for (ix = 0; ix < ARRAY_SIZE(w->menus); ix += 1)
   {
