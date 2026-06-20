@@ -83,7 +83,7 @@ void *xmalloc(size_t size)
   size = MAX(1, size);
 #endif
 
-  if ((p = malloc(size)) == NULL)
+  if ((p = malloc(size)) == nullptr)
   {
     fatal("Can't allocate memory!");
   }
@@ -94,7 +94,7 @@ void *xcalloc(size_t nmemb, size_t size)
 {
   void *p;
 
-  if ((p = calloc(nmemb, size)) == NULL)
+  if ((p = calloc(nmemb, size)) == nullptr)
   {
     fatal("Can't allocate memory!");
   }
@@ -116,12 +116,12 @@ void *xrealloc(void *ptr, const size_t size)
 
 char *xstrdup(const char *s)
 {
-  char *n = NULL;
+  char *n = nullptr;
 
   if (s)
   {
     n = strdup(s);
-    if (n == NULL)
+    if (n == nullptr)
     {
       fatal("Can't allocate memory!");
     }
@@ -224,7 +224,7 @@ void xsignal(int signum, void (*func)(int))
   act.sa_flags = 0;
   sigemptyset(&act.sa_mask);
 
-  if (sigaction(signum, &act, 0) == -1)
+  if (sigaction(signum, &act, nullptr) == -1)
   {
     fatal("sigaction() failed: %s", xstrerror(errno).c_str());
   }
@@ -239,7 +239,7 @@ char *str_repl(char *target, const char *oldstr, const char *newstr)
   size_t s, p;
   char *needle;
 
-  for (s = 0; (needle = strstr(target + s, oldstr)) != NULL; s = p + newstr_len)
+  for (s = 0; (needle = strstr(target + s, oldstr)) != nullptr; s = p + newstr_len)
   {
     target_len += newstr_len - oldstr_len;
     p = needle - target;
@@ -342,7 +342,7 @@ bool is_valid_symbol(const char *candidate)
   result = false;
   len = strlen(candidate);
   if (len > 0 && len == strspn(candidate, valid) &&
-      strchr(first, candidate[0]) == NULL)
+      strchr(first, candidate[0]) == nullptr)
   {
     result = true;
   }

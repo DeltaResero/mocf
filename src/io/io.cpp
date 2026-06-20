@@ -41,28 +41,28 @@
 #ifdef HAVE_MMAP
 static void *io_mmap_file(const struct io_stream *s)
 {
-  void *result = NULL;
+  void *result = nullptr;
 
   do
   {
-    if (s->size < 1 || (uint64_t)s->size > SIZE_MAX)
+    if (s->size < 1 || static_cast<uint64_t>(s->size) > SIZE_MAX)
     {
       logit("File size unsuitable for mmap()");
       break;
     }
 
-    const size_t sz = (size_t)s->size;
+    const size_t sz = static_cast<size_t>(s->size);
 
-    result = mmap(0, sz, PROT_READ, MAP_SHARED, s->fd, 0);
+    result = mmap(nullptr, sz, PROT_READ, MAP_SHARED, s->fd, 0);
     if (result == MAP_FAILED)
     {
       log_errno("mmap() failed", errno);
-      result = NULL;
+      result = nullptr;
       break;
     }
 
     logit("mmap()ed %zu bytes", sz);
-  } while (0);
+  } while (false);
 
   return result;
 }
@@ -87,7 +87,7 @@ static ssize_t io_read_mmap(struct io_stream *s, const int dont_move, void *buf,
   {
     logit("File size has changed");
 
-    if (munmap(s->mem, (size_t)s->size))
+    if (munmap(s->mem, static_cast<size_t>(s->size)))
     {
       log_errno("munmap() failed", errno);
       return -1;
@@ -112,7 +112,7 @@ static ssize_t io_read_mmap(struct io_stream *s, const int dont_move, void *buf,
   }
 
   to_read = MIN(count, (size_t)(s->size - s->mem_pos));
-  memcpy(buf, (char *)s->mem + s->mem_pos, to_read);
+  memcpy(buf, static_cast<char *>(s->mem) + s->mem_pos, to_read);
 
   if (!dont_move)
   {
@@ -329,7 +329,7 @@ void io_close(struct io_stream *s)
       io_abort(s);
 
       logit("Waiting for io_read_thread()...");
-      pthread_join(s->read_thread, NULL);
+      pthread_join(s->read_thread, nullptr);
       logit("IO read thread exited");
     }
 
@@ -340,7 +340,7 @@ void io_close(struct io_stream *s)
         break;
 #ifdef HAVE_MMAP
       case IO_SOURCE_MMAP:
-        if (s->mem && munmap(s->mem, (size_t)s->size))
+        if (s->mem && munmap(s->mem, static_cast<size_t>(s->size)))
         {
           log_errno("munmap() failed", errno);
         }
@@ -356,7 +356,7 @@ void io_close(struct io_stream *s)
     if (s->buffered)
     {
       fifo_buf_free(s->buf);
-      s->buf = NULL;
+      s->buf = nullptr;
       rc = pthread_cond_destroy(&s->buf_free_cond);
       if (rc != 0)
       {
@@ -388,7 +388,7 @@ void io_close(struct io_stream *s)
 
 static void *io_read_thread(void *data)
 {
-  struct io_stream *s = (struct io_stream *)data;
+  struct io_stream *s = static_cast<struct io_stream *>(data);
 
   logit("IO read thread created");
 
@@ -488,7 +488,7 @@ static void *io_read_thread(void *data)
 
   logit("Exiting IO read thread");
 
-  return NULL;
+  return nullptr;
 }
 
 static void io_open_file(struct io_stream *s, const char *file)
@@ -520,7 +520,7 @@ static void io_open_file(struct io_stream *s, const char *file)
     if (!options_get_bool("UseMMap"))
     {
       logit("Not using mmap()");
-      s->mem = NULL;
+      s->mem = nullptr;
       break;
     }
 
@@ -533,7 +533,7 @@ static void io_open_file(struct io_stream *s, const char *file)
     s->source = IO_SOURCE_MMAP;
     s->mem_pos = 0;
 #endif
-  } while (0);
+  } while (false);
 }
 
 /* Open the file. */
@@ -550,12 +550,12 @@ struct io_stream *io_open(const char *file, const int buffered)
   s->strerror = "";
   s->opened = 0;
   s->size = -1;
-  s->buf_fill_callback = NULL;
+  s->buf_fill_callback = nullptr;
 
   io_open_file(s, file);
 
-  pthread_mutex_init(&s->buf_mtx, NULL);
-  pthread_mutex_init(&s->io_mtx, NULL);
+  pthread_mutex_init(&s->buf_mtx, nullptr);
+  pthread_mutex_init(&s->io_mtx, nullptr);
 
   if (!s->opened)
   {
@@ -572,10 +572,10 @@ struct io_stream *io_open(const char *file, const int buffered)
   {
     s->buf = fifo_buf_new(options_get_int("InputBuffer") * 1024);
 
-    pthread_cond_init(&s->buf_free_cond, NULL);
-    pthread_cond_init(&s->buf_fill_cond, NULL);
+    pthread_cond_init(&s->buf_free_cond, nullptr);
+    pthread_cond_init(&s->buf_fill_cond, nullptr);
 
-    rc = pthread_create(&s->read_thread, NULL, io_read_thread, s);
+    rc = pthread_create(&s->read_thread, nullptr, io_read_thread, s);
     if (rc != 0)
     {
       fatal("Can't create read thread: %s", xstrerror(errno));
@@ -636,13 +636,13 @@ static ssize_t io_read_buffered(struct io_stream *s, void *buf, size_t count)
 
   LOCK(s->buf_mtx);
 
-  while (received < (ssize_t)count && !s->stop_read_thread &&
+  while (received < static_cast<ssize_t>(count) && !s->stop_read_thread &&
          ((!s->eof && !s->read_error) || fifo_buf_get_fill(s->buf)))
   {
     if (fifo_buf_get_fill(s->buf))
     {
       received +=
-          fifo_buf_get(s->buf, (char *)buf + received, count - received);
+          fifo_buf_get(s->buf, static_cast<char *>(buf) + received, count - received);
       debug("Read %zd bytes so far", received);
       pthread_cond_signal(&s->buf_free_cond);
       continue;

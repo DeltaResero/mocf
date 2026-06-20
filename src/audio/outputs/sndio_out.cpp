@@ -27,7 +27,7 @@
 #define PCT_TO_SIO(pct) ((127 * (pct) + 50) / 100)
 #define SIO_TO_PCT(vol) ((100 * (vol) + 64) / 127)
 
-static struct sio_hdl *hdl = NULL;
+static struct sio_hdl *hdl = nullptr;
 static int curvol = 100;
 static struct sound_params params = {0, 0, 0};
 
@@ -93,7 +93,7 @@ static int sndio_open(struct sound_params *sound_params)
   {
     logit("Failed to set sndio parameters.");
     sio_close(hdl);
-    hdl = NULL;
+    hdl = nullptr;
     return 0;
   }
   sio_setvol(hdl, PCT_TO_SIO(curvol));
@@ -123,14 +123,14 @@ static void sndio_close()
 
   sio_stop(hdl);
   sio_close(hdl);
-  hdl = NULL;
+  hdl = nullptr;
 }
 
 static int sndio_read_mixer() { return curvol; }
 
 static void sndio_set_mixer(int vol)
 {
-  if (hdl != NULL)
+  if (hdl != nullptr)
   {
     sio_setvol(hdl, PCT_TO_SIO(vol));
   }

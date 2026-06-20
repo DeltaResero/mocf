@@ -75,12 +75,12 @@ static void *process_header(struct spx_data *data)
   int enhance = ENHANCE_AUDIO;
 
   data->header =
-      speex_packet_to_header((char *)data->op.packet, data->op.bytes);
+      speex_packet_to_header(reinterpret_cast<char *>(data->op.packet), data->op.bytes);
   if (!data->header)
   {
     decoder_error(&data->error, ERROR_FATAL, 0,
                   "Can't open speex file: can't read header");
-    return NULL;
+    return nullptr;
   }
 
   if (data->header->mode >= SPEEX_NB_MODES)
@@ -89,7 +89,7 @@ static void *process_header(struct spx_data *data)
                   "Can't open speex file: Mode number %" PRId32
                   " does not exist in this version",
                   data->header->mode);
-    return NULL;
+    return nullptr;
   }
 
   modeID = data->header->mode;
@@ -100,7 +100,7 @@ static void *process_header(struct spx_data *data)
     decoder_error(&data->error, ERROR_FATAL, 0,
                   "Can't open speex file: The file was encoded "
                   "with a newer version of Speex.");
-    return NULL;
+    return nullptr;
   }
 
   if (mode->bitstream_version > data->header->mode_bitstream_version)
@@ -108,7 +108,7 @@ static void *process_header(struct spx_data *data)
     decoder_error(&data->error, ERROR_FATAL, 0,
                   "Can't open speex file: The file was encoded "
                   "with an older version of Speex.");
-    return NULL;
+    return nullptr;
   }
 
   st = speex_decoder_init(mode);
@@ -227,10 +227,10 @@ static struct spx_data *spx_open_internal(struct io_stream *stream)
   decoder_error_init(&data->error);
   data->stream = stream;
 
-  data->st = NULL;
+  data->st = nullptr;
   data->stereo = stereo;
-  data->header = NULL;
-  data->comment_packet = NULL;
+  data->header = nullptr;
+  data->comment_packet = nullptr;
   data->bitrate = -1;
   ogg_sync_init(&data->oy);
   speex_bits_init(&data->bits);
@@ -263,7 +263,7 @@ static void *spx_open(const char *file)
   {
     data = new spx_data;
     data->stream = stream;
-    data->header = NULL;
+    data->header = nullptr;
     decoder_error_init(&data->error);
     decoder_error(&data->error, ERROR_STREAM, 0, "Can't open file: %s",
                   io_strerror(stream));
@@ -275,7 +275,7 @@ static void *spx_open(const char *file)
 
 static void spx_close(void *prv_data)
 {
-  struct spx_data *data = (struct spx_data *)prv_data;
+  struct spx_data *data = static_cast<struct spx_data *>(prv_data);
 
   if (data->ok)
   {
@@ -319,11 +319,11 @@ static void parse_comment(const char *str, struct file_tags *tags)
   }
   else if (!strncasecmp(str, "tracknumber=", strlen("tracknumber=")))
   {
-    tags->track = (int)strtol(str + strlen("tracknumber="), NULL, 10);
+    tags->track = static_cast<int>(strtol(str + strlen("tracknumber="), nullptr, 10));
   }
   else if (!strncasecmp(str, "track=", strlen("track=")))
   {
-    tags->track = (int)strtol(str + strlen("track="), NULL, 10);
+    tags->track = static_cast<int>(strtol(str + strlen("track="), nullptr, 10));
   }
 }
 
@@ -373,7 +373,7 @@ static void get_comments(struct spx_data *data, struct file_tags *tags)
         return;
       }
 
-      if ((int)temp.size() < len + 1)
+      if (static_cast<int>(temp.size()) < len + 1)
       {
         temp.resize(len + 1);
       }
@@ -477,7 +477,7 @@ static void spx_info(const char *file_name, struct file_tags *tags,
 
 static int spx_seek(void *prv_data, int sec)
 {
-  struct spx_data *data = (struct spx_data *)prv_data;
+  struct spx_data *data = static_cast<struct spx_data *>(prv_data);
   off_t begin = 0, end, old_pos;
 
   assert(sec >= 0);
@@ -491,7 +491,7 @@ static int spx_seek(void *prv_data, int sec)
 
   debug("Seek request to %ds", sec);
 
-  while (1)
+  while (true)
   {
     off_t middle = (end + begin) / 2;
     ogg_int64_t granule_pos;
@@ -573,9 +573,9 @@ static int spx_seek(void *prv_data, int sec)
 static int spx_decode(void *prv_data, char *sound_buf, int nbytes,
                       struct sound_params *sound_params)
 {
-  struct spx_data *data = (struct spx_data *)prv_data;
+  struct spx_data *data = static_cast<struct spx_data *>(prv_data);
   int bytes_requested = nbytes;
-  int16_t *out = (int16_t *)sound_buf;
+  int16_t *out = reinterpret_cast<int16_t *>(sound_buf);
 
   sound_params->channels = data->nchannels;
   sound_params->rate = data->rate;
@@ -608,7 +608,7 @@ static int spx_decode(void *prv_data, char *sound_buf, int nbytes,
       /* Decode some more samples */
 
       /* Copy Ogg packet to Speex bitstream */
-      speex_bits_read_from(&data->bits, (char *)data->op.packet,
+      speex_bits_read_from(&data->bits, reinterpret_cast<char *>(data->op.packet),
                            data->op.bytes);
 
       for (j = 0; j < data->frames_per_packet; j++)
@@ -665,7 +665,7 @@ static int spx_current_tags (void *prv_data, struct file_tags *tags)
 
 static int spx_get_bitrate(void *prv_data)
 {
-  struct spx_data *data = (struct spx_data *)prv_data;
+  struct spx_data *data = static_cast<struct spx_data *>(prv_data);
 
   return data->bitrate / 1000;
 }
@@ -679,7 +679,7 @@ static int spx_get_duration(void *unused ATTR_UNUSED)
 
 static struct io_stream *spx_get_stream(void *prv_data)
 {
-  struct spx_data *data = (struct spx_data *)prv_data;
+  struct spx_data *data = static_cast<struct spx_data *>(prv_data);
 
   return data->stream;
 }
@@ -696,7 +696,7 @@ static int spx_our_format_ext(const char *ext)
 
 static void spx_get_error(void *prv_data, struct decoder_error *error)
 {
-  struct spx_data *data = (struct spx_data *)prv_data;
+  struct spx_data *data = static_cast<struct spx_data *>(prv_data);
 
   decoder_error_copy(error, &data->error);
 }

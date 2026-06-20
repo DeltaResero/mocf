@@ -91,12 +91,12 @@ static void get_comment_tags(OggVorbis_File *vf, struct file_tags *info)
     else if (!strncasecmp(comments->user_comments[i],
                           "tracknumber=", strlen("tracknumber=")))
     {
-      info->track = (int)strtol(comments->user_comments[i] + strlen("tracknumber="), NULL, 10);
+      info->track = static_cast<int>(strtol(comments->user_comments[i] + strlen("tracknumber="), nullptr, 10));
     }
     else if (!strncasecmp(comments->user_comments[i],
                           "track=", strlen("track=")))
     {
-      info->track = (int)strtol(comments->user_comments[i] + strlen("track="), NULL, 10);
+      info->track = static_cast<int>(strtol(comments->user_comments[i] + strlen("track="), nullptr, 10));
     }
   }
 }
@@ -148,11 +148,11 @@ static void vorbis_tags(const char *file_name, struct file_tags *info,
    * with it. */
   if (tags_sel & TAGS_TIME)
   {
-    err_code = ov_open(file, &vf, NULL, 0);
+    err_code = ov_open(file, &vf, nullptr, 0);
   }
   else
   {
-    err_code = ov_test(file, &vf, NULL, 0);
+    err_code = ov_test(file, &vf, nullptr, 0);
   }
 
   if (err_code < 0)
@@ -216,7 +216,7 @@ static int seek_cb(void *datasource, ogg_int64_t offset, int whence)
 
 static int close_cb(void *unused ATTR_UNUSED) { return 0; }
 
-static long tell_cb(void *datasource) { return (long)io_tell(static_cast<io_stream *>(datasource)); }
+static long tell_cb(void *datasource) { return static_cast<long>(io_tell(static_cast<io_stream *>(datasource))); }
 
 static void vorbis_open_stream_internal(struct vorbis_data *data)
 {
@@ -225,7 +225,7 @@ static void vorbis_open_stream_internal(struct vorbis_data *data)
 
   data->tags = tags_new();
 
-  res = ov_open_callbacks(data->stream, &data->vf, NULL, 0, callbacks);
+  res = ov_open_callbacks(data->stream, &data->vf, nullptr, 0, callbacks);
   if (res < 0)
   {
     const char *vorbis_err = vorbis_strerror(res);
@@ -260,7 +260,7 @@ static void *vorbis_open(const char *file)
 
   decoder_error_init(&data->error);
   data->tags_change = 0;
-  data->tags = NULL;
+  data->tags = nullptr;
 
   data->stream = io_open(file, 1);
   if (!io_ok(data->stream))
@@ -286,7 +286,7 @@ static void *vorbis_open(const char *file)
 
 static void vorbis_close(void *prv_data)
 {
-  struct vorbis_data *data = (struct vorbis_data *)prv_data;
+  struct vorbis_data *data = static_cast<struct vorbis_data *>(prv_data);
 
   if (data->ok)
   {
@@ -304,7 +304,7 @@ static void vorbis_close(void *prv_data)
 
 static int vorbis_seek(void *prv_data, int sec)
 {
-  struct vorbis_data *data = (struct vorbis_data *)prv_data;
+  struct vorbis_data *data = static_cast<struct vorbis_data *>(prv_data);
 
   assert(sec >= 0);
 
@@ -314,7 +314,7 @@ static int vorbis_seek(void *prv_data, int sec)
 static int vorbis_decode(void *prv_data, char *buf, int buf_len,
                          struct sound_params *sound_params)
 {
-  struct vorbis_data *data = (struct vorbis_data *)prv_data;
+  struct vorbis_data *data = static_cast<struct vorbis_data *>(prv_data);
   int ret;
   int current_section;
   int bitrate;
@@ -322,11 +322,11 @@ static int vorbis_decode(void *prv_data, char *buf, int buf_len,
 
   decoder_error_clear(&data->error);
 
-  while (1)
+  while (true)
   {
 #ifndef HAVE_TREMOR
 #ifdef INTERNAL_FLOAT
-    float **pcm = NULL;
+    float **pcm = nullptr;
     // We need some safe bound on maximal number of channels... Up to 8 are
     // described in Vorbis specification
     ret = ov_read_float(&data->vf, &pcm, buf_len / sizeof(float) / 8,
@@ -427,7 +427,7 @@ static int vorbis_decode(void *prv_data, char *buf, int buf_len,
 
 static int vorbis_current_tags(void *prv_data, struct file_tags *tags)
 {
-  struct vorbis_data *data = (struct vorbis_data *)prv_data;
+  struct vorbis_data *data = static_cast<struct vorbis_data *>(prv_data);
 
   tags_copy(tags, data->tags);
 
@@ -442,28 +442,28 @@ static int vorbis_current_tags(void *prv_data, struct file_tags *tags)
 
 static int vorbis_get_bitrate(void *prv_data)
 {
-  struct vorbis_data *data = (struct vorbis_data *)prv_data;
+  struct vorbis_data *data = static_cast<struct vorbis_data *>(prv_data);
 
   return data->bitrate;
 }
 
 static int vorbis_get_avg_bitrate(void *prv_data)
 {
-  struct vorbis_data *data = (struct vorbis_data *)prv_data;
+  struct vorbis_data *data = static_cast<struct vorbis_data *>(prv_data);
 
   return data->avg_bitrate;
 }
 
 static int vorbis_get_duration(void *prv_data)
 {
-  struct vorbis_data *data = (struct vorbis_data *)prv_data;
+  struct vorbis_data *data = static_cast<struct vorbis_data *>(prv_data);
 
   return data->duration;
 }
 
 static struct io_stream *vorbis_get_stream(void *prv_data)
 {
-  struct vorbis_data *data = (struct vorbis_data *)prv_data;
+  struct vorbis_data *data = static_cast<struct vorbis_data *>(prv_data);
 
   return data->stream;
 }
@@ -480,7 +480,7 @@ static int vorbis_our_format_ext(const char *ext)
 
 static void vorbis_get_error(void *prv_data, struct decoder_error *error)
 {
-  struct vorbis_data *data = (struct vorbis_data *)prv_data;
+  struct vorbis_data *data = static_cast<struct vorbis_data *>(prv_data);
 
   decoder_error_copy(error, &data->error);
 }

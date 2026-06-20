@@ -118,7 +118,7 @@ void *md5_finish_ctx(struct md5_ctx *ctx, void *resbuf)
   ctx->buffer[size - 2] = SWAP(ctx->total[0] << 3);
   ctx->buffer[size - 1] = SWAP((ctx->total[1] << 3) | (ctx->total[0] >> 29));
 
-  memcpy(&((char *)ctx->buffer)[bytes], fillbuf, (size - 2) * 4 - bytes);
+  memcpy(&(reinterpret_cast<char *>(ctx->buffer))[bytes], fillbuf, (size - 2) * 4 - bytes);
 
   /* Process last bytes.  */
   md5_process_block(ctx->buffer, size * 4, ctx);
@@ -140,7 +140,7 @@ int md5_stream(FILE *stream, void *resblock)
   md5_init_ctx(&ctx);
 
   /* Iterate over full file contents.  */
-  while (1)
+  while (true)
   {
     /* We read the file in blocks of BLOCKSIZE bytes.  One call of the
        computation function processes the whole buffer so that with the
@@ -149,7 +149,7 @@ int md5_stream(FILE *stream, void *resblock)
     sum = 0;
 
     /* Read block.  Take care for partial reads.  */
-    while (1)
+    while (true)
     {
       n = fread(buffer.data() + sum, 1, BLOCKSIZE - sum, stream);
 
@@ -227,7 +227,7 @@ void md5_process_bytes(const void *buffer, size_t len, struct md5_ctx *ctx)
     size_t left_over = ctx->buflen;
     size_t add = 128 - left_over > len ? len : 128 - left_over;
 
-    memcpy(&((char *)ctx->buffer)[left_over], buffer, add);
+    memcpy(&(reinterpret_cast<char *>(ctx->buffer))[left_over], buffer, add);
     ctx->buflen += add;
 
     if (ctx->buflen > 64)
@@ -236,11 +236,11 @@ void md5_process_bytes(const void *buffer, size_t len, struct md5_ctx *ctx)
 
       ctx->buflen &= 63;
       /* The regions in the following copy operation cannot overlap.  */
-      memcpy(ctx->buffer, &((char *)ctx->buffer)[(left_over + add) & ~63],
+      memcpy(ctx->buffer, &(reinterpret_cast<char *>(ctx->buffer))[(left_over + add) & ~63],
              ctx->buflen);
     }
 
-    buffer = (const char *)buffer + add;
+    buffer = static_cast<const char *>(buffer) + add;
     len -= add;
   }
 
@@ -254,7 +254,7 @@ void md5_process_bytes(const void *buffer, size_t len, struct md5_ctx *ctx)
       while (len > 64)
       {
         md5_process_block(memcpy(ctx->buffer, buffer, 64), 64, ctx);
-        buffer = (const char *)buffer + 64;
+        buffer = static_cast<const char *>(buffer) + 64;
         len -= 64;
       }
     }
@@ -262,7 +262,7 @@ void md5_process_bytes(const void *buffer, size_t len, struct md5_ctx *ctx)
 #endif
     {
       md5_process_block(buffer, len & ~63, ctx);
-      buffer = (const char *)buffer + (len & ~63);
+      buffer = static_cast<const char *>(buffer) + (len & ~63);
       len &= 63;
     }
   }
@@ -272,7 +272,7 @@ void md5_process_bytes(const void *buffer, size_t len, struct md5_ctx *ctx)
   {
     size_t left_over = ctx->buflen;
 
-    memcpy(&((char *)ctx->buffer)[left_over], buffer, len);
+    memcpy(&(reinterpret_cast<char *>(ctx->buffer))[left_over], buffer, len);
     left_over += len;
     if (left_over >= 64)
     {

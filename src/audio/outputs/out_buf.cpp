@@ -111,7 +111,7 @@ static void read_thread(struct out_buf *buf)
 
   std::unique_lock<std::mutex> lock(buf->mutex);
 
-  while (1)
+  while (true)
   {
     int played = 0;
     char play_buf[AUDIO_MAX_PLAY_BYTES];
@@ -177,7 +177,7 @@ static void read_thread(struct out_buf *buf)
     else if (audio_dev_closed && !buf->pause)
     {
       logit("Opening the device again after pause");
-      if (!audio_open(NULL))
+      if (!audio_open(nullptr))
       {
         logit("Can't reopen the device! sleeping...");
         xsleep(1, 1); /* there is no way to exit :( */
@@ -247,7 +247,7 @@ static void read_thread(struct out_buf *buf)
       /* Update time */
       if (play_buf_fill && audio_get_bps())
       {
-        buf->time += play_buf_fill / (float)audio_get_bps();
+        buf->time += play_buf_fill / static_cast<float>(audio_get_bps());
       }
       buf->hardware_buf_fill = audio_get_buf_fill();
     }
@@ -275,7 +275,7 @@ struct out_buf *out_buf_new(int size)
   buf->reset_dev = 0;
   buf->hardware_buf_fill = 0;
   buf->read_thread_waiting = 0;
-  buf->free_callback = NULL;
+  buf->free_callback = nullptr;
 
   buf->tid = std::thread(read_thread, buf);
 
@@ -305,7 +305,7 @@ void out_buf_free(struct out_buf *buf)
   }
 
   fifo_buf_free(buf->buf);
-  buf->buf = NULL;
+  buf->buf = nullptr;
 
   delete buf;
 
@@ -414,9 +414,9 @@ int out_buf_time_get(struct out_buf *buf)
   int bps = audio_get_bps();
 
   std::lock_guard<std::mutex> lock(buf->mutex);
-  time_f = buf->time - (bps ? buf->hardware_buf_fill / (float)bps : 0);
+  time_f = buf->time - (bps ? buf->hardware_buf_fill / static_cast<float>(bps) : 0);
 
-  return (int)roundf(time_f);
+  return static_cast<int>(roundf(time_f));
 }
 
 void out_buf_set_free_callback(struct out_buf *buf,

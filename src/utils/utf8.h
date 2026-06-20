@@ -44,7 +44,7 @@ extern "C"
   int xmvwaddnstr(WINDOW *win, const int y, const int x, const char *str,
                   const int n);
   int xwprintw(WINDOW *win, const char *fmt, ...) ATTR_PRINTF(2, 3);
-  size_t strwidth(const char *s);
+  std::size_t strwidth(const char *s);
   char *xstrtail(const char *str, const int len);
   char *iconv_str(const iconv_t desc, const char *str);
   char *files_iconv_str(const char *str);

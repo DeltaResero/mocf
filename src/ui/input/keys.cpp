@@ -610,7 +610,7 @@ static char *find_keymap_file()
     return pathstrcpy(path, create_file_name(file));
   }
 
-  return NULL;
+  return nullptr;
 }
 
 static void keymap_parse_error(const int line, const char *msg)
@@ -791,7 +791,7 @@ static void load_key_map(const char *file_name)
       keymap_parse_error(line_num, "unknown command");
     }
 
-    tmp = strtok(NULL, " \t");
+    tmp = strtok(nullptr, " \t");
     if (!tmp || (strcmp(tmp, "=") && strcmp(tmp, "+=")))
     {
       keymap_parse_error(line_num, "expected '=' or '+='");
@@ -806,7 +806,7 @@ static void load_key_map(const char *file_name)
       clear_default_keys(cmd_ix);
     }
 
-    while ((key = strtok(NULL, " \t")))
+    while ((key = strtok(nullptr, " \t")))
     {
       add_key(line_num, cmd_ix, key);
     }
@@ -979,7 +979,7 @@ void keys_cleanup()
  * in num. */
 char **get_keys_help(int *num)
 {
-  *num = (int)COMMANDS_NUM;
+  *num = static_cast<int>COMMANDS_NUM;
   return help;
 }
 

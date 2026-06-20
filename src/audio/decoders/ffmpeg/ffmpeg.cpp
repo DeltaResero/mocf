@@ -221,7 +221,7 @@ static inline char *ffmpeg_strerror(int errnum)
 {
   char *result;
 
-  ffmpeg_log_repeats(NULL);
+  ffmpeg_log_repeats(nullptr);
   result = static_cast<char *>(xmalloc(256));
   av_strerror(errnum, result, 256);
   result[255] = 0;
@@ -276,7 +276,7 @@ static void load_audio_extns(std::vector<std::string> &list)
       {"sap", "libgme"},   {"spc", "libgme"},  {"tak", "tak"},
       {"tta", "tta"},      {"vgm", "libgme"},  {"vgz", "libgme"},
       {"vqf", "vqf"},      {"wav", "wav"},     {"w64", "w64"},
-      {"wma", "asf"},      {"wv", "wv"},       {NULL, NULL}};
+      {"wma", "asf"},      {"wv", "wv"},       {nullptr, nullptr}};
 
   for (ix = 0; audio_extns[ix].extn; ix += 1)
   {
@@ -316,7 +316,7 @@ static void load_video_extns(std::vector<std::string> &list)
   int ix;
   const struct extn_list video_extns[] = {
       {"avi", "avi"},    {"flv", "flv"},  {"mkv", "matroska"},  {"mp4", "mp4"},
-      {"rec", "mpegts"}, {"vob", "mpeg"}, {"webm", "matroska"}, {NULL, NULL}};
+      {"rec", "mpegts"}, {"vob", "mpeg"}, {"webm", "matroska"}, {nullptr, nullptr}};
 
   for (ix = 0; video_extns[ix].extn; ix += 1)
   {
@@ -452,7 +452,7 @@ static void ffmpeg_destroy()
 #endif
 
   av_log_set_level(AV_LOG_QUIET);
-  ffmpeg_log_repeats(NULL);
+  ffmpeg_log_repeats(nullptr);
 
   supported_extns.clear();
 }
@@ -462,18 +462,18 @@ static void ffmpeg_info(const char *file_name, struct file_tags *info,
                         const int tags_sel)
 {
   int err;
-  AVFormatContext *ic = NULL;
+  AVFormatContext *ic = nullptr;
   AVDictionaryEntry *entry;
   AVDictionary *md;
 
-  err = avformat_open_input(&ic, file_name, NULL, NULL);
+  err = avformat_open_input(&ic, file_name, nullptr, nullptr);
   if (err < 0)
   {
     log_errno("avformat_open_input() failed", err);
     return;
   }
 
-  err = avformat_find_stream_info(ic, NULL);
+  err = avformat_find_stream_info(ic, nullptr);
   if (err < 0)
   {
     log_errno("avformat_find_stream_info() failed", err);
@@ -483,7 +483,7 @@ static void ffmpeg_info(const char *file_name, struct file_tags *info,
   if (!is_timing_broken(ic) && tags_sel & TAGS_TIME)
   {
     info->time = -1;
-    if (ic->duration != (int64_t)AV_NOPTS_VALUE && ic->duration >= 0)
+    if (ic->duration != AV_NOPTS_VALUE && ic->duration >= 0)
     {
       info->time = ic->duration / AV_TIME_BASE;
     }
@@ -495,7 +495,7 @@ static void ffmpeg_info(const char *file_name, struct file_tags *info,
   }
 
   md = ic->metadata;
-  if (md == NULL)
+  if (md == nullptr)
   {
     unsigned int audio_ix;
 
@@ -506,28 +506,28 @@ static void ffmpeg_info(const char *file_name, struct file_tags *info,
     }
   }
 
-  if (md == NULL)
+  if (md == nullptr)
   {
     debug("no metadata found");
     goto end;
   }
 
-  entry = av_dict_get(md, "track", NULL, 0);
+  entry = av_dict_get(md, "track", nullptr, 0);
   if (entry && entry->value && entry->value[0])
   {
-    info->track = (int)strtol(entry->value, NULL, 10);
+    info->track = static_cast<int>(strtol(entry->value, nullptr, 10));
   }
-  entry = av_dict_get(md, "title", NULL, 0);
+  entry = av_dict_get(md, "title", nullptr, 0);
   if (entry && entry->value && entry->value[0])
   {
     info->title = entry->value;
   }
-  entry = av_dict_get(md, "artist", NULL, 0);
+  entry = av_dict_get(md, "artist", nullptr, 0);
   if (entry && entry->value && entry->value[0])
   {
     info->artist = entry->value;
   }
-  entry = av_dict_get(md, "album", NULL, 0);
+  entry = av_dict_get(md, "album", nullptr, 0);
   if (entry && entry->value && entry->value[0])
   {
     info->album = entry->value;
@@ -535,7 +535,7 @@ static void ffmpeg_info(const char *file_name, struct file_tags *info,
 
 end:
   avformat_close_input(&ic);
-  ffmpeg_log_repeats(NULL);
+  ffmpeg_log_repeats(nullptr);
 }
 
 static long fmt_from_sample_fmt(struct ffmpeg_data *data)
@@ -639,7 +639,7 @@ static int ffmpeg_io_read_cb(void *s, uint8_t *buf, int count)
     return AVERROR(EINVAL);
   }
 
-  len = io_read((struct io_stream *)s, buf, (size_t)count);
+  len = io_read(static_cast<struct io_stream *>(s), buf, static_cast<size_t>(count));
   if (len == 0)
   {
     len = AVERROR_EOF;
@@ -668,34 +668,34 @@ static int64_t ffmpeg_io_seek_cb(void *s, int64_t offset, int whence)
     case SEEK_SET:
     case SEEK_CUR:
     case SEEK_END:
-      result = io_seek((struct io_stream *)s, offset, w);
+      result = io_seek(static_cast<struct io_stream *>(s), offset, w);
       break;
     case AVSEEK_SIZE:
-      result = io_file_size((struct io_stream *)s);
+      result = io_file_size(static_cast<struct io_stream *>(s));
       break;
   }
 
   return result;
 }
 
-static struct ffmpeg_data *ffmpeg_make_data(void)
+static struct ffmpeg_data *ffmpeg_make_data()
 {
   struct ffmpeg_data *data;
 
   data = new ffmpeg_data;
 
-  data->ic = NULL;
-  data->pb = NULL;
-  data->stream = NULL;
-  data->enc = NULL;
-  data->codec = NULL;
-  data->opts = NULL;
+  data->ic = nullptr;
+  data->pb = nullptr;
+  data->stream = nullptr;
+  data->enc = nullptr;
+  data->codec = nullptr;
+  data->opts = nullptr;
   data->delay = false;
   data->eof = false;
   data->eos = false;
   data->okay = false;
-  data->filename = NULL;
-  data->iostream = NULL;
+  data->filename = nullptr;
+  data->iostream = nullptr;
   decoder_error_init(&data->error);
   data->fmt = 0;
   data->sample_width = 0;
@@ -717,7 +717,7 @@ static struct ffmpeg_data *ffmpeg_make_data(void)
 static void *ffmpeg_open_internal(struct ffmpeg_data *data)
 {
   int err;
-  const char *extn = NULL;
+  const char *extn = nullptr;
   unsigned int audio_ix;
 
   data->ic = avformat_alloc_context();
@@ -726,8 +726,8 @@ static void *ffmpeg_open_internal(struct ffmpeg_data *data)
     fatal("Can't allocate format context!");
   }
 
-  data->ic->pb = avio_alloc_context(NULL, 0, 0, data->iostream,
-                                    ffmpeg_io_read_cb, NULL, ffmpeg_io_seek_cb);
+  data->ic->pb = avio_alloc_context(nullptr, 0, 0, data->iostream,
+                                    ffmpeg_io_read_cb, nullptr, ffmpeg_io_seek_cb);
   if (!data->ic->pb)
   {
     fatal("Can't allocate avio context!");
@@ -737,7 +737,7 @@ static void *ffmpeg_open_internal(struct ffmpeg_data *data)
    * memory leak later in ffmpeg_close(). */
   data->pb = data->ic->pb;
 
-  err = avformat_open_input(&data->ic, NULL, NULL, NULL);
+  err = avformat_open_input(&data->ic, nullptr, nullptr, nullptr);
   if (err < 0)
   {
     char *buf = ffmpeg_strerror(err);
@@ -762,7 +762,7 @@ static void *ffmpeg_open_internal(struct ffmpeg_data *data)
     }
   }
 
-  err = avformat_find_stream_info(data->ic, NULL);
+  err = avformat_find_stream_info(data->ic, nullptr);
   if (err < 0)
   {
     /* Depending on the particular FFmpeg/LibAV version in use, this
@@ -784,7 +784,7 @@ static void *ffmpeg_open_internal(struct ffmpeg_data *data)
 
   data->stream = data->ic->streams[audio_ix];
 
-  data->enc = avcodec_alloc_context3(NULL);
+  data->enc = avcodec_alloc_context3(nullptr);
   if (!data->enc)
   {
     decoder_error(&data->error, ERROR_FATAL, 0,
@@ -877,7 +877,7 @@ static void *ffmpeg_open_internal(struct ffmpeg_data *data)
 
   if (data->timing_broken && extn && !strcasecmp(extn, "wav"))
   {
-    ffmpeg_log_repeats(NULL);
+    ffmpeg_log_repeats(nullptr);
     decoder_error(&data->error, ERROR_FATAL, 0, "Broken WAV file; use W64!");
     goto end;
   }
@@ -886,7 +886,7 @@ static void *ffmpeg_open_internal(struct ffmpeg_data *data)
 
   if (!data->timing_broken && data->ic->duration >= AV_TIME_BASE)
   {
-    data->avg_bitrate = (int)(avio_size(data->ic->pb) /
+    data->avg_bitrate = static_cast<int>(avio_size(data->ic->pb) /
                               (data->ic->duration / AV_TIME_BASE) * 8);
   }
 
@@ -906,7 +906,7 @@ end:
 #endif
   av_dict_free(&data->opts);
   avformat_close_input(&data->ic);
-  ffmpeg_log_repeats(NULL);
+  ffmpeg_log_repeats(nullptr);
   return data;
 }
 
@@ -959,7 +959,7 @@ static int take_from_remain_buf(struct ffmpeg_data *data, char *buf,
 
   memcpy(buf, data->remain_buf.data(), to_copy);
 
-  if (to_copy < (int)data->remain_buf.size())
+  if (to_copy < static_cast<int>(data->remain_buf.size()))
   {
     data->remain_buf.erase(data->remain_buf.begin(),
                            data->remain_buf.begin() + to_copy);
@@ -1075,7 +1075,7 @@ static AVPacket *get_packet(struct ffmpeg_data *data)
     char *buf = ffmpeg_strerror(rc);
     decoder_error(&data->error, ERROR_FATAL, 0, "Error in the stream: %s", buf);
     free(buf);
-    return NULL;
+    return nullptr;
   }
 
   if (data->delay)
@@ -1084,7 +1084,7 @@ static AVPacket *get_packet(struct ffmpeg_data *data)
   }
 
   data->eos = true;
-  return NULL;
+  return nullptr;
 }
 
 #ifndef HAVE_AVCODEC_RECEIVE_FRAME
@@ -1203,7 +1203,7 @@ static int decode_packet(struct ffmpeg_data *data, AVPacket *pkt, char *buf,
     }
 
     is_planar = av_sample_fmt_is_planar(data->enc->sample_fmt);
-    packed = (char *)frame->extended_data[0];
+    packed = reinterpret_cast<char *>(frame->extended_data[0]);
 #if LIBAVUTIL_VERSION_MAJOR < 58
     int nb_channels = data->enc->channels;
 #else
@@ -1225,7 +1225,7 @@ static int decode_packet(struct ffmpeg_data *data, AVPacket *pkt, char *buf,
         for (ch = 0; ch < nb_channels; ch += 1)
         {
           memcpy(packed + (sample * nb_channels + ch) * data->sample_width,
-                 (char *)frame->extended_data[ch] + sample * data->sample_width,
+                 reinterpret_cast<char *>(frame->extended_data[ch]) + sample * data->sample_width,
                  data->sample_width);
         }
       }
@@ -1274,7 +1274,7 @@ static bool seek_in_stream(struct ffmpeg_data *data, int sec)
   seek_ts =
       av_rescale(sec, data->stream->time_base.den, data->stream->time_base.num);
 
-  if (data->stream->start_time != (int64_t)AV_NOPTS_VALUE)
+  if (data->stream->start_time != AV_NOPTS_VALUE)
   {
     if (seek_ts > INT64_MAX - MAX(0, data->stream->start_time))
     {
@@ -1303,11 +1303,11 @@ static inline int compute_bitrate(struct sound_params *sound_params,
   int64_t bytes_per_frame, bytes_per_second, seconds;
 
   bytes_per_frame = sfmt_Bps(sound_params->fmt) * sound_params->channels;
-  bytes_per_second = bytes_per_frame * (int64_t)sound_params->rate;
-  seconds = (int64_t)bytes_produced / bytes_per_second;
+  bytes_per_second = bytes_per_frame * static_cast<int64_t>(sound_params->rate);
+  seconds = static_cast<int64_t>(bytes_produced) / bytes_per_second;
   if (seconds > 0)
   {
-    bitrate = (int)((int64_t)bytes_used * 8 / seconds);
+    bitrate = static_cast<int>(static_cast<int64_t>(bytes_used) * 8 / seconds);
   }
 
   return bitrate;
@@ -1316,7 +1316,7 @@ static inline int compute_bitrate(struct sound_params *sound_params,
 static int ffmpeg_decode(void *prv_data, char *buf, int buf_len,
                          struct sound_params *sound_params)
 {
-  struct ffmpeg_data *data = (struct ffmpeg_data *)prv_data;
+  struct ffmpeg_data *data = static_cast<struct ffmpeg_data *>(prv_data);
   int bytes_used = 0, bytes_produced = 0;
 
   decoder_error_clear(&data->error);
@@ -1372,7 +1372,7 @@ static int ffmpeg_decode(void *prv_data, char *buf, int buf_len,
 #ifdef AV_PKT_FLAG_CORRUPT
     if (pkt->flags & AV_PKT_FLAG_CORRUPT)
     {
-      ffmpeg_log_repeats(NULL);
+      ffmpeg_log_repeats(nullptr);
       debug("Dropped corrupt packet.");
       free_packet(pkt);
       continue;
@@ -1395,7 +1395,7 @@ static int ffmpeg_decode(void *prv_data, char *buf, int buf_len,
   {
     data->bitrate =
         compute_bitrate(sound_params, bytes_used,
-                        bytes_produced + (int)data->remain_buf.size(), data->bitrate);
+                        bytes_produced + static_cast<int>(data->remain_buf.size()), data->bitrate);
   }
 
   return bytes_produced;
@@ -1403,7 +1403,7 @@ static int ffmpeg_decode(void *prv_data, char *buf, int buf_len,
 
 static int ffmpeg_seek(void *prv_data, int sec)
 {
-  struct ffmpeg_data *data = (struct ffmpeg_data *)prv_data;
+  struct ffmpeg_data *data = static_cast<struct ffmpeg_data *>(prv_data);
 
   assert(sec >= 0);
 
@@ -1436,7 +1436,7 @@ static int ffmpeg_seek(void *prv_data, int sec)
 
 static void ffmpeg_close(void *prv_data)
 {
-  struct ffmpeg_data *data = (struct ffmpeg_data *)prv_data;
+  struct ffmpeg_data *data = static_cast<struct ffmpeg_data *>(prv_data);
 
   /* We need to delve into the AVIOContext struct to free the
    * buffer FFmpeg leaked if avformat_open_input() failed.  Do
@@ -1460,12 +1460,12 @@ static void ffmpeg_close(void *prv_data)
     free_remain_buf(data);
   }
 
-  ffmpeg_log_repeats(NULL);
+  ffmpeg_log_repeats(nullptr);
 
   if (data->iostream)
   {
     io_close(data->iostream);
-    data->iostream = NULL;
+    data->iostream = nullptr;
   }
 
   decoder_error_clear(&data->error);
@@ -1479,27 +1479,27 @@ static struct io_stream *ffmpeg_get_iostream(void *prv_data)
 
   assert(prv_data);
 
-  data = (struct ffmpeg_data *)prv_data;
+  data = static_cast<struct ffmpeg_data *>(prv_data);
   return data->iostream;
 }
 
 static int ffmpeg_get_bitrate(void *prv_data)
 {
-  struct ffmpeg_data *data = (struct ffmpeg_data *)prv_data;
+  struct ffmpeg_data *data = static_cast<struct ffmpeg_data *>(prv_data);
 
   return data->timing_broken ? -1 : data->bitrate / 1000;
 }
 
 static int ffmpeg_get_avg_bitrate(void *prv_data)
 {
-  struct ffmpeg_data *data = (struct ffmpeg_data *)prv_data;
+  struct ffmpeg_data *data = static_cast<struct ffmpeg_data *>(prv_data);
 
   return data->timing_broken ? -1 : data->avg_bitrate / 1000;
 }
 
 static int ffmpeg_get_duration(void *prv_data)
 {
-  struct ffmpeg_data *data = (struct ffmpeg_data *)prv_data;
+  struct ffmpeg_data *data = static_cast<struct ffmpeg_data *>(prv_data);
 
   if (data->timing_broken)
   {
@@ -1511,7 +1511,7 @@ static int ffmpeg_get_duration(void *prv_data)
     return -1;
   }
 
-  if (data->stream->duration == (int64_t)AV_NOPTS_VALUE)
+  if (data->stream->duration == AV_NOPTS_VALUE)
   {
     return -1;
   }
@@ -1549,7 +1549,7 @@ static int ffmpeg_our_format_mime(const char *mime_type)
 
 static void ffmpeg_get_error(void *prv_data, struct decoder_error *error)
 {
-  struct ffmpeg_data *data = (struct ffmpeg_data *)prv_data;
+  struct ffmpeg_data *data = static_cast<struct ffmpeg_data *>(prv_data);
 
   decoder_error_copy(error, &data->error);
 }

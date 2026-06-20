@@ -148,7 +148,7 @@ struct plist_item *plist_new_item()
   item->type     = F_OTHER;
   item->deleted  = 0;
   item->tags     = nullptr;
-  item->mtime    = (time_t)-1;
+  item->mtime    = static_cast<time_t>(-1);
   item->queue_pos = 0;
   return item;
 }
@@ -167,7 +167,7 @@ int plist_add(struct plist *plist, const char *file_name)
   item.type      = file_name ? file_type(file_name) : F_OTHER;
   item.deleted   = 0;
   item.tags      = nullptr;
-  item.mtime     = file_name ? get_mtime(file_name) : (time_t)-1;
+  item.mtime     = file_name ? get_mtime(file_name) : static_cast<time_t>(-1);
   item.queue_pos = 0;
 
   plist->num++;
@@ -218,7 +218,7 @@ char *plist_get_file(const struct plist *plist, int i)
     return xstrdup(plist->items[i].file.c_str());
   }
 
-  return NULL;
+  return nullptr;
 }
 
 /* Get the number of the next item on the list (skipping deleted items).
@@ -314,7 +314,7 @@ void plist_sort_fname(struct plist *plist)
     }
   }
 
-  n = (int)sorted.size();
+  n = static_cast<int>(sorted.size());
   plist->search_tree.clear();
   for (int i = 0; i < n; i++)
   {
@@ -390,7 +390,7 @@ const char *plist_get_next_dead_entry(const struct plist *plist,
     }
   }
 
-  return NULL;
+  return nullptr;
 }
 
 static const char *title_expn_subs(char fmt, const struct file_tags *tags)
@@ -407,16 +407,16 @@ static const char *title_expn_subs(char fmt, const struct file_tags *tags)
       snprintf(track, sizeof(track), "%d", tags->track);
       return track;
     case 'a':
-      return (tags && !tags->artist.empty()) ? tags->artist.c_str() : NULL;
+      return (tags && !tags->artist.empty()) ? tags->artist.c_str() : nullptr;
     case 'A':
-      return (tags && !tags->album.empty()) ? tags->album.c_str() : NULL;
+      return (tags && !tags->album.empty()) ? tags->album.c_str() : nullptr;
     case 't':
-      return (tags && !tags->title.empty()) ? tags->title.c_str() : NULL;
+      return (tags && !tags->title.empty()) ? tags->title.c_str() : nullptr;
     default:
       fatal("Error parsing format string!");
   }
 
-  return NULL;
+  return nullptr;
 }
 
 static inline void check_zero(const char *x)
@@ -912,7 +912,7 @@ struct file_tags *plist_get_tags(const struct plist *plist, const int num)
     return tags_dup(plist->items[num].tags.get());
   }
 
-  return NULL;
+  return nullptr;
 }
 
 /* Swap two files on the playlist. */

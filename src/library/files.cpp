@@ -45,9 +45,9 @@
 #define READ_LINE_INIT_SIZE 256
 
 #ifdef HAVE_LIBMAGIC
-static magic_t cookie = NULL;
-static char *cached_file = NULL;
-static char *cached_result = NULL;
+static magic_t cookie = nullptr;
+static char *cached_file = nullptr;
+static char *cached_result = nullptr;
 #endif
 
 void files_init()
@@ -59,15 +59,15 @@ void files_init()
                       MAGIC_NO_CHECK_COMPRESS | MAGIC_NO_CHECK_ELF |
                       MAGIC_NO_CHECK_TAR | MAGIC_NO_CHECK_TOKENS |
                       MAGIC_NO_CHECK_FORTRAN | MAGIC_NO_CHECK_TROFF);
-  if (cookie == NULL)
+  if (cookie == nullptr)
   {
     log_errno("Error allocating magic cookie", errno);
   }
-  else if (magic_load(cookie, NULL) != 0)
+  else if (magic_load(cookie, nullptr) != 0)
   {
     logit("Error loading magic database: %s", magic_error(cookie));
     magic_close(cookie);
-    cookie = NULL;
+    cookie = nullptr;
   }
 #endif
 }
@@ -76,11 +76,11 @@ void files_cleanup()
 {
 #ifdef HAVE_LIBMAGIC
   free(cached_file);
-  cached_file = NULL;
+  cached_file = nullptr;
   free(cached_result);
-  cached_result = NULL;
+  cached_result = nullptr;
   magic_close(cookie);
-  cookie = NULL;
+  cookie = nullptr;
 #endif
 }
 
@@ -129,14 +129,14 @@ enum file_type file_type(const char *file)
 /* Given a file name, return the mime type or NULL. */
 char *file_mime_type(const char *file ASSERT_ONLY)
 {
-  char *result = NULL;
+  char *result = nullptr;
 
   assert(file != NULL);
 
 #ifdef HAVE_LIBMAGIC
   static pthread_mutex_t magic_mtx = PTHREAD_MUTEX_INITIALIZER;
 
-  if (cookie != NULL)
+  if (cookie != nullptr)
   {
     LOCK(magic_mtx);
     if (cached_file && !strcmp(cached_file, file))
@@ -147,9 +147,9 @@ char *file_mime_type(const char *file ASSERT_ONLY)
     {
       free(cached_file);
       free(cached_result);
-      cached_file = cached_result = NULL;
+      cached_file = cached_result = nullptr;
       result = xstrdup(magic_file(cookie, file));
-      if (result == NULL)
+      if (result == nullptr)
       {
         logit("Error interrogating file: %s", magic_error(cookie));
       }
@@ -361,7 +361,7 @@ struct file_tags *read_file_tags(const char *file, struct file_tags *tags,
 
   assert(file != NULL);
 
-  if (tags == NULL)
+  if (tags == nullptr)
   {
     tags = tags_new();
   }
@@ -520,7 +520,7 @@ static int read_directory_recurr_internal(const char *directory,
   }
 
   (*depth)++;
-  *dir_stack = (ino_t *)xrealloc(*dir_stack, sizeof(ino_t) * (*depth));
+  *dir_stack = static_cast<ino_t *>(xrealloc(*dir_stack, sizeof(ino_t) * (*depth)));
   (*dir_stack)[*depth - 1] = st.st_ino;
 
   while ((entry = readdir(dir)))
@@ -557,7 +557,7 @@ static int read_directory_recurr_internal(const char *directory,
   }
 
   (*depth)--;
-  *dir_stack = (ino_t *)xrealloc(*dir_stack, sizeof(ino_t) * (*depth));
+  *dir_stack = static_cast<ino_t *>(xrealloc(*dir_stack, sizeof(ino_t) * (*depth)));
 
   closedir(dir);
   return 1;
@@ -567,7 +567,7 @@ int read_directory_recurr(const char *directory, struct plist *plist)
 {
   int ret;
   int depth = 0;
-  ino_t *dir_stack = NULL;
+  ino_t *dir_stack = nullptr;
 
   ret = read_directory_recurr_internal(directory, plist, &dir_stack, &depth);
 
@@ -592,10 +592,10 @@ char *ext_pos(const char *file)
   }
   else
   {
-    ext = NULL;
+    ext = nullptr;
   }
 
-  return (char *)ext;
+  return const_cast<char *>(ext);
 }
 
 /* Read one line from a file, strip trailing end of line chars.
@@ -604,9 +604,9 @@ char *read_line(FILE *file)
 {
   int line_alloc = READ_LINE_INIT_SIZE;
   int len = 0;
-  char *line = (char *)xmalloc(sizeof(char) * line_alloc);
+  char *line = static_cast<char *>(xmalloc(sizeof(char) * line_alloc));
 
-  while (1)
+  while (true)
   {
     if (!fgets(line + len, line_alloc - len, file))
     {
@@ -621,13 +621,13 @@ char *read_line(FILE *file)
 
     /* If we are here, it means that line is longer than the buffer. */
     line_alloc *= 2;
-    line = (char *)xrealloc(line, sizeof(char) * line_alloc);
+    line = static_cast<char *>(xrealloc(line, sizeof(char) * line_alloc));
   }
 
   if (len == 0)
   {
     free(line);
-    return NULL;
+    return nullptr;
   }
 
   if (line[len - 1] == '\n')
@@ -664,20 +664,20 @@ char *find_match_dir(char *pattern)
   struct dirent *entry;
   int name_len;
   char *name;
-  char *matching_dir = NULL;
+  char *matching_dir = nullptr;
   char *search_dir;
   int unambiguous = 1;
 
   if (!pattern[0])
   {
-    return NULL;
+    return nullptr;
   }
 
   /* strip the last directory */
   slash = strrchr(pattern, '/');
   if (!slash)
   {
-    return NULL;
+    return nullptr;
   }
   if (slash == pattern)
   {
@@ -696,7 +696,7 @@ char *find_match_dir(char *pattern)
 
   if (!(dir = opendir(search_dir)))
   {
-    return NULL;
+    return nullptr;
   }
 
   while ((entry = readdir(dir)))
@@ -740,8 +740,8 @@ char *find_match_dir(char *pattern)
 
   if (matching_dir && unambiguous)
   {
-    matching_dir = (char *)xrealloc(matching_dir,
-                                    sizeof(char) * (strlen(matching_dir) + 2));
+    matching_dir = static_cast<char *>(xrealloc(matching_dir,
+                                    sizeof(char) * (strlen(matching_dir) + 2)));
     strcat(matching_dir, "/");
   }
 
@@ -777,7 +777,7 @@ time_t get_mtime(const char *file)
     return stat_buf.st_mtime;
   }
 
-  return (time_t)-1;
+  return static_cast<time_t>(-1);
 }
 
 /* Convert file path to absolute path;

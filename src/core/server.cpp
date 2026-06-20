@@ -152,7 +152,7 @@ void engine_event_queue_wait_flush(struct engine_event_queue *eq,
   /* select() restores the O_NONBLOCK flag so reading will still work. */
   int fd_blocking = eq->pipe_fd[0];
   /* Temporarily make the read end blocking just for select. */
-  (void)select(fd_blocking + 1, &fds, NULL, NULL, NULL);
+  (void)select(fd_blocking + 1, &fds, nullptr, nullptr, nullptr);
 
   engine_event_queue_flush(eq, dest);
 }
@@ -191,7 +191,7 @@ void engine_quit(void)
 /* -----------------------------------------------------------------------
  * Global engine event queue pointer (set by server_init, used by callbacks)
  * ----------------------------------------------------------------------- */
-static struct engine_event_queue *g_eq = NULL;
+static struct engine_event_queue *g_eq = nullptr;
 
 /* Thread ID of the engine thread (used in signal handling) */
 static pthread_t server_tid;
@@ -223,7 +223,7 @@ static void sig_chld(int sig LOGIT_ONLY)
   saved_errno = errno;
   do
   {
-    rc = waitpid(-1, NULL, WNOHANG);
+    rc = waitpid(-1, nullptr, WNOHANG);
   } while (rc > 0);
   errno = saved_errno;
 }
@@ -296,7 +296,7 @@ static void run_extern_cmd(const char *event)
     char *args[2];
 
     args[0] = xstrdup(command);
-    args[1] = NULL;
+    args[1] = nullptr;
 
     switch (fork())
     {
@@ -323,7 +323,7 @@ static void run_extern_cmd(const char *event)
 
 static void add_event_all(const int event, const void *data)
 {
-  void *data_copy = NULL;
+  void *data_copy = nullptr;
 
   if (event == EV_STATE)
   {
@@ -351,7 +351,7 @@ static void add_event_all(const int event, const void *data)
     }
     else if (event == EV_SRV_ERROR)
     {
-      const struct srv_error_ev *src = (const struct srv_error_ev *)data;
+      const struct srv_error_ev *src = static_cast<const struct srv_error_ev *>(data);
       auto *e = new srv_error_ev;
       e->file = xstrdup(src->file);
       e->msg  = xstrdup(src->msg);
@@ -413,12 +413,12 @@ void server_init(struct engine_event_queue *eq)
  * server_loop — wait for quit, then shut down
  * ----------------------------------------------------------------------- */
 
-static void server_shutdown(void)
+static void server_shutdown()
 {
   logit("Engine exiting...");
   audio_exit();
   tags_cache_free(tags_cache);
-  tags_cache = NULL;
+  tags_cache = nullptr;
   logit("Running OnEngineStop");
   run_extern_cmd("OnEngineStop");
   logit("Engine exited");
@@ -451,30 +451,30 @@ void server_loop(void)
 void set_info_bitrate(const int bitrate)
 {
   sound_info.bitrate = bitrate;
-  add_event_all(EV_BITRATE, NULL);
+  add_event_all(EV_BITRATE, nullptr);
 }
 
 void set_info_channels(const int channels)
 {
   sound_info.channels = channels;
-  add_event_all(EV_CHANNELS, NULL);
+  add_event_all(EV_CHANNELS, nullptr);
 }
 
 void set_info_rate(const int rate)
 {
   sound_info.rate = rate;
-  add_event_all(EV_RATE, NULL);
+  add_event_all(EV_RATE, nullptr);
 }
 
 void set_info_avg_bitrate(const int avg_bitrate)
 {
   sound_info.avg_bitrate = avg_bitrate;
-  add_event_all(EV_AVG_BITRATE, NULL);
+  add_event_all(EV_AVG_BITRATE, nullptr);
 }
 
-void state_change(void)  { add_event_all(EV_STATE, NULL); }
-void ctime_change(void)  { add_event_all(EV_CTIME, NULL); }
-void tags_change(void)   { add_event_all(EV_TAGS, NULL); }
+void state_change(void)  { add_event_all(EV_STATE, nullptr); }
+void ctime_change(void)  { add_event_all(EV_CTIME, nullptr); }
+void tags_change(void)   { add_event_all(EV_TAGS, nullptr); }
 
 void status_msg(const char *msg) { add_event_all(EV_STATUS_MSG, msg); }
 
@@ -491,8 +491,8 @@ void tags_response(const char *file, const struct file_tags *tags)
   eq_push(g_eq, EV_FILE_TAGS, data);
 }
 
-void ev_audio_start(void) { add_event_all(EV_AUDIO_START, NULL); }
-void ev_audio_stop(void)  { add_event_all(EV_AUDIO_STOP, NULL); }
+void ev_audio_start(void) { add_event_all(EV_AUDIO_START, nullptr); }
+void ev_audio_stop(void)  { add_event_all(EV_AUDIO_STOP, nullptr); }
 
 void server_queue_pop(const char *filename)
 {
@@ -503,8 +503,8 @@ void server_queue_pop(const char *filename)
 void engine_error(const char *file, const char *msg)
 {
   struct srv_error_ev e;
-  e.file = (char *)file;
-  e.msg  = (char *)msg;
+  e.file = const_cast<char *>(file);
+  e.msg  = const_cast<char *>(msg);
   add_event_all(EV_SRV_ERROR, &e);
 }
 
@@ -544,7 +544,7 @@ void engine_set_option(const char *name, bool val)
     return;
   }
   options_set_bool(name, val);
-  add_event_all(EV_OPTIONS, NULL);
+  add_event_all(EV_OPTIONS, nullptr);
 }
 
 /* -----------------------------------------------------------------------
@@ -594,7 +594,7 @@ void engine_queue_clear(void)
 {
   logit("Clearing the queue");
   audio_queue_clear();
-  add_event_all(EV_QUEUE_CLEAR, NULL);
+  add_event_all(EV_QUEUE_CLEAR, nullptr);
 }
 
 struct plist *engine_get_queue(void)
@@ -641,16 +641,16 @@ void engine_jump_to(int sec)
 void engine_toggle_mixer_channel(void)
 {
   audio_toggle_mixer_channel();
-  add_event_all(EV_MIXER_CHANGE, NULL);
+  add_event_all(EV_MIXER_CHANGE, nullptr);
 }
 
 void engine_toggle_softmixer(void)
 {
   softmixer_set_active(!softmixer_is_active());
-  add_event_all(EV_MIXER_CHANGE, NULL);
+  add_event_all(EV_MIXER_CHANGE, nullptr);
 }
 
-static void update_eq_name(void)
+static void update_eq_name()
 {
   char buffer[27];
   char *n = equalizer_current_eqname();

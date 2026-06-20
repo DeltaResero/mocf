@@ -324,7 +324,7 @@ static int get_exe_dir(char *buf, size_t len)
   }
   *slash = '\0';
 
-  if ((size_t)snprintf(buf, len, "%s", exe_path) >= len)
+  if (static_cast<size_t>(snprintf(buf, len, "%s", exe_path)) >= len)
   {
     return 0;
   }
@@ -391,7 +391,7 @@ static char *find_theme_file(const char *name)
   }
 
   printf("Error loading theme '%s'!", name);
-  return NULL;
+  return nullptr;
 }
 
 /* Parse a theme element line. strtok() should be already invoked and consumed
@@ -407,7 +407,7 @@ static int parse_theme_element(const int line_num, const char *name,
   enum color_index element;
   short clr_fore, clr_back;
 
-  if (!(tmp = strtok(NULL, " \t")) || strcmp(tmp, "="))
+  if (!(tmp = strtok(nullptr, " \t")) || strcmp(tmp, "="))
   {
     if (errors_are_fatal)
     {
@@ -415,7 +415,7 @@ static int parse_theme_element(const int line_num, const char *name,
     }
     return 0;
   }
-  if (!(foreground = strtok(NULL, " \t")))
+  if (!(foreground = strtok(nullptr, " \t")))
   {
     if (errors_are_fatal)
     {
@@ -423,7 +423,7 @@ static int parse_theme_element(const int line_num, const char *name,
     }
     return 0;
   }
-  if (!(background = strtok(NULL, " \t")))
+  if (!(background = strtok(nullptr, " \t")))
   {
     if (errors_are_fatal)
     {
@@ -431,11 +431,11 @@ static int parse_theme_element(const int line_num, const char *name,
     }
     return 0;
   }
-  if ((attributes = strtok(NULL, " \t")))
+  if ((attributes = strtok(nullptr, " \t")))
   {
     char *attr;
 
-    if ((tmp = strtok(NULL, " \t")))
+    if ((tmp = strtok(nullptr, " \t")))
     {
       if (errors_are_fatal)
       {
@@ -488,7 +488,7 @@ static int parse_theme_element(const int line_num, const char *name,
         }
         return 0;
       }
-    } while ((attr = strtok(NULL, ",")));
+    } while ((attr = strtok(nullptr, ",")));
   }
 
   if ((element = find_color_element_name(name)) == CLR_WRONG)
@@ -568,7 +568,7 @@ static int parse_theme_colordef(const int line_num, const int errors_are_fatal)
   char *tmp, *tmp2;
   short red, green, blue;
 
-  if (!(name = strtok(NULL, " \t")))
+  if (!(name = strtok(nullptr, " \t")))
   {
     if (errors_are_fatal)
     {
@@ -576,7 +576,7 @@ static int parse_theme_colordef(const int line_num, const int errors_are_fatal)
     }
     return 0;
   }
-  if (!(tmp = strtok(NULL, " \t")) || strcmp(tmp, "="))
+  if (!(tmp = strtok(nullptr, " \t")) || strcmp(tmp, "="))
   {
     if (errors_are_fatal)
     {
@@ -585,7 +585,7 @@ static int parse_theme_colordef(const int line_num, const int errors_are_fatal)
     return 0;
   }
 
-  tmp = strtok(NULL, "");
+  tmp = strtok(nullptr, "");
 
   /* Check if color is in hex format */
   if (tmp[0] == '#')
@@ -618,9 +618,9 @@ static int parse_theme_colordef(const int line_num, const int errors_are_fatal)
   {
     tmp2 = strtok(tmp, " \t");
     red = parse_rgb_color_value(line_num, errors_are_fatal, tmp2);
-    tmp2 = strtok(NULL, " \t");
+    tmp2 = strtok(nullptr, " \t");
     green = parse_rgb_color_value(line_num, errors_are_fatal, tmp2);
-    tmp2 = strtok(NULL, " \t");
+    tmp2 = strtok(nullptr, " \t");
     blue = parse_rgb_color_value(line_num, errors_are_fatal, tmp2);
     if (red == -1 || green == -1 || blue == -1)
     {

@@ -70,12 +70,12 @@ static void get_comment_tags(OggOpusFile *of, struct file_tags *info)
     else if (!strncasecmp(comments->user_comments[i],
                           "tracknumber=", strlen("tracknumber=")))
     {
-      info->track = (int)strtol(comments->user_comments[i] + strlen("tracknumber="), NULL, 10);
+      info->track = static_cast<int>(strtol(comments->user_comments[i] + strlen("tracknumber="), nullptr, 10));
     }
     else if (!strncasecmp(comments->user_comments[i],
                           "track=", strlen("track=")))
     {
-      info->track = (int)strtol(comments->user_comments[i] + strlen("track="), NULL, 10);
+      info->track = static_cast<int>(strtol(comments->user_comments[i] + strlen("track="), nullptr, 10));
     }
   }
 }
@@ -204,7 +204,7 @@ static int close_cb(void *datasource ATTR_UNUSED) { return 0; }
 
 static opus_int64 tell_cb(void *datasource)
 {
-  return (opus_int64)io_tell(static_cast<io_stream *>(datasource));
+  return static_cast<opus_int64>(io_tell(static_cast<io_stream *>(datasource)));
 }
 
 static void opus_open_stream_internal(struct opus_data *data)
@@ -215,7 +215,7 @@ static void opus_open_stream_internal(struct opus_data *data)
 
   data->tags = tags_new();
 
-  data->of = op_open_callbacks(data->stream, &callbacks, NULL, 0, &res);
+  data->of = op_open_callbacks(data->stream, &callbacks, nullptr, 0, &res);
   if (res < 0)
   {
     const char *opus_err = opus_str_error(res);
@@ -223,7 +223,7 @@ static void opus_open_stream_internal(struct opus_data *data)
     decoder_error(&data->error, ERROR_FATAL, 0, "%s", opus_err);
     debug("op_open error: %s", opus_err);
     op_free(data->of);
-    data->of = NULL;
+    data->of = nullptr;
     io_close(data->stream);
   }
   else
@@ -255,7 +255,7 @@ static void *opus_open(const char *file)
 
   decoder_error_init(&data->error);
   data->tags_change = 0;
-  data->tags = NULL;
+  data->tags = nullptr;
 
   data->stream = io_open(file, 1);
   if (!io_ok(data->stream))
@@ -273,7 +273,7 @@ static void *opus_open(const char *file)
 
 static void opus_close(void *prv_data)
 {
-  struct opus_data *data = (struct opus_data *)prv_data;
+  struct opus_data *data = static_cast<struct opus_data *>(prv_data);
 
   if (data->ok)
   {
@@ -291,27 +291,27 @@ static void opus_close(void *prv_data)
 
 static int opus_seek(void *prv_data, int sec)
 {
-  struct opus_data *data = (struct opus_data *)prv_data;
+  struct opus_data *data = static_cast<struct opus_data *>(prv_data);
 
   assert(sec >= 0);
 
-  return op_pcm_seek(data->of, sec * (ogg_int64_t)48000) < 0 ? -1 : sec;
+  return op_pcm_seek(data->of, sec * static_cast<ogg_int64_t>(48000)) < 0 ? -1 : sec;
 }
 
 static int opus_decodeX(void *prv_data, char *buf, int buf_len,
                         struct sound_params *sound_params)
 {
-  struct opus_data *data = (struct opus_data *)prv_data;
+  struct opus_data *data = static_cast<struct opus_data *>(prv_data);
   int ret;
   int current_section;
   int bitrate;
 
   decoder_error_clear(&data->error);
 
-  while (1)
+  while (true)
   {
 #if HAVE_OPUSFILE_FLOAT && INTERNAL_FLOAT
-    ret = op_read_float(data->of, (float *)buf, buf_len / sizeof(float),
+    ret = op_read_float(data->of, reinterpret_cast<float *>(buf), buf_len / sizeof(float),
                         &current_section);
     debug("opus float!");
 #else
@@ -362,7 +362,7 @@ static int opus_decodeX(void *prv_data, char *buf, int buf_len,
 
 static int opus_current_tags(void *prv_data, struct file_tags *tags)
 {
-  struct opus_data *data = (struct opus_data *)prv_data;
+  struct opus_data *data = static_cast<struct opus_data *>(prv_data);
 
   tags_copy(tags, data->tags);
 
@@ -377,28 +377,28 @@ static int opus_current_tags(void *prv_data, struct file_tags *tags)
 
 static int opus_get_bitrate(void *prv_data)
 {
-  struct opus_data *data = (struct opus_data *)prv_data;
+  struct opus_data *data = static_cast<struct opus_data *>(prv_data);
 
   return data->bitrate;
 }
 
 static int opus_get_avg_bitrate(void *prv_data)
 {
-  struct opus_data *data = (struct opus_data *)prv_data;
+  struct opus_data *data = static_cast<struct opus_data *>(prv_data);
 
   return data->avg_bitrate;
 }
 
 static int opus_get_duration(void *prv_data)
 {
-  struct opus_data *data = (struct opus_data *)prv_data;
+  struct opus_data *data = static_cast<struct opus_data *>(prv_data);
 
   return data->duration;
 }
 
 static struct io_stream *opus_get_stream(void *prv_data)
 {
-  struct opus_data *data = (struct opus_data *)prv_data;
+  struct opus_data *data = static_cast<struct opus_data *>(prv_data);
 
   return data->stream;
 }
@@ -415,7 +415,7 @@ static int opus_our_format_ext(const char *ext)
 
 static void opus_get_error(void *prv_data, struct decoder_error *error)
 {
-  struct opus_data *data = (struct opus_data *)prv_data;
+  struct opus_data *data = static_cast<struct opus_data *>(prv_data);
 
   decoder_error_copy(error, &data->error);
 }

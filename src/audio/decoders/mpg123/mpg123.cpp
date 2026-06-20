@@ -117,7 +117,7 @@ static void get_tags(mpg123_handle *mf, struct file_tags *info)
             long track_num = strtol(num.c_str(), nullptr, 10);
             if (track_num > 0)
             {
-              info->track = (int)track_num;
+              info->track = static_cast<int>(track_num);
             }
             debug("TG: track v2 %d.", info->track);
           }
@@ -146,7 +146,7 @@ static void get_tags(mpg123_handle *mf, struct file_tags *info)
       }
       if (info->track == -1 && v1->comment[28] == 0 && v1->comment[29] > 0)
       {
-        info->track = (int)(v1->comment[29]);
+        info->track = static_cast<int>(v1->comment[29]);
         debug("TG: track v1 %d.", info->track);
       }
     }
@@ -165,8 +165,8 @@ static void mpg123_tags(const char *file_name, struct file_tags *info,
 #if MPG123_API_VERSION < 46
   mpg123_init();
 #endif
-  mf = mpg123_new(NULL, &res);
-  if (mf == NULL || mpg123_open(mf, file_name) != MPG123_OK ||
+  mf = mpg123_new(nullptr, &res);
+  if (mf == nullptr || mpg123_open(mf, file_name) != MPG123_OK ||
       mpg123_getformat(mf, &rate, &ch, &enc) != MPG123_OK)
   {
     logit("Can't open file %s:", file_name);
@@ -230,14 +230,14 @@ static void mpg123_open_stream_internal(struct mpg123_data *data)
   mpg123_init();
 #endif
 
-  data->mf = mpg123_new(NULL, &res);
+  data->mf = mpg123_new(nullptr, &res);
 
-  if (data->mf == NULL)
+  if (data->mf == nullptr)
   {
     goto err;
   }
 
-  res = mpg123_replace_reader_handle(data->mf, read_cb, seek_cb, NULL);
+  res = mpg123_replace_reader_handle(data->mf, read_cb, seek_cb, nullptr);
   if (res != MPG123_OK)
   {
     goto err;
@@ -350,7 +350,7 @@ err:
   debug("mpg123 error: %s", mpg123_err);
   free(mpg123_err);
   mpg123_delete(data->mf);
-  data->mf = NULL;
+  data->mf = nullptr;
   io_close(data->stream);
 }
 
@@ -362,7 +362,7 @@ static void *mpg123_openX(const char *file)
 
   decoder_error_init(&data->error);
   data->tags_change = 0;
-  data->tags = NULL;
+  data->tags = nullptr;
 
   data->stream = io_open(file, 1);
   if (!io_ok(data->stream))
@@ -380,7 +380,7 @@ static void *mpg123_openX(const char *file)
 
 static void mpg123_closeX(void *prv_data)
 {
-  struct mpg123_data *data = (struct mpg123_data *)prv_data;
+  struct mpg123_data *data = static_cast<struct mpg123_data *>(prv_data);
 
   if (data->ok)
   {
@@ -398,7 +398,7 @@ static void mpg123_closeX(void *prv_data)
 
 static int mpg123_seekX(void *prv_data, int sec)
 {
-  struct mpg123_data *data = (struct mpg123_data *)prv_data;
+  struct mpg123_data *data = static_cast<struct mpg123_data *>(prv_data);
 
   assert(sec >= 0);
 
@@ -409,7 +409,7 @@ static int mpg123_seekX(void *prv_data, int sec)
 static int mpg123_decodeX(void *prv_data, char *buf, int buf_len,
                           struct sound_params *sound_params)
 {
-  struct mpg123_data *data = (struct mpg123_data *)prv_data;
+  struct mpg123_data *data = static_cast<struct mpg123_data *>(prv_data);
   int ret;
   size_t decoded_bytes;
   struct mpg123_frameinfo info;
@@ -419,9 +419,9 @@ static int mpg123_decodeX(void *prv_data, char *buf, int buf_len,
 
   decoder_error_clear(&data->error);
 
-  while (1)
+  while (true)
   {
-    ret = mpg123_read(data->mf, (unsigned char *)buf, buf_len, &decoded_bytes);
+    ret = mpg123_read(data->mf, reinterpret_cast<unsigned char *>(buf), buf_len, &decoded_bytes);
 
     if (ret != MPG123_OK && ret != MPG123_DONE && ret != MPG123_NEW_FORMAT)
     {
@@ -478,12 +478,12 @@ static int mpg123_decodeX(void *prv_data, char *buf, int buf_len,
 
     break;
   }
-  return (int)decoded_bytes;
+  return static_cast<int>(decoded_bytes);
 }
 
 static int mpg123_current_tags(void *prv_data, struct file_tags *tags)
 {
-  struct mpg123_data *data = (struct mpg123_data *)prv_data;
+  struct mpg123_data *data = static_cast<struct mpg123_data *>(prv_data);
 
   tags_copy(tags, data->tags);
 
@@ -498,28 +498,28 @@ static int mpg123_current_tags(void *prv_data, struct file_tags *tags)
 
 static int mpg123_get_bitrate(void *prv_data)
 {
-  struct mpg123_data *data = (struct mpg123_data *)prv_data;
+  struct mpg123_data *data = static_cast<struct mpg123_data *>(prv_data);
 
   return data->bitrate;
 }
 
 static int mpg123_get_avg_bitrate(void *prv_data)
 {
-  struct mpg123_data *data = (struct mpg123_data *)prv_data;
+  struct mpg123_data *data = static_cast<struct mpg123_data *>(prv_data);
 
   return data->avg_bitrate;
 }
 
 static int mpg123_get_duration(void *prv_data)
 {
-  struct mpg123_data *data = (struct mpg123_data *)prv_data;
+  struct mpg123_data *data = static_cast<struct mpg123_data *>(prv_data);
 
   return data->duration;
 }
 
 static struct io_stream *mpg123_get_stream(void *prv_data)
 {
-  struct mpg123_data *data = (struct mpg123_data *)prv_data;
+  struct mpg123_data *data = static_cast<struct mpg123_data *>(prv_data);
 
   return data->stream;
 }
@@ -536,7 +536,7 @@ static int mpg123_our_format_ext(const char *ext)
 
 static void mpg123_get_error(void *prv_data, struct decoder_error *error)
 {
-  struct mpg123_data *data = (struct mpg123_data *)prv_data;
+  struct mpg123_data *data = static_cast<struct mpg123_data *>(prv_data);
 
   decoder_error_copy(error, &data->error);
 }

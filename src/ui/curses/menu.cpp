@@ -124,7 +124,7 @@ static void draw_item(const struct menu *menu, const struct menu_item *mi,
   if ((menu->show_time && *mi->time) ||
       (menu->show_format && *mi->format))
   {
-    bool first = 1;
+    bool first = true;
     xwprintw(menu->win, "[");
 
     if (menu->show_time)
@@ -143,7 +143,7 @@ static void draw_item(const struct menu *menu, const struct menu_item *mi,
       {
         xwprintw(menu->win, "%5s", mi->time);
       }
-      first = 0;
+      first = false;
     }
     if (menu->show_format && *mi->format)
     {
@@ -240,16 +240,16 @@ struct menu *menu_new(WINDOW *win, const int posx, const int posy,
   menu = new struct menu;
 
   menu->win = win;
-  menu->items = NULL;
+  menu->items = nullptr;
   menu->nitems = 0;
-  menu->top = NULL;
-  menu->last = NULL;
-  menu->selected = NULL;
+  menu->top = nullptr;
+  menu->last = nullptr;
+  menu->selected = nullptr;
   menu->posx = posx;
   menu->posy = posy;
   menu->width = width;
   menu->height = height;
-  menu->marked = NULL;
+  menu->marked = nullptr;
   menu->show_time = 0;
   menu->show_format = false;
   menu->info_attr_normal = A_NORMAL;
@@ -287,7 +287,7 @@ struct menu_item *menu_add(struct menu *menu, const char *title,
   mi->format[0] = 0;
   mi->queue_pos = 0;
 
-  mi->next = NULL;
+  mi->next = nullptr;
   mi->prev = menu->last;
   if (menu->last)
   {
@@ -327,7 +327,7 @@ static struct menu_item *menu_add_from_item(struct menu *menu,
   assert(mi != NULL);
 
   new_item = menu_add(menu, mi->title.c_str(), mi->type,
-                      mi->file.empty() ? NULL : mi->file.c_str());
+                      mi->file.empty() ? nullptr : mi->file.c_str());
 
   new_item->attr_normal = mi->attr_normal;
   new_item->attr_sel = mi->attr_sel;
@@ -599,7 +599,7 @@ void menu_get_state(const struct menu *menu, struct menu_state *st)
 void menu_unmark_item(struct menu *menu)
 {
   assert(menu != NULL);
-  menu->marked = NULL;
+  menu->marked = nullptr;
 }
 
 /* Make a new menu from elements matching pattern. */
@@ -766,7 +766,7 @@ struct menu_item *menu_find(struct menu *menu, const char *fname)
   auto it = menu->search_tree.find(fname);
   if (it == menu->search_tree.end())
   {
-    return NULL;
+    return nullptr;
   }
 
   return it->second;
@@ -826,7 +826,7 @@ static void menu_delete(struct menu *menu, struct menu_item *mi)
 
   if (menu->marked == mi)
   {
-    menu->marked = NULL;
+    menu->marked = nullptr;
   }
   if (menu->selected == mi)
   {

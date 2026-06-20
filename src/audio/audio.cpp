@@ -747,7 +747,7 @@ static void play_thread_func()
           out_buf_time_set(out_buf, 0.0);
 
           next = plist_next(curr_plist, curr_playing);
-          next_file = next != -1 ? plist_get_file(curr_plist, next) : NULL;
+          next_file = next != -1 ? plist_get_file(curr_plist, next) : nullptr;
       }
 
       player(file, next_file, out_buf);
@@ -1081,7 +1081,7 @@ int audio_send_buf(const char *buf, const size_t size)
 {
   size_t out_data_len = size;
   int res;
-  char *converted = NULL;
+  char *converted = nullptr;
 
   if (need_audio_conversion)
   {
@@ -1123,7 +1123,7 @@ int audio_get_bps() { return driver_sound_params.rate * audio_get_bpf(); }
 
 int audio_get_buf_fill() { return hw.get_buff_fill(); }
 
-int audio_can_hw_pause() { return hw.hw_pause != NULL; }
+int audio_can_hw_pause() { return hw.hw_pause != nullptr; }
 
 void audio_hw_pause()
 {
@@ -1409,7 +1409,7 @@ void audio_exit()
     hw.shutdown();
   }
   out_buf_free(out_buf);
-  out_buf = NULL;
+  out_buf = nullptr;
   plist_free(&playlist);
   plist_free(&shuffled_plist);
   plist_free(&queue);

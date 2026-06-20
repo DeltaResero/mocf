@@ -85,7 +85,7 @@ static int plist_load_m3u(struct plist *plist, const char *fname,
                           const char *cwd)
 {
   FILE *file;
-  char *line = NULL;
+  char *line = nullptr;
   int last_added = -1;
   int after_extinf = 0;
   int added = 0;
@@ -151,7 +151,7 @@ static int plist_load_m3u(struct plist *plist, const char *fname,
       }
 
       after_extinf = 1;
-      last_added = plist_add(plist, NULL);
+      last_added = plist_add(plist, nullptr);
       plist_set_title_tags(plist, last_added, comma + 1);
 
       if (*time_text)
@@ -221,15 +221,15 @@ static int is_blank_line(const char *l)
  * if not present or error occurred. */
 static char *read_ini_value(FILE *file, const char *section, const char *key)
 {
-  char *line = NULL;
+  char *line = nullptr;
   int in_section = 0;
-  char *value = NULL;
+  char *value = nullptr;
   int key_len;
 
   if (fseek(file, 0, SEEK_SET))
   {
     error_errno("File fseek() error", errno);
-    return NULL;
+    return nullptr;
   }
 
   key_len = strlen(key);
@@ -327,7 +327,7 @@ static int plist_load_pls(struct plist *plist, const char *fname,
                           const char *cwd)
 {
   FILE *file;
-  char *e, *line = NULL;
+  char *e, *line = nullptr;
   long i, nitems, added = 0;
 
   file = fopen(fname, "r");
@@ -460,7 +460,7 @@ int plist_load(struct plist *plist, const char *fname, const char *cwd)
 static int plist_save_m3u(struct plist *plist, const char *fname,
                           const int strip_path, const bool save_tags)
 {
-  FILE *file = NULL;
+  FILE *file = nullptr;
   int i, ret, result = 0;
   struct flock write_lock = {.l_type = F_WRLCK, .l_whence = SEEK_SET};
 
@@ -530,7 +530,7 @@ static int plist_save_m3u(struct plist *plist, const char *fname,
   }
 
   ret = fclose(file);
-  file = NULL;
+  file = nullptr;
   if (ret)
   {
     error_errno("Error writing playlist", errno);

@@ -72,11 +72,11 @@ static void load_extn_list()
     int limit;
     SF_FORMAT_INFO format_info;
 
-    sf_command(NULL, counts[ix], &limit, sizeof(limit));
+    sf_command(nullptr, counts[ix], &limit, sizeof(limit));
     for (int iy = 0; iy < limit; iy += 1)
     {
       format_info.format = iy;
-      sf_command(NULL, formats[ix], &format_info, sizeof(format_info));
+      sf_command(nullptr, formats[ix], &format_info, sizeof(format_info));
       if (!extn_exists(format_info.extension))
       {
         supported_extns.push_back(format_info.extension);
@@ -174,7 +174,7 @@ static void *sndfile_open(const char *file)
 
   decoder_error_init(&data->error);
   memset(&data->snd_info, 0, sizeof(data->snd_info));
-  data->sndfile = NULL;
+  data->sndfile = nullptr;
   data->timing_broken = false;
   data->bitrate = -1;
 
@@ -192,7 +192,7 @@ static void *sndfile_open(const char *file)
   {
     /* FIXME: sf_strerror is not thread safe with NULL argument */
     decoder_error(&data->error, ERROR_FATAL, 0, "Can't open file: %s",
-                  sf_strerror(NULL));
+                  sf_strerror(nullptr));
     return data;
   }
 
@@ -231,7 +231,7 @@ static void *sndfile_open(const char *file)
 
 static void sndfile_close(void *void_data)
 {
-  struct sndfile_data *data = (struct sndfile_data *)void_data;
+  struct sndfile_data *data = static_cast<struct sndfile_data *>(void_data);
 
   if (data->sndfile)
   {
@@ -275,7 +275,7 @@ static void sndfile_info(const char *file_name, struct file_tags *info,
     }
     if ((res = sf_get_string(data->sndfile, SF_STR_TRACKNUMBER)))
     {
-      info->track = (int)strtol(res, NULL, 10);
+      info->track = static_cast<int>(strtol(res, nullptr, 10));
     }
   }
 
@@ -284,7 +284,7 @@ static void sndfile_info(const char *file_name, struct file_tags *info,
 
 static int sndfile_seek(void *void_data, int sec)
 {
-  struct sndfile_data *data = (struct sndfile_data *)void_data;
+  struct sndfile_data *data = static_cast<struct sndfile_data *>(void_data);
   int res;
 
   assert(sec >= 0);
@@ -302,7 +302,7 @@ static int sndfile_seek(void *void_data, int sec)
 static int sndfile_decode(void *void_data, char *buf, int buf_len,
                           struct sound_params *sound_params)
 {
-  struct sndfile_data *data = (struct sndfile_data *)void_data;
+  struct sndfile_data *data = static_cast<struct sndfile_data *>(void_data);
   int use_float = 0;
   int res;
 
@@ -341,13 +341,13 @@ static int sndfile_decode(void *void_data, char *buf, int buf_len,
 
   if (use_float)
   {
-    res = sf_readf_float(data->sndfile, (float *)buf,
+    res = sf_readf_float(data->sndfile, reinterpret_cast<float *>(buf),
                          buf_len / sizeof(float) / data->snd_info.channels) *
           sizeof(float) * data->snd_info.channels;
   }
   else
   {
-    res = sf_readf_int(data->sndfile, (int *)buf,
+    res = sf_readf_int(data->sndfile, reinterpret_cast<int *>(buf),
                        buf_len / sizeof(int) / data->snd_info.channels) *
           sizeof(int) * data->snd_info.channels;
   }
@@ -365,7 +365,7 @@ static int sndfile_decode(void *void_data, char *buf, int buf_len,
 
 static int sndfile_get_bitrate(void *void_data)
 {
-  struct sndfile_data *data = (struct sndfile_data *)void_data;
+  struct sndfile_data *data = static_cast<struct sndfile_data *>(void_data);
 
   return data->bitrate;
 }
@@ -373,7 +373,7 @@ static int sndfile_get_bitrate(void *void_data)
 static int sndfile_get_duration(void *void_data)
 {
   int result;
-  struct sndfile_data *data = (struct sndfile_data *)void_data;
+  struct sndfile_data *data = static_cast<struct sndfile_data *>(void_data);
 
   result = -1;
   if (!data->timing_broken)
@@ -421,7 +421,7 @@ static int sndfile_our_format_ext(const char *ext)
 
 static void sndfile_get_error(void *prv_data, struct decoder_error *error)
 {
-  struct sndfile_data *data = (struct sndfile_data *)prv_data;
+  struct sndfile_data *data = static_cast<struct sndfile_data *>(prv_data);
 
   decoder_error_copy(error, &data->error);
 }

@@ -64,10 +64,10 @@ static int process_cb(jack_nframes_t nframes, void *unused ATTR_UNUSED)
   }
 
   /* get the jack output ports */
-  out[0] = (jack_default_audio_sample_t *)jack_port_get_buffer(output_port[0],
-                                                               nframes);
-  out[1] = (jack_default_audio_sample_t *)jack_port_get_buffer(output_port[1],
-                                                               nframes);
+  out[0] = static_cast<jack_default_audio_sample_t *>(jack_port_get_buffer(output_port[0],
+                                                               nframes));
+  out[1] = static_cast<jack_default_audio_sample_t *>(jack_port_get_buffer(output_port[1],
+                                                               nframes));
 
   if (play)
   {
@@ -84,8 +84,8 @@ static int process_cb(jack_nframes_t nframes, void *unused ATTR_UNUSED)
       avail_data = nframes * sizeof(jack_default_audio_sample_t);
     }
 
-    jack_ringbuffer_read(ringbuffer[0], (char *)out[0], avail_data);
-    jack_ringbuffer_read(ringbuffer[1], (char *)out[1], avail_data);
+    jack_ringbuffer_read(ringbuffer[0], reinterpret_cast<char *>(out[0]), avail_data);
+    jack_ringbuffer_read(ringbuffer[1], reinterpret_cast<char *>(out[1]), avail_data);
 
     /* we must provide nframes data, so fill with silence
      * the remaining space. */
@@ -171,7 +171,7 @@ static int moc_jack_init(struct output_driver_caps *caps)
 
   /* try to become a client of the JACK server */
   client = jack_client_new(client_name);
-  if (client == NULL)
+  if (client == nullptr)
   {
     error("Cannot create client; JACK server not running?");
     return 0;
@@ -180,7 +180,7 @@ static int moc_jack_init(struct output_driver_caps *caps)
 #endif
 
   jack_shutdown = 0;
-  jack_on_shutdown(client, shutdown_cb, NULL);
+  jack_on_shutdown(client, shutdown_cb, nullptr);
 
   /* allocate memory for an array of 2 output ports */
   output_port = new jack_port_t *[2];
@@ -194,8 +194,8 @@ static int moc_jack_init(struct output_driver_caps *caps)
   ringbuffer[1] = jack_ringbuffer_create(RINGBUF_SZ);
 
   /* set the call back functions, activate the client */
-  jack_set_process_callback(client, process_cb, NULL);
-  jack_set_sample_rate_callback(client, update_sample_rate_cb, NULL);
+  jack_set_process_callback(client, process_cb, nullptr);
+  jack_set_sample_rate_callback(client, update_sample_rate_cb, nullptr);
   if (jack_activate(client))
   {
     error("cannot activate client");
@@ -303,11 +303,11 @@ static int moc_jack_play(const char *buff, const size_t size)
 
         sample = *(jack_default_audio_sample_t *)(buff + pos) * volume;
         pos += sizeof(jack_default_audio_sample_t);
-        jack_ringbuffer_write(ringbuffer[0], (char *)&sample, sizeof(sample));
+        jack_ringbuffer_write(ringbuffer[0], reinterpret_cast<char *>(&sample), sizeof(sample));
 
         sample = *(jack_default_audio_sample_t *)(buff + pos) * volume;
         pos += sizeof(jack_default_audio_sample_t);
-        jack_ringbuffer_write(ringbuffer[1], (char *)&sample, sizeof(sample));
+        jack_ringbuffer_write(ringbuffer[1], reinterpret_cast<char *>(&sample), sizeof(sample));
       }
     }
     else
@@ -332,7 +332,7 @@ static void moc_jack_set_mixer(int vol)
 {
   volume_integer = vol;
   volume =
-      (jack_default_audio_sample_t)(expm1((double)vol / 100.0) / (M_E - 1));
+      static_cast<jack_default_audio_sample_t>(expm1(static_cast<double>(vol) / 100.0) / (M_E - 1));
 }
 
 static int moc_jack_get_buff_fill()

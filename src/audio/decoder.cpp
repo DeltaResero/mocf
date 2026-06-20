@@ -37,7 +37,7 @@
 static const struct
 {
   const char *name;
-  AudioPlugin *(*init)(void);
+  AudioPlugin *(*init)();
 } decoder_table[] = {
 #include "decoders/decoder_list.h"
 };
@@ -67,7 +67,7 @@ struct decoder_s_preference
   std::string type;              /* MIME type or filename extn */
 };
 typedef struct decoder_s_preference decoder_t_preference;
-static decoder_t_preference *preferences = NULL;
+static decoder_t_preference *preferences = nullptr;
 static int default_decoder_list[PLUGINS_NUM];
 
 static char *clean_mime_subtype(char *subtype)
@@ -127,8 +127,8 @@ static decoder_t_preference *lookup_preference(const char *extn,
 
   assert((extn && extn[0]) || (file && file[0]) || (mime && *mime && *mime[0]));
 
-  type = NULL;
-  subtype = NULL;
+  type = nullptr;
+  subtype = nullptr;
   for (result = preferences; result; result = result->next)
   {
     if (result->subtype.empty())
@@ -142,7 +142,7 @@ static decoder_t_preference *lookup_preference(const char *extn,
     {
       if (!type)
       {
-        if (mime && *mime == NULL && file && file[0])
+        if (mime && *mime == nullptr && file && file[0])
         {
           if (options_get_bool("UseMimeMagic"))
           {
@@ -261,7 +261,7 @@ static int find_type(const char *file)
   char *extn, *mime;
 
   extn = ext_pos(file);
-  mime = NULL;
+  mime = nullptr;
 
   result = find_decoder(extn, file, &mime);
 
@@ -281,7 +281,7 @@ char *file_type_name(const char *file)
   i = find_type(file);
   if (i == -1)
   {
-    return NULL;
+    return nullptr;
   }
 
   memset(buf, 0, sizeof(buf));
@@ -312,7 +312,7 @@ char *file_type_name(const char *file)
 
   if (!buf[0])
   {
-    return NULL;
+    return nullptr;
   }
 
   return buf;
@@ -328,14 +328,14 @@ AudioPlugin *get_decoder(const char *file)
     return plugins[i].decoder;
   }
 
-  return NULL;
+  return nullptr;
 }
 
 /* Given a decoder pointer, return its name. */
 const char *get_decoder_name(const AudioPlugin *decoder)
 {
   int ix;
-  const char *result = NULL;
+  const char *result = nullptr;
 
   assert(decoder);
 
@@ -432,7 +432,7 @@ static decoder_t_preference *make_preference(const char *prefix)
   assert(prefix && prefix[0]);
 
   result = new decoder_t_preference;
-  result->next = NULL;
+  result->next = nullptr;
   result->decoders = 0;
   result->subtype = "";
 
@@ -626,9 +626,9 @@ static void load_plugins(int debug_info)
   have_tremor = true;
 #endif
 
-  for (ix = 0; ix < (size_t)plugins_num; ix += 1)
+  for (ix = 0; ix < static_cast<size_t>(plugins_num); ix += 1)
   {
-    default_decoder_list[ix] = (int)ix;
+    default_decoder_list[ix] = static_cast<int>(ix);
   }
 
   names = list_decoder_names(default_decoder_list, plugins_num);
@@ -663,7 +663,7 @@ static void cleanup_preferences()
     delete pref;
   }
 
-  preferences = NULL;
+  preferences = nullptr;
 }
 
 void decoder_cleanup()

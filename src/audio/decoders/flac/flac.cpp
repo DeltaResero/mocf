@@ -104,19 +104,19 @@ static size_t pack_pcm_signed(FLAC__byte *data,
           data[0] = sample;
           break;
         case 16:
-          data[0] = (FLAC__byte)(sample >> 8);
-          data[1] = (FLAC__byte)sample;
+          data[0] = static_cast<FLAC__byte>(sample >> 8);
+          data[1] = static_cast<FLAC__byte>(sample);
           break;
         case 24:
-          data[0] = (FLAC__byte)(sample >> 16);
-          data[1] = (FLAC__byte)(sample >> 8);
-          data[2] = (FLAC__byte)sample;
+          data[0] = static_cast<FLAC__byte>(sample >> 16);
+          data[1] = static_cast<FLAC__byte>(sample >> 8);
+          data[2] = static_cast<FLAC__byte>(sample);
           break;
         case 32:
-          data[0] = (FLAC__byte)(sample >> 24);
-          data[1] = (FLAC__byte)(sample >> 16);
-          data[2] = (FLAC__byte)(sample >> 8);
-          data[3] = (FLAC__byte)sample;
+          data[0] = static_cast<FLAC__byte>(sample >> 24);
+          data[1] = static_cast<FLAC__byte>(sample >> 16);
+          data[2] = static_cast<FLAC__byte>(sample >> 8);
+          data[3] = static_cast<FLAC__byte>(sample);
           break;
       }
 
@@ -134,7 +134,7 @@ write_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
          const FLAC__Frame *frame, const FLAC__int32 *const buffer[],
          void *client_data)
 {
-  FlacDecoder *data = (FlacDecoder *)client_data;
+  FlacDecoder *data = static_cast<FlacDecoder *>(client_data);
   const unsigned int wide_samples = frame->header.blocksize;
 
   if (data->abort)
@@ -152,7 +152,7 @@ write_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
 static void metadata_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
                         const FLAC__StreamMetadata *metadata, void *client_data)
 {
-  FlacDecoder *data = (FlacDecoder *)client_data;
+  FlacDecoder *data = static_cast<FlacDecoder *>(client_data);
 
   if (metadata->type == FLAC__METADATA_TYPE_STREAMINFO)
   {
@@ -172,7 +172,7 @@ static void metadata_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
 static void error_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
                      FLAC__StreamDecoderErrorStatus status, void *client_data)
 {
-  FlacDecoder *data = (FlacDecoder *)client_data;
+  FlacDecoder *data = static_cast<FlacDecoder *>(client_data);
 
   if (status != FLAC__STREAM_DECODER_ERROR_STATUS_LOST_SYNC)
   {
@@ -189,7 +189,7 @@ static FLAC__StreamDecoderReadStatus
 read_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED, FLAC__byte buffer[],
         size_t *bytes, void *client_data)
 {
-  FlacDecoder *data = (FlacDecoder *)client_data;
+  FlacDecoder *data = static_cast<FlacDecoder *>(client_data);
   ssize_t res;
 
   res = io_read(data->stream, buffer, *bytes);
@@ -216,7 +216,7 @@ static FLAC__StreamDecoderSeekStatus
 seek_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
         FLAC__uint64 absolute_byte_offset, void *client_data)
 {
-  FlacDecoder *data = (FlacDecoder *)client_data;
+  FlacDecoder *data = static_cast<FlacDecoder *>(client_data);
 
   return io_seek(data->stream, absolute_byte_offset, SEEK_SET) >= 0
              ? FLAC__STREAM_DECODER_SEEK_STATUS_OK
@@ -227,7 +227,7 @@ static FLAC__StreamDecoderTellStatus
 tell_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
         FLAC__uint64 *absolute_byte_offset, void *client_data)
 {
-  FlacDecoder *data = (FlacDecoder *)client_data;
+  FlacDecoder *data = static_cast<FlacDecoder *>(client_data);
 
   *absolute_byte_offset = io_tell(data->stream);
 
@@ -239,7 +239,7 @@ length_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
           FLAC__uint64 *stream_length, void *client_data)
 {
   off_t file_size;
-  FlacDecoder *data = (FlacDecoder *)client_data;
+  FlacDecoder *data = static_cast<FlacDecoder *>(client_data);
 
   file_size = io_file_size(data->stream);
   if (file_size == -1)
@@ -255,7 +255,7 @@ length_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
 static FLAC__bool eof_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
                          void *client_data)
 {
-  FlacDecoder *data = (FlacDecoder *)client_data;
+  FlacDecoder *data = static_cast<FlacDecoder *>(client_data);
 
   return io_eof(data->stream);
 }
@@ -263,7 +263,7 @@ static FLAC__bool eof_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
 FlacDecoder::FlacDecoder()
 {
   decoder_error_init(&error);
-  decoder = NULL;
+  decoder = nullptr;
   bitrate = -1;
   avg_bitrate = -1;
   abort = 0;
@@ -360,7 +360,7 @@ static void fill_tag(FLAC__StreamMetadata_VorbisComment_Entry *comm,
     return;
   }
 
-  std::string name((char *)comm->entry, eq - comm->entry);
+  std::string name(reinterpret_cast<char *>(comm->entry), eq - comm->entry);
   size_t value_length = comm->length - (eq - comm->entry + 1);
 
   if (value_length == 0)
@@ -384,7 +384,7 @@ static void fill_tag(FLAC__StreamMetadata_VorbisComment_Entry *comm,
   }
   else if (!strcasecmp(name.c_str(), "tracknumber") || !strcasecmp(name.c_str(), "track"))
   {
-    tags->track = (int)strtol(value.c_str(), NULL, 10);
+    tags->track = static_cast<int>(strtol(value.c_str(), nullptr, 10));
   }
 }
 
@@ -442,13 +442,13 @@ int FlacDecoder::seek(int sec)
 {
   FLAC__uint64 target_sample;
 
-  if ((unsigned int)sec > length)
+  if (static_cast<unsigned int>(sec) > length)
   {
     return -1;
   }
 
-  target_sample = (FLAC__uint64)(((double)sec / (double)length) *
-                                 (double)total_samples);
+  target_sample = static_cast<FLAC__uint64>((static_cast<double>(sec) / static_cast<double>(length)) *
+                                 static_cast<double>(total_samples));
 
   if (FLAC__stream_decoder_seek_absolute(decoder, target_sample))
   {
@@ -519,7 +519,7 @@ int FlacDecoder::decode(char *buf, int buf_len,
       int bytes_per_sec = bytes_per_sample_val * sample_rate * channels;
 
       bitrate = (decode_position - last_decode_position) * 8.0 /
-                      (sample_buffer_fill / (float)bytes_per_sec) / 1000;
+                      (sample_buffer_fill / static_cast<float>(bytes_per_sec)) / 1000;
     }
 
     last_decode_position = decode_position;

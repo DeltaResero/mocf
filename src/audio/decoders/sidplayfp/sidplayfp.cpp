@@ -58,7 +58,7 @@ static void init_database()
         return;
 
     const char *dbfile = options_get_str(OPT_DATABASE);
-    if (dbfile == NULL || dbfile[0] == '\0')
+    if (dbfile == nullptr || dbfile[0] == '\0')
         return;
 
     database = new SidDatabase();
@@ -66,7 +66,7 @@ static void init_database()
         logit("sidplayfp: Unable to open SidDatabase \"%s\": %s",
               dbfile, database->error());
         delete database;
-        database = NULL;
+        database = nullptr;
     }
 }
 
@@ -75,16 +75,16 @@ static void init_database()
 // falls back to the older seconds-based one (pre-MD5 databases).
 static int song_length_ms(SidTune &tune)
 {
-    if (database == NULL)
+    if (database == nullptr)
         return -1;
 
     int_least32_t ms = database->lengthMs(tune);
     if (ms >= 0)
-        return (int)ms;
+        return static_cast<int>(ms);
 
     int_least32_t s = database->length(tune);
     if (s >= 0)
-        return (int)(s * 1000);
+        return (s * 1000);
 
     return -1;
 }
@@ -100,7 +100,7 @@ static ReSIDBuilder *make_builder(unsigned int n_chips)
     if (!b->getStatus()) {
         logit("sidplayfp: ReSIDBuilder construction failed");
         delete b;
-        return NULL;
+        return nullptr;
     }
 
     b->create(n_chips);
@@ -108,7 +108,7 @@ static ReSIDBuilder *make_builder(unsigned int n_chips)
         logit("sidplayfp: ReSIDBuilder::create(%u) failed: %s",
               n_chips, b->error());
         delete b;
-        return NULL;
+        return nullptr;
     }
 
     return b;
@@ -120,7 +120,7 @@ static sidplayfp *make_engine(ReSIDBuilder *builder, int frequency)
     sidplayfp *engine = new sidplayfp();
 
     SidConfig cfg    = engine->config();
-    cfg.frequency    = (uint_least32_t)frequency;
+    cfg.frequency    = static_cast<uint_least32_t>(frequency);
     cfg.playback     = SidConfig::STEREO;
     cfg.sidEmulation = builder;
 
@@ -141,7 +141,7 @@ static sidplayfp *make_engine(ReSIDBuilder *builder, int frequency)
     if (!engine->config(cfg)) {
         logit("sidplayfp: engine config failed: %s", engine->error());
         delete engine;
-        return NULL;
+        return nullptr;
     }
 
     return engine;
@@ -421,7 +421,7 @@ static void init()
     minLength     = options_get_int(OPT_MINLEN);
     startAtStart  = options_get_bool(OPT_START);
     playSubTunes  = options_get_bool(OPT_SUBTUNES);
-    database      = NULL;
+    database      = nullptr;
     init_db       = 1;
 }
 
@@ -429,7 +429,7 @@ static void destroy()
 {
     pthread_mutex_destroy(&db_mtx);
     delete database;
-    database = NULL;
+    database = nullptr;
 }
 
 class SidplayfpDecoder : public AudioDecoder {
@@ -485,7 +485,7 @@ public:
 };
 
 extern "C" class AudioPlugin *sidplayfp_plugin_init() {
-    pthread_mutex_init(&db_mtx, NULL);
+    pthread_mutex_init(&db_mtx, nullptr);
     static SidplayfpPlugin plugin;
     return &plugin;
 }

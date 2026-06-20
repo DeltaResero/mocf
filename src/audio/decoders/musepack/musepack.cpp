@@ -109,7 +109,7 @@ static mpc_int32_t tell_cb(mpc_reader *t)
 
   debug("tell callback");
 
-  return (mpc_int32_t)io_tell(data->stream);
+  return static_cast<mpc_int32_t>(io_tell(data->stream));
 }
 
 #ifdef MPC_IS_OLD_API
@@ -126,7 +126,7 @@ static mpc_int32_t get_size_cb(mpc_reader *t)
 
   debug("size callback");
 
-  return (mpc_int32_t)io_file_size(data->stream);
+  return static_cast<mpc_int32_t>(io_file_size(data->stream));
 }
 
 #ifdef MPC_IS_OLD_API
@@ -181,7 +181,7 @@ static void musepack_open_stream_internal(struct musepack_data *data)
   mpc_demux_get_info(data->demux, &data->info);
 #endif
 
-  data->avg_bitrate = (int)(data->info.average_bitrate / 1000);
+  data->avg_bitrate = static_cast<int>(data->info.average_bitrate / 1000);
   debug("Avg bitrate: %d", data->avg_bitrate);
 
   data->bitrate = 0;
@@ -218,7 +218,7 @@ static void *musepack_open(const char *file)
 
 static void musepack_close(void *prv_data)
 {
-  struct musepack_data *data = (struct musepack_data *)prv_data;
+  struct musepack_data *data = static_cast<struct musepack_data *>(prv_data);
 
   if (data->ok)
   {
@@ -289,7 +289,7 @@ static void musepack_info(const char *file_name, struct file_tags *info,
 
 static int musepack_seek(void *prv_data, int sec)
 {
-  struct musepack_data *data = (struct musepack_data *)prv_data;
+  struct musepack_data *data = static_cast<struct musepack_data *>(prv_data);
   int res;
 
   assert(sec >= 0);
@@ -320,7 +320,7 @@ static int musepack_seek(void *prv_data, int sec)
 static int musepack_decode(void *prv_data, char *buf, int buf_len,
                            struct sound_params *sound_params)
 {
-  struct musepack_data *data = (struct musepack_data *)prv_data;
+  struct musepack_data *data = static_cast<struct musepack_data *>(prv_data);
   int decoded;
   int bytes_from_decoder;
 #ifndef MPC_IS_OLD_API
@@ -436,28 +436,28 @@ static int musepack_decode(void *prv_data, char *buf, int buf_len,
 
 static int musepack_get_bitrate(void *prv_data)
 {
-  struct musepack_data *data = (struct musepack_data *)prv_data;
+  struct musepack_data *data = static_cast<struct musepack_data *>(prv_data);
 
   return data->bitrate;
 }
 
 static int musepack_get_avg_bitrate(void *prv_data)
 {
-  struct musepack_data *data = (struct musepack_data *)prv_data;
+  struct musepack_data *data = static_cast<struct musepack_data *>(prv_data);
 
   return data->avg_bitrate;
 }
 
 static int musepack_get_duration(void *prv_data)
 {
-  struct musepack_data *data = (struct musepack_data *)prv_data;
+  struct musepack_data *data = static_cast<struct musepack_data *>(prv_data);
 
   return mpc_streaminfo_get_length(&data->info);
 }
 
 static struct io_stream *musepack_get_stream(void *prv_data)
 {
-  struct musepack_data *data = (struct musepack_data *)prv_data;
+  struct musepack_data *data = static_cast<struct musepack_data *>(prv_data);
 
   return data->stream;
 }
@@ -474,7 +474,7 @@ static int musepack_our_format_ext(const char *ext)
 
 static void musepack_get_error(void *prv_data, struct decoder_error *error)
 {
-  struct musepack_data *data = (struct musepack_data *)prv_data;
+  struct musepack_data *data = static_cast<struct musepack_data *>(prv_data);
 
   decoder_error_copy(error, &data->error);
 }

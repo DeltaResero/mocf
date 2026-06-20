@@ -80,7 +80,7 @@ static size_t fill_buff(struct mp3_data *data)
   ssize_t read_size;
   unsigned char *read_start;
 
-  if (data->stream.next_frame != NULL)
+  if (data->stream.next_frame != nullptr)
   {
     remaining = data->stream.bufend - data->stream.next_frame;
     memmove(data->in_buff, data->stream.next_frame, remaining);
@@ -153,7 +153,7 @@ int __unique_frame(struct id3_tag *tag, struct id3_frame *frame)
 static std::string get_tag(struct id3_tag *tag, const char *what)
 {
   std::string result;
-  char *comm = NULL;
+  char *comm = nullptr;
 
   struct id3_frame *frame = id3_tag_findframe(tag, what, 0);
   if (frame)
@@ -221,10 +221,10 @@ static int count_time_internal(struct mp3_data *data)
      choice, i.e. if it's a VBR file with no Xing tag.
   */
 
-  while (1)
+  while (true)
   {
     /* Fill the input buffer if needed */
-    if (data->stream.buffer == NULL || data->stream.error == MAD_ERROR_BUFLEN)
+    if (data->stream.buffer == nullptr || data->stream.error == MAD_ERROR_BUFLEN)
     {
       if (!fill_buff(data))
       {
@@ -313,18 +313,18 @@ static int count_time_internal(struct mp3_data *data)
     /* time in seconds */
     double time = (data->size * 8.0) / (header.bitrate);
 
-    double timefrac = (double)time - ((long)(time));
+    double timefrac = time - (static_cast<long>(time));
 
     /* samples per frame */
     long nsamples = 32 * MAD_NSBSAMPLES(&header);
 
     /* samplerate is a constant */
-    num_frames = (long)(time * header.samplerate / nsamples);
+    num_frames = static_cast<long>(time * header.samplerate / nsamples);
 
     /* the average bitrate is the constant bitrate */
     data->avg_bitrate = bitrate;
 
-    mad_timer_set(&duration, (long)time, (long)(timefrac * 100), 100);
+    mad_timer_set(&duration, static_cast<long>(time), static_cast<long>(timefrac * 100), 100);
   }
 
   else if (has_xing)
@@ -387,7 +387,7 @@ static struct mp3_data *mp3_open_internal(const char *file, const int buffered)
 
     data->duration = count_time_internal(data);
     mad_frame_mute(&data->frame);
-    data->stream.next_frame = NULL;
+    data->stream.next_frame = nullptr;
     data->stream.sync = 0;
     data->stream.error = MAD_ERROR_NONE;
 
@@ -575,10 +575,10 @@ static int mp3_decode(void *void_data, char *buf, int buf_len,
 
   decoder_error_clear(&data->error);
 
-  while (1)
+  while (true)
   {
     /* Fill the input buffer if needed */
-    if (data->stream.buffer == NULL || data->stream.error == MAD_ERROR_BUFLEN)
+    if (data->stream.buffer == nullptr || data->stream.error == MAD_ERROR_BUFLEN)
     {
       if (!fill_buff(data))
       {
@@ -673,7 +673,7 @@ static int mp3_seek(void *void_data, int sec)
     return -1;
   }
 
-  new_position = ((double)sec / (double)data->duration) * data->size;
+  new_position = (static_cast<double>(sec) / static_cast<double>(data->duration)) * data->size;
 
   debug("Seeking to %d (byte %" PRId64 ")", sec, new_position);
 
@@ -698,7 +698,7 @@ static int mp3_seek(void *void_data, int sec)
   mad_synth_mute(&data->synth);
 
   data->stream.sync = 0;
-  data->stream.next_frame = NULL;
+  data->stream.next_frame = nullptr;
 
   data->skip_frames = 2;
 

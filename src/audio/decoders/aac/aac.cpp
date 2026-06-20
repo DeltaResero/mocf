@@ -171,7 +171,7 @@ static int buffer_fill_frame(struct aac_data *data)
   int rc, n, len;
   int max = 32768;
 
-  while (1)
+  while (true)
   {
     /* need at least 6 bytes of data */
     rc = buffer_fill_min(data, 6);
@@ -355,13 +355,13 @@ static struct aac_data *aac_open_internal(struct io_stream *stream,
   }
 
   /* init decoder, returns the length of the header (if any) */
-  channels = (unsigned char)data->channels;
+  channels = static_cast<unsigned char>(data->channels);
   sample_rate = data->sample_rate;
   n = NeAACDecInit(data->decoder, static_cast<unsigned char *>(buffer_data(data)),
                    buffer_length(data),
                    &sample_rate, &channels);
   data->channels = channels;
-  data->sample_rate = (int)sample_rate;
+  data->sample_rate = static_cast<int>(sample_rate);
   if (n < 0)
   {
     decoder_error(&data->error, ERROR_FATAL, 0,
@@ -389,7 +389,7 @@ static struct aac_data *aac_open_internal(struct io_stream *stream,
 
 static void aac_close(void *prv_data)
 {
-  struct aac_data *data = (struct aac_data *)prv_data;
+  struct aac_data *data = static_cast<struct aac_data *>(prv_data);
 
   NeAACDecClose(data->decoder);
   io_close(data->stream);
@@ -401,7 +401,7 @@ static void *aac_open(const char *file)
 {
   struct aac_data *data;
 
-  data = aac_open_internal(NULL, file);
+  data = aac_open_internal(nullptr, file);
 
   if (data->ok)
   {
@@ -417,7 +417,7 @@ static void *aac_open(const char *file)
     }
     aac_close(data);
 
-    data = aac_open_internal(NULL, file);
+    data = aac_open_internal(nullptr, file);
     data->duration = duration;
     data->avg_bitrate = avg_bitrate;
   }
@@ -438,7 +438,7 @@ static std::string get_tag(struct id3_tag *tag, const char *what)
     ucs4 = id3_field_getstrings(field, 0);
     if (ucs4)
     {
-      char *comm = (char *)id3_ucs4_utf8duplicate(ucs4);
+      char *comm = reinterpret_cast<char *>(id3_ucs4_utf8duplicate(ucs4));
       if (comm)
       {
         result = comm;
@@ -492,7 +492,7 @@ static void aac_info(const char *file_name, struct file_tags *info,
   {
     struct aac_data *data;
 
-    data = aac_open_internal(NULL, file_name);
+    data = aac_open_internal(nullptr, file_name);
 
     if (data->ok)
     {
@@ -566,8 +566,8 @@ static int decode_one_frame(struct aac_data *data, void *buffer, int count)
     return -2;
   }
 
-  if (frame_info.channels != (unsigned char)data->channels ||
-      frame_info.samplerate != (unsigned long)data->sample_rate)
+  if (frame_info.channels != static_cast<unsigned char>(data->channels) ||
+      frame_info.samplerate != static_cast<unsigned long>(data->sample_rate))
   {
     decoder_error(&data->error, ERROR_STREAM, 0, "%s",
                   "Invalid channel or sample_rate count");
@@ -597,7 +597,7 @@ static int decode_one_frame(struct aac_data *data, void *buffer, int count)
 static int aac_decode(void *prv_data, char *buf, int buf_len,
                       struct sound_params *sound_params)
 {
-  struct aac_data *data = (struct aac_data *)prv_data;
+  struct aac_data *data = static_cast<struct aac_data *>(prv_data);
   int rc;
 
   decoder_error_clear(&data->error);
@@ -629,21 +629,21 @@ static int aac_decode(void *prv_data, char *buf, int buf_len,
 
 static int aac_get_bitrate(void *prv_data)
 {
-  struct aac_data *data = (struct aac_data *)prv_data;
+  struct aac_data *data = static_cast<struct aac_data *>(prv_data);
 
   return data->bitrate;
 }
 
 static int aac_get_avg_bitrate(void *prv_data)
 {
-  struct aac_data *data = (struct aac_data *)prv_data;
+  struct aac_data *data = static_cast<struct aac_data *>(prv_data);
 
   return data->avg_bitrate / 1000;
 }
 
 static int aac_get_duration(void *prv_data)
 {
-  struct aac_data *data = (struct aac_data *)prv_data;
+  struct aac_data *data = static_cast<struct aac_data *>(prv_data);
 
   return data->duration;
 }
@@ -660,7 +660,7 @@ static int aac_our_format_ext(const char *ext)
 
 static void aac_get_error(void *prv_data, struct decoder_error *error)
 {
-  struct aac_data *data = (struct aac_data *)prv_data;
+  struct aac_data *data = static_cast<struct aac_data *>(prv_data);
 
   decoder_error_copy(error, &data->error);
 }

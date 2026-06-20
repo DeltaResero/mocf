@@ -95,7 +95,7 @@ static struct modplug_data *make_modplug_data(const char *file)
 
   data = new modplug_data;
 
-  data->modplugfile = NULL;
+  data->modplugfile = nullptr;
   decoder_error_init(&data->error);
 
   struct io_stream *s = io_open(file, 0);
@@ -117,23 +117,23 @@ static struct modplug_data *make_modplug_data(const char *file)
   }
 
   int max_size = options_get_int("ModPlug_MaxFileSize");
-  if (size > (off_t)max_size)
+  if (size > static_cast<off_t>(max_size))
   {
     io_close(s);
     decoder_error(&data->error, ERROR_FATAL, 0,
                   "Module file too large (%ldMB). Increase ModPlug_MaxFileSize in config.",
-                  (long)size / (1024 * 1024));
+                  static_cast<long>(size) / (1024 * 1024));
     return data;
   }
 
-  std::vector<char> filedata((size_t)size);
+  std::vector<char> filedata(static_cast<size_t>(size));
 
-  io_read(s, filedata.data(), (size_t)size);
+  io_read(s, filedata.data(), static_cast<size_t>(size));
   io_close(s);
 
-  data->modplugfile = ModPlug_Load(filedata.data(), (int)size);
+  data->modplugfile = ModPlug_Load(filedata.data(), static_cast<int>(size));
 
-  if (data->modplugfile == NULL)
+  if (data->modplugfile == nullptr)
   {
     decoder_error(&data->error, ERROR_FATAL, 0, "Can't load module: %s", file);
     return data;
@@ -166,7 +166,7 @@ static void *modplug_open(const char *file)
 
 static void modplug_close(void *void_data)
 {
-  struct modplug_data *data = (struct modplug_data *)void_data;
+  struct modplug_data *data = static_cast<struct modplug_data *>(void_data);
 
   if (data->modplugfile)
   {
@@ -182,7 +182,7 @@ static void modplug_info(const char *file_name, struct file_tags *info,
 {
   struct modplug_data *data = make_modplug_data(file_name);
 
-  if (data->modplugfile == NULL)
+  if (data->modplugfile == nullptr)
   {
     modplug_close(data);
     return;
@@ -205,7 +205,7 @@ static void modplug_info(const char *file_name, struct file_tags *info,
 
 static int modplug_seek(void *void_data, int sec)
 {
-  struct modplug_data *data = (struct modplug_data *)void_data;
+  struct modplug_data *data = static_cast<struct modplug_data *>(void_data);
 
   assert(sec >= 0);
 
@@ -221,7 +221,7 @@ static int modplug_seek(void *void_data, int sec)
 static int modplug_decode(void *void_data, char *buf, int buf_len,
                           struct sound_params *sound_params)
 {
-  struct modplug_data *data = (struct modplug_data *)void_data;
+  struct modplug_data *data = static_cast<struct modplug_data *>(void_data);
 
   sound_params->channels = settings.mChannels;
   sound_params->rate = settings.mFrequency;
@@ -237,7 +237,7 @@ static int modplug_get_bitrate(void *unused ATTR_UNUSED) { return -1; }
 
 static int modplug_get_duration(void *void_data)
 {
-  struct modplug_data *data = (struct modplug_data *)void_data;
+  struct modplug_data *data = static_cast<struct modplug_data *>(void_data);
   return data->length / 1000;
 }
 
@@ -264,7 +264,7 @@ static int modplug_our_format_ext(const char *ext)
 
 static void modplug_get_error(void *prv_data, struct decoder_error *error)
 {
-  struct modplug_data *data = (struct modplug_data *)prv_data;
+  struct modplug_data *data = static_cast<struct modplug_data *>(prv_data);
 
   decoder_error_copy(error, &data->error);
 }

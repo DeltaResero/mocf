@@ -365,7 +365,7 @@ private:
     }
 
     void follow_curr_file() {
-        if (!curr_file.file.empty() && file_type(curr_file.file.c_str()) == F_SOUND && last_menu_move_time <= time(NULL) - 2) {
+        if (!curr_file.file.empty() && file_type(curr_file.file.c_str()) == F_SOUND && last_menu_move_time <= time(nullptr) - 2) {
             if (plist_find_fname(&playlist, curr_file.file.c_str()) != -1) {
                 iface_make_visible(IFACE_MENU_PLIST, curr_file.file.c_str());
             } else if (plist_find_fname(&dir_plist, curr_file.file.c_str()) != -1) {
@@ -378,7 +378,7 @@ private:
         char *file = audio_get_sname();
         if (!file || !file[0] || curr_file.state == STATE_STOP) {
             curr_file = file_info{};
-            iface_set_played_file(NULL);
+            iface_set_played_file(nullptr);
             free(file);
         } else if (file[0] && (curr_file.file.empty() || curr_file.file != file)) {
             if (!curr_file.block_file.empty() && curr_file.block_file != file) {
@@ -502,16 +502,16 @@ private:
             case EV_BITRATE: update_bitrate(); break;
             case EV_RATE: update_rate(); break;
             case EV_CHANNELS: update_channels(); break;
-            case EV_SRV_ERROR: update_error((srv_error_ev *)data); break;
+            case EV_SRV_ERROR: update_error(static_cast<srv_error_ev *>(data)); break;
             case EV_OPTIONS: get_engine_options(); break;
-            case EV_STATUS_MSG: iface_set_status((char *)data); break;
+            case EV_STATUS_MSG: iface_set_status(static_cast<char *>(data)); break;
             case EV_MIXER_CHANGE: update_mixer_name(); break;
-            case EV_FILE_TAGS: ev_file_tags((tag_ev_response *)data); break;
+            case EV_FILE_TAGS: ev_file_tags(static_cast<tag_ev_response *>(data)); break;
             case EV_AVG_BITRATE: curr_file.avg_bitrate = engine_get_avg_bitrate(); break;
-            case EV_QUEUE_ADD: event_queue_add((plist_item *)data); break;
-            case EV_QUEUE_DEL: event_queue_del((char *)data); break;
+            case EV_QUEUE_ADD: event_queue_add(static_cast<plist_item *>(data)); break;
+            case EV_QUEUE_DEL: event_queue_del(static_cast<char *>(data)); break;
             case EV_QUEUE_CLEAR: clear_queue(); break;
-            case EV_QUEUE_MOVE: event_queue_move((move_ev_data *)data); break;
+            case EV_QUEUE_MOVE: event_queue_move(static_cast<move_ev_data *>(data)); break;
             case EV_AUDIO_START: break;
             case EV_AUDIO_STOP: break;
             case EV_TAGS:
@@ -544,7 +544,7 @@ private:
             }
 
             if (type == EV_FILE_TAGS) {
-                tag_ev_response *ev = (tag_ev_response *)data;
+                tag_ev_response *ev = static_cast<tag_ev_response *>(data);
                 if (plist_find_fname(p, ev->file) != -1) {
                     if (ev->tags->filled & tags_sel) files--;
                 }
@@ -615,7 +615,7 @@ private:
         if (going_up) iface_set_curr_item_title(last_dir);
 
         iface_set_title(IFACE_MENU_DIR, cwd);
-        iface_update_queue_positions(&queue, NULL, &dir_plist, NULL);
+        iface_update_queue_positions(&queue, nullptr, &dir_plist, nullptr);
 
         if (iface_in_plist_menu()) iface_switch_to_dir();
 
@@ -631,7 +631,7 @@ private:
                 if (first_run && file_type(music_dir) == F_PLAYLIST && plist_count(&playlist) == 0 && go_to_playlist(music_dir, false)) {
                     cwd[0] = 0;
                     first_run = 0;
-                } else if (file_type(cwd) == F_DIR && go_to_dir(NULL, 0)) {
+                } else if (file_type(cwd) == F_DIR && go_to_dir(nullptr, 0)) {
                     first_run = 0;
                     return;
                 }
@@ -640,9 +640,9 @@ private:
             }
         }
 
-        if (!(read_last_dir() && go_to_dir(NULL, 0))) {
+        if (!(read_last_dir() && go_to_dir(nullptr, 0))) {
             set_start_dir();
-            if (!go_to_dir(NULL, 0)) interface_fatal("Can't enter any directory!");
+            if (!go_to_dir(nullptr, 0)) interface_fatal("Can't enter any directory!");
         }
         first_run = 0;
     }
@@ -669,7 +669,7 @@ private:
         if (plist_load(&playlist, file, cwd)) {
             if (!default_playlist) toggle_menu();
             iface_set_dir_content(IFACE_MENU_PLIST, &playlist, {}, {});
-            iface_update_queue_positions(&queue, &playlist, NULL, NULL);
+            iface_update_queue_positions(&queue, &playlist, nullptr, nullptr);
             interface_message("Playlist loaded.");
         } else {
             interface_message("The playlist is empty");
@@ -683,13 +683,13 @@ private:
         iface_set_status("Getting the queue...");
         recv_engine_queue(&queue);
         iface_set_files_in_queue(plist_count(&queue));
-        iface_update_queue_positions(&queue, &playlist, &dir_plist, NULL);
+        iface_update_queue_positions(&queue, &playlist, &dir_plist, nullptr);
         iface_set_status("");
     }
 
     void process_dir_arg(const char *dir) {
         set_cwd(dir);
-        if (!go_to_dir(NULL, 0)) enter_first_dir();
+        if (!go_to_dir(nullptr, 0)) enter_first_dir();
     }
 
     void process_plist_arg(const char *file) {
@@ -752,7 +752,7 @@ private:
             switch_titles_file(&playlist);
             ask_for_tags(&playlist, get_tags_setting());
             iface_set_dir_content(IFACE_MENU_PLIST, &playlist, {}, {});
-            iface_update_queue_positions(&queue, &playlist, NULL, NULL);
+            iface_update_queue_positions(&queue, &playlist, nullptr, nullptr);
             iface_switch_to_plist();
         } else {
             enter_first_dir();
@@ -891,9 +891,9 @@ private:
             return;
         }
 
-        const char *file = NULL;
+        const char *file = nullptr;
         int i = 0;
-        while ((file = plist_get_next_dead_entry(&playlist, &i)) != NULL) {
+        while ((file = plist_get_next_dead_entry(&playlist, &i)) != nullptr) {
             remove_file_from_playlist(file);
         }
     }
@@ -981,7 +981,7 @@ private:
     }
 
     void reread_dir() {
-        while (go_to_dir(NULL, 1) == 0) go_dir_up();
+        while (go_to_dir(nullptr, 1) == 0) go_dir_up();
     }
 
     void cmd_clear_playlist() { clear_playlist(); }
@@ -1005,7 +1005,7 @@ private:
     }
 
     char *make_dir(const char *str) {
-        char *dir = (char *)xmalloc(sizeof(char) * PATH_MAX);
+        char *dir = static_cast<char *>(xmalloc(sizeof(char) * PATH_MAX));
         dir[0] = 0;
         int add_slash = (strlen(str) > 1 && str[strlen(str) - 1] == '/');
 
@@ -1013,7 +1013,7 @@ private:
             const char *home = get_home();
             if (strnlen(home, PATH_MAX) == PATH_MAX) {
                 free(dir);
-                return NULL;
+                return nullptr;
             }
             strcpy(dir, home);
             if (!strcmp(str, "~")) add_slash = 1;
@@ -1107,7 +1107,7 @@ private:
             if (text[0]) {
                 char *ext = ext_pos(text);
                 if (!ext || strcmp(ext, "m3u")) {
-                    char *tmp = (char *)xmalloc((strlen(text) + 5) * sizeof(char));
+                    char *tmp = static_cast<char *>(xmalloc((strlen(text) + 5) * sizeof(char)));
                     snprintf(tmp, strlen(text) + 5, "%s.m3u", text);
                     free(text);
                     text = tmp;
@@ -1261,7 +1261,7 @@ private:
     }
 
     void do_silent_seek() {
-        time_t curr_time = time(NULL);
+        time_t curr_time = time(nullptr);
         if (silent_seek_pos != -1 && silent_seek_key_last < curr_time) {
             seek(silent_seek_pos - curr_file.curr_time - 1);
             silent_seek_pos = -1;
@@ -1359,7 +1359,7 @@ private:
                 case KEY_CMD_MENU_FIRST:
                 case KEY_CMD_MENU_LAST:
                     iface_menu_key(cmd);
-                    last_menu_move_time = time(NULL);
+                    last_menu_move_time = time(nullptr);
                     break;
                 case KEY_CMD_STOP: audio_stop(); break;
                 case KEY_CMD_NEXT: cmd_next(); break;
@@ -1551,7 +1551,7 @@ public:
 
             dequeue_events();
 #ifdef HAVE_SYS_INOTIFY_H
-            ret = pselect(MAX(engine_event_queue_fd(g_engine_eq), inotify_fd) + 1, &fds, NULL, NULL, &timeout, NULL);
+            ret = pselect(MAX(engine_event_queue_fd(g_engine_eq), inotify_fd) + 1, &fds, nullptr, nullptr, &timeout, nullptr);
 #else
             ret = pselect(engine_event_queue_fd(g_engine_eq) + 1, &fds, NULL, NULL, &timeout, NULL);
 #endif

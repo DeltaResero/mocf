@@ -33,8 +33,8 @@
 void event_queue_init(struct event_queue *q)
 {
   assert(q != NULL);
-  q->head = NULL;
-  q->tail = NULL;
+  q->head = nullptr;
+  q->tail = nullptr;
 }
 
 /* Push an event onto the tail of the queue. */
@@ -86,7 +86,7 @@ struct event *event_get_first(struct event_queue *q)
 int event_queue_empty(const struct event_queue *q)
 {
   assert(q != NULL);
-  return q->head == NULL ? 1 : 0;
+  return q->head == nullptr ? 1 : 0;
 }
 
 /* Free data associated with an event. */
@@ -97,16 +97,16 @@ void free_event_data(const int type, void *data)
 
   if (type == EV_QUEUE_ADD)
   {
-    plist_free_item_fields((struct plist_item *)data);
+    plist_free_item_fields(static_cast<struct plist_item *>(data));
     delete static_cast<struct plist_item *>(data);
   }
   else if (type == EV_FILE_TAGS)
   {
-    free_tag_ev_data((struct tag_ev_response *)data);
+    free_tag_ev_data(static_cast<struct tag_ev_response *>(data));
   }
   else if (type == EV_SRV_ERROR)
   {
-    struct srv_error_ev *e = (struct srv_error_ev *)data;
+    struct srv_error_ev *e = static_cast<struct srv_error_ev *>(data);
     free(e->file);
     free(e->msg);
     delete e;
@@ -117,7 +117,7 @@ void free_event_data(const int type, void *data)
   }
   else if (type == EV_QUEUE_MOVE)
   {
-    free_move_ev_data((struct move_ev_data *)data);
+    free_move_ev_data(static_cast<struct move_ev_data *>(data));
   }
   else
   {

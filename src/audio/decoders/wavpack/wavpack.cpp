@@ -74,7 +74,7 @@ static void *wav_open(const char *file)
 
   char wv_error[100];
 
-  if ((data->wpc = WavpackOpenFileInput(file, wv_error, o_flags, 0)) == NULL)
+  if ((data->wpc = WavpackOpenFileInput(file, wv_error, o_flags, 0)) == nullptr)
   {
     decoder_error(&data->error, ERROR_FATAL, 0, "%s", wv_error);
     logit("wv_open error: %s", wv_error);
@@ -89,7 +89,7 @@ static void *wav_open(const char *file)
 
 static void wav_close(void *prv_data)
 {
-  struct wavpack_data *data = (struct wavpack_data *)prv_data;
+  struct wavpack_data *data = static_cast<struct wavpack_data *>(prv_data);
 
   if (data->ok)
   {
@@ -103,7 +103,7 @@ static void wav_close(void *prv_data)
 
 static int wav_seek(void *prv_data, int sec)
 {
-  struct wavpack_data *data = (struct wavpack_data *)prv_data;
+  struct wavpack_data *data = static_cast<struct wavpack_data *>(prv_data);
 
   assert(sec >= 0);
 
@@ -118,7 +118,7 @@ static int wav_seek(void *prv_data, int sec)
 
 static int wav_get_bitrate(void *prv_data)
 {
-  struct wavpack_data *data = (struct wavpack_data *)prv_data;
+  struct wavpack_data *data = static_cast<struct wavpack_data *>(prv_data);
 
   int bitrate;
   bitrate = WavpackGetInstantBitrate(data->wpc) / 1000;
@@ -128,20 +128,20 @@ static int wav_get_bitrate(void *prv_data)
 
 static int wav_get_avg_bitrate(void *prv_data)
 {
-  struct wavpack_data *data = (struct wavpack_data *)prv_data;
+  struct wavpack_data *data = static_cast<struct wavpack_data *>(prv_data);
 
   return data->avg_bitrate;
 }
 
 static int wav_get_duration(void *prv_data)
 {
-  struct wavpack_data *data = (struct wavpack_data *)prv_data;
+  struct wavpack_data *data = static_cast<struct wavpack_data *>(prv_data);
   return data->duration;
 }
 
 static void wav_get_error(void *prv_data, struct decoder_error *error)
 {
-  struct wavpack_data *data = (struct wavpack_data *)prv_data;
+  struct wavpack_data *data = static_cast<struct wavpack_data *>(prv_data);
   decoder_error_copy(error, &data->error);
 }
 
@@ -156,7 +156,7 @@ static void wav_info(const char *file_name, struct file_tags *info,
 
   wpc = WavpackOpenFileInput(file_name, wv_error, OPEN_TAGS, 0);
 
-  if (wpc == NULL)
+  if (wpc == nullptr)
   {
     logit("wv_open error: %s", wv_error);
     return;
@@ -172,32 +172,32 @@ static void wav_info(const char *file_name, struct file_tags *info,
 
   if (tags_sel & TAGS_COMMENTS)
   {
-    if ((tag_len = WavpackGetTagItem(wpc, "title", NULL, 0)) > 0)
+    if ((tag_len = WavpackGetTagItem(wpc, "title", nullptr, 0)) > 0)
     {
       std::vector<char> buf(++tag_len);
       WavpackGetTagItem(wpc, "title", buf.data(), tag_len);
       info->title = buf.data();
     }
 
-    if ((tag_len = WavpackGetTagItem(wpc, "artist", NULL, 0)) > 0)
+    if ((tag_len = WavpackGetTagItem(wpc, "artist", nullptr, 0)) > 0)
     {
       std::vector<char> buf(++tag_len);
       WavpackGetTagItem(wpc, "artist", buf.data(), tag_len);
       info->artist = buf.data();
     }
 
-    if ((tag_len = WavpackGetTagItem(wpc, "album", NULL, 0)) > 0)
+    if ((tag_len = WavpackGetTagItem(wpc, "album", nullptr, 0)) > 0)
     {
       std::vector<char> buf(++tag_len);
       WavpackGetTagItem(wpc, "album", buf.data(), tag_len);
       info->album = buf.data();
     }
 
-    if ((tag_len = WavpackGetTagItem(wpc, "track", NULL, 0)) > 0)
+    if ((tag_len = WavpackGetTagItem(wpc, "track", nullptr, 0)) > 0)
     {
       std::vector<char> buf(++tag_len);
       WavpackGetTagItem(wpc, "track", buf.data(), tag_len);
-      info->track = (int)strtol(buf.data(), NULL, 10);
+      info->track = static_cast<int>(strtol(buf.data(), nullptr, 10));
     }
 
     info->filled |= TAGS_COMMENTS;
@@ -209,12 +209,12 @@ static void wav_info(const char *file_name, struct file_tags *info,
 static int wav_decode(void *prv_data, char *buf, int buf_len,
                       struct sound_params *sound_params)
 {
-  struct wavpack_data *data = (struct wavpack_data *)prv_data;
+  struct wavpack_data *data = static_cast<struct wavpack_data *>(prv_data);
   int ret, i, s_num, Bps, iBps, oBps;
 
-  int8_t *buf8 = (int8_t *)buf;
-  int16_t *buf16 = (int16_t *)buf;
-  int32_t *buf32 = (int32_t *)buf;
+  int8_t *buf8 = reinterpret_cast<int8_t *>(buf);
+  int16_t *buf16 = reinterpret_cast<int16_t *>(buf);
+  int32_t *buf32 = reinterpret_cast<int32_t *>(buf);
 
   Bps = WavpackGetBytesPerSample(data->wpc);
   iBps = data->channels * Bps;

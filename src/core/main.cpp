@@ -130,10 +130,10 @@ static void start_moc(const struct parameters *params, const std::vector<std::st
   }
   else
   {
-    log_init_stream(NULL, NULL);
+    log_init_stream(nullptr, nullptr);
   }
 
-  if (pthread_create(&server_thread, NULL, server_thread_func, th_args) != 0)
+  if (pthread_create(&server_thread, nullptr, server_thread_func, th_args) != 0)
   {
     fatal("pthread_create() failed: %s", xstrerror(errno));
   }
@@ -148,7 +148,7 @@ static void start_moc(const struct parameters *params, const std::vector<std::st
   interface_end();
 
   /* engine_quit() was called by interface_end(); wait for the thread. */
-  pthread_join(server_thread, NULL);
+  pthread_join(server_thread, nullptr);
 
   engine_event_queue_free(eq);
 }
@@ -331,10 +331,10 @@ static struct poptOption general_opts[] = {
     {"debug", 'D', POPT_ARG_NONE, &params.debug, CL_HANDLED,
      "Turn on logging to a file", NULL},
 #endif
-    {"moc-dir", 'M', POPT_ARG_STRING, NULL, CL_MOCDIR,
+    {"moc-dir", 'M', POPT_ARG_STRING, nullptr, CL_MOCDIR,
      "Use the specified MOC directory instead of the default", "DIR"},
-    {"music-dir", 'm', POPT_ARG_NONE, NULL, CL_MUSICDIR, "Start in MusicDir",
-     NULL},
+    {"music-dir", 'm', POPT_ARG_NONE, nullptr, CL_MUSICDIR, "Start in MusicDir",
+     nullptr},
     {"config", 'C', POPT_ARG_STRING, &params.config_file, CL_HANDLED,
      "Use the specified config file instead of the default"
      " (conflicts with '--no-config')",
@@ -342,34 +342,34 @@ static struct poptOption general_opts[] = {
     {"no-config", 0, POPT_ARG_NONE, &params.no_config_file, CL_HANDLED,
      "Use program defaults rather than any config file"
      " (conflicts with '--config')",
-     NULL},
-    {"set-option", 'O', POPT_ARG_STRING, NULL, CL_SETOPTION,
+     nullptr},
+    {"set-option", 'O', POPT_ARG_STRING, nullptr, CL_SETOPTION,
      "Override the configuration option NAME with VALUE", "'NAME=VALUE'"},
-    {"sound-driver", 'R', POPT_ARG_STRING, NULL, CL_SDRIVER,
+    {"sound-driver", 'R', POPT_ARG_STRING, nullptr, CL_SDRIVER,
      "Use the first valid sound driver", "DRIVERS"},
-    {"ascii", 'A', POPT_ARG_NONE, NULL, CL_ASCII,
-     "Use ASCII characters to draw lines", NULL},
-    {"theme", 'T', POPT_ARG_STRING, NULL, CL_THEME,
+    {"ascii", 'A', POPT_ARG_NONE, nullptr, CL_ASCII,
+     "Use ASCII characters to draw lines", nullptr},
+    {"theme", 'T', POPT_ARG_STRING, nullptr, CL_THEME,
      "Use the selected theme file (read from ~/.moc/themes if the path is not "
      "absolute)",
      "FILE"},
     POPT_TABLEEND};
 
 static struct poptOption misc_opts[] = {
-    {NULL, 0, POPT_ARG_CALLBACK, (void *)(uintptr_t)show_misc_cb, 0, NULL,
-     NULL},
-    {"version", 'V', POPT_ARG_NONE, NULL, 0, "Print version information", NULL},
-    {"echo-args", 0, POPT_ARG_NONE, NULL, 0, "Print POPT-interpreted arguments",
-     NULL},
-    {"usage", 0, POPT_ARG_NONE, NULL, 0, "Print brief usage", NULL},
-    {"help", 'h', POPT_ARG_NONE, NULL, 0, "Print extended usage", NULL},
+    {nullptr, 0, POPT_ARG_CALLBACK, (void *)(uintptr_t)show_misc_cb, 0, nullptr,
+     nullptr},
+    {"version", 'V', POPT_ARG_NONE, nullptr, 0, "Print version information", nullptr},
+    {"echo-args", 0, POPT_ARG_NONE, nullptr, 0, "Print POPT-interpreted arguments",
+     nullptr},
+    {"usage", 0, POPT_ARG_NONE, nullptr, 0, "Print brief usage", nullptr},
+    {"help", 'h', POPT_ARG_NONE, nullptr, 0, "Print extended usage", nullptr},
     POPT_TABLEEND};
 
 static struct poptOption mocf_opts[] = {
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, general_opts, 0,
-     "Options:", NULL},
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, misc_opts, 0,
-     "Miscellaneous options:", NULL},
+    {nullptr, 0, POPT_ARG_INCLUDE_TABLE, general_opts, 0,
+     "Options:", nullptr},
+    {nullptr, 0, POPT_ARG_INCLUDE_TABLE, misc_opts, 0,
+     "Miscellaneous options:", nullptr},
     POPT_AUTOALIAS POPT_TABLEEND};
 
 /* Read the POPT configuration files as given in MOCF_POPTRC. */
@@ -581,7 +581,7 @@ struct poptOption *clone_popt_options(struct poptOption *opts)
         fatal("Unknown POPT option table argInfo type: %d", result[iy].argInfo);
     }
 
-    result[iy].arg = NULL;
+    result[iy].arg = nullptr;
     result[iy++].val = popt_next_val++;
   }
 
@@ -646,7 +646,7 @@ struct poptOption *find_popt_option(struct poptOption *opts, int wanted)
     }
   }
 
-  return NULL;
+  return nullptr;
 }
 
 static char *render_popt_command_line()
@@ -669,7 +669,7 @@ static char *render_popt_command_line()
   cmdline.reserve(mocf_argc * 2);
   cmdline.push_back(mocf_argv[0]);
 
-  while (1)
+  while (true)
   {
     std::string str;
     const char *arg;
@@ -710,7 +710,7 @@ static char *render_popt_command_line()
     }
 
     cmdline.push_back(std::move(str));
-    free((void *)arg);
+    free(const_cast<char *>(arg));
   }
 
   rest = poptGetArgs(ctx);
@@ -750,7 +750,7 @@ static void override_config_option(const char *arg, std::vector<std::string> *de
   assert(arg != NULL);
 
   ptr = strchr(arg, '=');
-  if (ptr == NULL)
+  if (ptr == nullptr)
   {
     goto error;
   }
@@ -858,7 +858,7 @@ static void process_options(poptContext ctx, std::vector<std::string> *deferred)
         exit(EXIT_FAILURE);
     }
 
-    free((void *)arg);
+    free(const_cast<char *>(arg));
   }
 
   if (rc < -1)
@@ -1034,7 +1034,7 @@ int main(int argc, const char *argv[])
 
   files_init();
 
-  if (get_home() == NULL)
+  if (get_home() == nullptr)
   {
     fatal("Could not determine user's home directory!");
   }
@@ -1075,7 +1075,7 @@ int main(int argc, const char *argv[])
 
   io_init();
   decoder_init(params.debug);
-  srand(time(NULL));
+  srand(time(nullptr));
 
   start_moc(&params, args);
 

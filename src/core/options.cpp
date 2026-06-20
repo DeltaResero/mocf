@@ -138,7 +138,7 @@ static bool check_function(const Option& opt, int int_val, const std::string& st
         regcomp(&preg, "^[a-z0-9/-]+\\([^,) ]*(,[^,) ]*)*\\)$", REG_EXTENDED | REG_ICASE | REG_NOSUB);
         initialized = true;
     }
-    return regexec(&preg, str_val.c_str(), 0, NULL, 0) == 0;
+    return regexec(&preg, str_val.c_str(), 0, nullptr, 0) == 0;
 }
 
 /* Always pass a value as valid. */
@@ -398,7 +398,7 @@ void options_init()
   options_map.clear();
 
   add_bool("ReadTags", true);
-  add_path("MusicDir", NULL, check_true);
+  add_path("MusicDir", nullptr, check_true);
   add_bool("StartInMusicDir", false);
   add_int("CircularLogSize", 0, check_range, {0, INT_MAX});
   add_symb("Sort", "FileName", {"FileName"});
@@ -452,9 +452,9 @@ void options_init()
            "eterm",
            check_true);
 
-  add_str("Theme", NULL, check_true);
-  add_str("XTermTheme", NULL, check_true);
-  add_str("ForceTheme", NULL, check_true);
+  add_str("Theme", nullptr, check_true);
+  add_str("XTermTheme", nullptr, check_true);
+  add_str("ForceTheme", nullptr, check_true);
   add_path("MOCDir", "~/.mocf", check_true);
   add_bool("UseMMap", false);
   add_bool("UseMimeMagic", false);
@@ -466,19 +466,19 @@ void options_init()
   add_bool("SavePlaylist", true);
 
   add_bool("SavePlaylistTags", false);
-  add_str("Keymap", NULL, check_true);
+  add_str("Keymap", nullptr, check_true);
   add_bool("ASCIILines", false);
 
-  add_path("FastDir1", NULL, check_true);
-  add_path("FastDir2", NULL, check_true);
-  add_path("FastDir3", NULL, check_true);
-  add_path("FastDir4", NULL, check_true);
-  add_path("FastDir5", NULL, check_true);
-  add_path("FastDir6", NULL, check_true);
-  add_path("FastDir7", NULL, check_true);
-  add_path("FastDir8", NULL, check_true);
-  add_path("FastDir9", NULL, check_true);
-  add_path("FastDir10", NULL, check_true);
+  add_path("FastDir1", nullptr, check_true);
+  add_path("FastDir2", nullptr, check_true);
+  add_path("FastDir3", nullptr, check_true);
+  add_path("FastDir4", nullptr, check_true);
+  add_path("FastDir5", nullptr, check_true);
+  add_path("FastDir6", nullptr, check_true);
+  add_path("FastDir7", nullptr, check_true);
+  add_path("FastDir8", nullptr, check_true);
+  add_path("FastDir9", nullptr, check_true);
+  add_path("FastDir10", nullptr, check_true);
 
   add_int("SeekTime", 1, check_range, {1, INT_MAX});
   add_int("SilentSeekTime", 5, check_range, {1, INT_MAX});
@@ -510,7 +510,7 @@ void options_init()
 
   add_list("Layout1", "directory(0,0,50%,100%):playlist(50%,0,FILL,100%)", check_function);
   add_list("Layout2", "directory(0,0,100%,100%):playlist(0,0,100%,100%)", check_function);
-  add_list("Layout3", NULL, check_function);
+  add_list("Layout3", nullptr, check_function);
 
   add_bool("FollowPlayedFile", true);
 
@@ -545,7 +545,7 @@ void options_init()
 
   add_int("SidPlayFP_DefaultSongLength", 180, check_range, {0, INT_MAX});
   add_int("SidPlayFP_MinimumSongLength", 0, check_range, {0, INT_MAX});
-  add_str("SidPlayFP_Database", NULL, check_true);
+  add_str("SidPlayFP_Database", nullptr, check_true);
   add_int("SidPlayFP_Frequency", 48000, check_range, {4000, 48000});
   add_bool("SidPlayFP_StartAtStart", true);
   add_bool("SidPlayFP_PlaySubTunes", true);
@@ -553,9 +553,9 @@ void options_init()
 
   add_bool("AAC_HEAACUpsampling", true);
 
-  add_path("OnEngineStart", NULL, check_true);
-  add_path("OnEngineStop", NULL, check_true);
-  add_path("OnStop", NULL, check_true);
+  add_path("OnEngineStart", nullptr, check_true);
+  add_path("OnEngineStop", nullptr, check_true);
+  add_path("OnStop", nullptr, check_true);
 
   add_bool("QueueNextSongReturn", false);
 }
@@ -660,7 +660,7 @@ static char *substitute_variable(const char *name_in, const char *value_in)
     }
 
     /* Find default substitution or closing brace. */
-    dflt = NULL;
+    dflt = nullptr;
     if (name[len] == '}')
     {
       end = &name[len];
@@ -671,7 +671,7 @@ static char *substitute_variable(const char *name_in, const char *value_in)
       name[len] = 0x00;
       dflt = &name[len + 2];
       end = strchr(dflt, '}');
-      if (end == NULL)
+      if (end == nullptr)
       {
         fatal("Error in config file option '%s': "
               "unterminated '${%s:-'!",
@@ -694,7 +694,7 @@ static char *substitute_variable(const char *name_in, const char *value_in)
 
     /* Fetch environment variable or configuration option value. */
     value = xstrdup(getenv(name));
-    if (value == NULL && find_option(name, OPTION_ANY) != nullptr)
+    if (value == nullptr && find_option(name, OPTION_ANY) != nullptr)
     {
       char buf[16];
 

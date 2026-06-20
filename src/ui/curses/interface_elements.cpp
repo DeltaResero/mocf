@@ -352,11 +352,11 @@ static void entry_draw(const struct entry *e, WINDOW *w, const int posx,
 
   std::vector<wchar_t> text_ucs(len + 1);
   memcpy(text_ucs.data(), e->text_ucs + e->display_from, sizeof(wchar_t) * (len + 1));
-  if (len > (size_t)e->width)
+  if (len > static_cast<size_t>(e->width))
   {
     text_ucs[e->width] = L'\0';
   }
-  size_t mlen = wcstombs(NULL, text_ucs.data(), 0) + 1;
+  size_t mlen = wcstombs(nullptr, text_ucs.data(), 0) + 1;
   assert(mlen >= 1);
 
   std::vector<char> text(mlen);
@@ -654,9 +654,9 @@ static char *entry_get_text(const struct entry *e)
 
   assert(e != NULL);
 
-  len = wcstombs(NULL, e->text_ucs, 0) + 1;
+  len = wcstombs(nullptr, e->text_ucs, 0) + 1;
   assert(len >= 1);
-  text = (char *)xmalloc(sizeof(char) * len);
+  text = static_cast<char *>(xmalloc(sizeof(char) * len));
   wcstombs(text, e->text_ucs, len);
 
   return text;
@@ -682,14 +682,14 @@ static void entry_set_history_up(struct entry *e)
       t = entry_get_text(e);
       entry_history_replace(e->history, e->history_pos, t);
       free(t);
-      t = NULL;
+      t = nullptr;
     }
     e->history_pos--;
 
     t = entry_history_get(e->history, e->history_pos);
     entry_set_text(e, t);
     free(t);
-    t = NULL;
+    t = nullptr;
   }
 }
 
@@ -707,7 +707,7 @@ static void entry_set_history_down(struct entry *e)
     t = entry_get_text(e);
     entry_history_replace(e->history, e->history_pos, t);
     free(t);
-    t = NULL;
+    t = nullptr;
 
     e->history_pos++;
     if (e->history_pos == entry_history_nitems(e->history))
@@ -719,7 +719,7 @@ static void entry_set_history_down(struct entry *e)
       t = entry_history_get(e->history, e->history_pos);
       entry_set_text(e, t);
       free(t);
-      t = NULL;
+      t = nullptr;
     }
   }
 }
@@ -793,7 +793,7 @@ static void side_menu_init(struct side_menu *m, const enum side_menu_type type,
   if (type == MENU_DIR || type == MENU_PLAYLIST)
   {
     side_menu_init_menu(m);
-    m->menu.list.copy = NULL;
+    m->menu.list.copy = nullptr;
 
     menu_set_items_numbering(m->menu.list.main,
                              type == MENU_PLAYLIST &&
@@ -812,7 +812,7 @@ static void side_menu_init(struct side_menu *m, const enum side_menu_type type,
   else if (type == MENU_THEMES)
   {
     side_menu_init_menu(m);
-    m->menu.list.copy = NULL;
+    m->menu.list.copy = nullptr;
   }
   else
   {
@@ -869,7 +869,7 @@ static bool parse_layout_coordinate(const char *fmt, int *val, const int max)
     return true;
   }
 
-  v = strtol(fmt, (char **)&e, 10);
+  v = strtol(fmt, const_cast<char **>(&e), 10);
   if (e == fmt)
   {
     return false;
@@ -1275,12 +1275,12 @@ static void side_menu_draw_frame(const struct side_menu *m)
 
   if (!m->title.empty())
   {
-    if ((int)strwidth(m->title.c_str()) > m->width - 4)
+    if (static_cast<int>(strwidth(m->title.c_str())) > m->width - 4)
     {
       char *tail;
 
       tail = xstrtail(m->title.c_str(), m->width - 7);
-      title = (char *)xmalloc(strlen(tail) + 4);
+      title = static_cast<char *>(xmalloc(strlen(tail) + 4));
       snprintf(title, strlen(tail) + 4, "...%s", tail);
       free(tail);
     }
@@ -1291,7 +1291,7 @@ static void side_menu_draw_frame(const struct side_menu *m)
   }
   else
   {
-    title = NULL;
+    title = nullptr;
   }
 
   /* Border */
@@ -1747,7 +1747,7 @@ static void side_menu_use_main(struct side_menu *m)
   {
     menu_free(m->menu.list.main);
     m->menu.list.main = m->menu.list.copy;
-    m->menu.list.copy = NULL;
+    m->menu.list.copy = nullptr;
   }
 }
 
@@ -1892,7 +1892,7 @@ static void main_win_draw(struct main_win *w)
     /* Draw all visible menus.  Draw the selected menu last. */
     for (ix = 0; ix < ARRAY_SIZE(w->menus); ix += 1)
     {
-      if (w->menus[ix].visible && ix != (size_t)w->selected_menu)
+      if (w->menus[ix].visible && ix != static_cast<size_t>(w->selected_menu))
       {
         side_menu_draw(&w->menus[ix], 0);
       }
@@ -2201,7 +2201,7 @@ static int main_win_get_files_time(const struct main_win *w,
 
   assert(w != NULL);
 
-  m = find_side_menu((struct main_win *)w, iface_to_side_menu(menu));
+  m = find_side_menu(const_cast<struct main_win *>(w), iface_to_side_menu(menu));
 
   return side_menu_get_files_time(m);
 }
@@ -2213,7 +2213,7 @@ static int main_win_is_time_for_all(const struct main_win *w,
 
   assert(w != NULL);
 
-  m = find_side_menu((struct main_win *)w, iface_to_side_menu(menu));
+  m = find_side_menu(const_cast<struct main_win *>(w), iface_to_side_menu(menu));
 
   return side_menu_is_time_for_all(m);
 }
@@ -2739,13 +2739,13 @@ static struct queued_message *queued_message_create(enum message_type type)
   struct queued_message *result;
 
   result = new queued_message;
-  result->next = NULL;
+  result->next = nullptr;
   result->type = type;
   result->msg = "";
   result->prompt = "";
   result->timeout = 0;
-  result->callback = NULL;
-  result->data = NULL;
+  result->callback = nullptr;
+  result->data = nullptr;
 
   return result;
 }
@@ -2763,7 +2763,7 @@ static void set_startup_message(struct info_win *w)
 
   w->current_message = queued_message_create(NORMAL_MSG);
   w->current_message->msg = STARTUP_MESSAGE;
-  w->current_message->timeout = time(NULL);
+  w->current_message->timeout = time(nullptr);
   w->current_message->timeout += options_get_int("MessageLingerTime");
 
   if (is_help_still_h())
@@ -2787,8 +2787,8 @@ static void info_win_init(struct info_win *w)
   w->win = newwin(4, COLS, LINES - 4, 0);
   wbkgd(w->win, get_color(CLR_BACKGROUND));
 
-  w->queued_message_head = NULL;
-  w->queued_message_tail = NULL;
+  w->queued_message_head = nullptr;
+  w->queued_message_tail = nullptr;
   w->queued_message_total = 0;
   w->queued_message_errors = 0;
 
@@ -2877,7 +2877,7 @@ static void info_win_draw_status(const struct info_win *w)
   {
     wattrset(w->win, get_color(CLR_STATUS));
     wmove(w->win, 0, 6);
-    xwprintw(w->win, "%-*s", (int)sizeof(w->status_msg) - 1, w->status_msg);
+    xwprintw(w->win, "%-*s", static_cast<int>(sizeof(w->status_msg)) - 1, w->status_msg);
     info_win_update_curs(w);
   }
 }
@@ -2965,7 +2965,7 @@ static void info_win_draw_title(const struct info_win *w)
     clear_area(w->win, 4, 1, COLS - 5, 1);
 
     if (w->current_message && !w->current_message->msg.empty() &&
-        w->current_message->timeout >= time(NULL))
+        w->current_message->timeout >= time(nullptr))
     {
       wattrset(w->win, w->current_message->type == ERROR_MSG
                            ? get_color(CLR_ERROR)
@@ -3223,7 +3223,7 @@ static void info_win_set_mixer_value(struct info_win *w, const int value)
 {
   assert(w != NULL);
 
-  bar_set_fill(&w->mixer_bar, (double)value);
+  bar_set_fill(&w->mixer_bar, static_cast<double>(value));
   if (!w->in_entry && !w->too_small)
   {
     bar_draw(&w->mixer_bar, w->win,
@@ -3267,7 +3267,7 @@ static void info_win_make_entry(struct info_win *w, const enum entry_type type)
   assert(w != NULL);
   assert(!w->in_entry);
 
-  prompt = NULL;
+  prompt = nullptr;
   switch (type)
   {
     case ENTRY_GO_DIR:
@@ -3278,7 +3278,7 @@ static void info_win_make_entry(struct info_win *w, const enum entry_type type)
       prompt = w->current_message->prompt.c_str();
       break;
     default:
-      history = NULL;
+      history = nullptr;
   }
 
   entry_init(&w->entry, type, COLS - 4, history, prompt);
@@ -3295,12 +3295,12 @@ static void info_win_display_msg(struct info_win *w)
   assert(w != NULL);
 
   msg_changed = 0;
-  if (w->current_message && time(NULL) > w->current_message->timeout)
+  if (w->current_message && time(nullptr) > w->current_message->timeout)
   {
     w->callback = w->current_message->callback;
     w->data = w->current_message->data;
     queued_message_destroy(w->current_message);
-    w->current_message = NULL;
+    w->current_message = nullptr;
     msg_changed = 1;
   }
 
@@ -3308,10 +3308,10 @@ static void info_win_display_msg(struct info_win *w)
   {
     w->current_message = w->queued_message_head;
     w->queued_message_head = w->current_message->next;
-    w->current_message->next = NULL;
+    w->current_message->next = nullptr;
     if (!w->queued_message_head)
     {
-      w->queued_message_tail = NULL;
+      w->queued_message_tail = nullptr;
     }
     w->queued_message_total -= 1;
     if (w->current_message->type == ERROR_MSG)
@@ -3336,7 +3336,7 @@ static void info_win_display_msg(struct info_win *w)
       w->current_message->timeout = 86400;
     }
 
-    w->current_message->timeout += time(NULL);
+    w->current_message->timeout += time(nullptr);
     msg_changed = 1;
   }
 
@@ -3374,12 +3374,12 @@ static void info_win_clear_msg(struct info_win *w)
 
   w->queued_message_total = 0;
   w->queued_message_errors = 0;
-  w->queued_message_tail = NULL;
+  w->queued_message_tail = nullptr;
 
   if (w->current_message)
   {
     queued_message_destroy(w->current_message);
-    w->current_message = NULL;
+    w->current_message = nullptr;
   }
 }
 
@@ -3733,7 +3733,7 @@ static void info_win_entry_handle_key(struct info_win *iw, struct main_win *mw,
       info_win_entry_disable(iw);
       if (type == ENTRY_USER_QUERY)
       {
-        iface_user_reply(NULL);
+        iface_user_reply(nullptr);
       }
     }
     else if ((type == ENTRY_GO_DIR || type == ENTRY_USER_QUERY) &&
@@ -3830,7 +3830,7 @@ static void info_win_resize(struct info_win *w)
 
 void windows_init()
 {
-  if (getenv("ESCDELAY") == NULL)
+  if (getenv("ESCDELAY") == nullptr)
   {
 #ifdef HAVE_SET_ESCDELAY
     set_escdelay(25);
@@ -4112,7 +4112,7 @@ void iface_set_title(const enum iface_menu menu, const char *title)
 
   if (options_get_bool("FileNamesIconv"))
   {
-    char *conv_title = NULL;
+    char *conv_title = nullptr;
     conv_title = files_iconv_str(title);
 
     main_win_set_title(&main_win,
@@ -4135,7 +4135,7 @@ void iface_get_key(struct iface_key *k)
   wint_t ch;
 
   ch = wgetch(main_win.win);
-  if (ch == (wint_t)ERR)
+  if (ch == static_cast<wint_t>ERR)
   {
     interface_fatal("wgetch() failed!");
   }
@@ -4290,7 +4290,7 @@ void iface_set_played_file(const char *file)
 
   if (!file)
   {
-    info_win_set_played_title(&info_win, NULL);
+    info_win_set_played_title(&info_win, nullptr);
     info_win_set_bitrate(&info_win, -1);
     info_win_set_rate(&info_win, -1);
     info_win_set_curr_time(&info_win, -1);
@@ -4365,7 +4365,7 @@ void iface_error(const char *msg)
 {
   if (iface_initialized)
   {
-    info_win_msg(&info_win, msg, ERROR_MSG, NULL, NULL, NULL);
+    info_win_msg(&info_win, msg, ERROR_MSG, nullptr, nullptr, nullptr);
     iface_refresh_screen();
   }
   else
@@ -4481,7 +4481,7 @@ void iface_message(const char *msg)
 {
   assert(msg != NULL);
 
-  info_win_msg(&info_win, msg, NORMAL_MSG, NULL, NULL, NULL);
+  info_win_msg(&info_win, msg, NORMAL_MSG, nullptr, nullptr, nullptr);
   iface_refresh_screen();
 }
 

@@ -447,7 +447,7 @@ static int oss_open(struct sound_params *sound_params)
 /* Return -1 on error, or number of bytes played when okay. */
 static int oss_play(const char *buff, const size_t size)
 {
-  ssize_t ssize = (ssize_t)size;
+  ssize_t ssize = static_cast<ssize_t>(size);
   ssize_t count = 0;
 
   if (dsp_fd == -1)

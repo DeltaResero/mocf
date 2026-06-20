@@ -77,12 +77,12 @@
 /* The pulse mainloop and context are initialized in pulse_init and
  * destroyed in pulse_shutdown.
  */
-static pa_threaded_mainloop *mainloop = NULL;
-static pa_context *context = NULL;
+static pa_threaded_mainloop *mainloop = nullptr;
+static pa_context *context = nullptr;
 static uint32_t pa_default_sink_index = 0;
 
 /* The stream is initialized in pulse_open and destroyed in pulse_close. */
-static pa_stream *stream = NULL;
+static pa_stream *stream = nullptr;
 
 static int showing_sink_volume = 0;
 static int stream_volume = 100;
@@ -98,7 +98,7 @@ static void flush_callback(pa_stream *s, int success, void *userdata);
 
 /* Load stream_volume from disk.  Silently ignored if the file does not
  * exist yet (first run). */
-static void pulse_load_volume(void)
+static void pulse_load_volume()
 {
   char *cfname = create_file_name(PULSE_VOLUME_SAVE_FILE);
   FILE *cf = fopen(cfname, "r");
@@ -119,7 +119,7 @@ static void pulse_load_volume(void)
 }
 
 /* Save stream_volume to disk so it survives across sessions. */
-static void pulse_save_volume(void)
+static void pulse_save_volume()
 {
   char *cfname = create_file_name(PULSE_VOLUME_SAVE_FILE);
   FILE *cf = fopen(cfname, "w");
@@ -218,9 +218,9 @@ static int pulse_init(struct output_driver_caps *caps)
   pa_context_set_state_callback(c, context_state_callback, mainloop);
 
   /* Ignore return value, rely on state being set properly */
-  pa_context_connect(c, NULL, PA_CONTEXT_NOAUTOSPAWN, NULL);
+  pa_context_connect(c, nullptr, PA_CONTEXT_NOAUTOSPAWN, nullptr);
 
-  while (1)
+  while (true)
   {
     pa_context_state_t state = pa_context_get_state(c);
 
@@ -271,12 +271,12 @@ unlock_and_fail:
 
   pa_threaded_mainloop_stop(mainloop);
   pa_threaded_mainloop_free(mainloop);
-  mainloop = NULL;
+  mainloop = nullptr;
 
   return 0;
 }
 
-static void pulse_shutdown(void)
+static void pulse_shutdown()
 {
   /* Persist the current volume so it is restored on the next startup. */
   pulse_save_volume();
@@ -285,13 +285,13 @@ static void pulse_shutdown(void)
 
   pa_context_disconnect(context);
   pa_context_unref(context);
-  context = NULL;
+  context = nullptr;
 
   pa_threaded_mainloop_unlock(mainloop);
 
   pa_threaded_mainloop_stop(mainloop);
   pa_threaded_mainloop_free(mainloop);
-  mainloop = NULL;
+  mainloop = nullptr;
 }
 
 static int pulse_open(struct sound_params *sound_params)
@@ -306,11 +306,11 @@ static int pulse_open(struct sound_params *sound_params)
    * same as passing NULL for this struct, which gets us an
    * unnecessarily short alsa-like latency.
    */
-  ba.fragsize = (uint32_t)-1;
-  ba.tlength = (uint32_t)-1;
-  ba.prebuf = (uint32_t)-1;
-  ba.minreq = (uint32_t)-1;
-  ba.maxlength = (uint32_t)-1;
+  ba.fragsize = static_cast<uint32_t>(-1);
+  ba.tlength = static_cast<uint32_t>(-1);
+  ba.prebuf = static_cast<uint32_t>(-1);
+  ba.minreq = static_cast<uint32_t>(-1);
+  ba.maxlength = static_cast<uint32_t>(-1);
 
   ss.channels = sound_params->channels;
   ss.rate = sound_params->rate;
@@ -353,7 +353,7 @@ static int pulse_open(struct sound_params *sound_params)
    * here (there are media title/artist/etc props but we do not
    * have that data available here).
    */
-  s = pa_stream_new(context, "music", &ss, NULL);
+  s = pa_stream_new(context, "music", &ss, nullptr);
   if (!s)
   {
     fatal("pulse: stream allocation failed");
@@ -369,14 +369,14 @@ static int pulse_open(struct sound_params *sound_params)
    * explicit volume here would override that mechanism, resetting the
    * volume to stream_volume (100 at startup) on every session open. */
   /* Ignore return value, rely on failed stream state instead. */
-  pa_stream_connect_playback(s, NULL, &ba,
+  pa_stream_connect_playback(s, nullptr, &ba,
                              static_cast<pa_stream_flags_t>(
                                  PA_STREAM_INTERPOLATE_TIMING |
                                  PA_STREAM_AUTO_TIMING_UPDATE |
                                  PA_STREAM_ADJUST_LATENCY),
-                             NULL, NULL);
+                             nullptr, nullptr);
 
-  while (1)
+  while (true)
   {
     pa_stream_state_t state = pa_stream_get_state(s);
 
@@ -413,7 +413,7 @@ static int pulse_open(struct sound_params *sound_params)
     pa_operation *op;
     pa_cvolume_set(&v, 1, stream_volume * PA_VOLUME_NORM / 100);
     op = pa_context_set_sink_input_volume(context, pa_stream_get_index(stream),
-                                          &v, NULL, NULL);
+                                          &v, nullptr, nullptr);
     pa_operation_unref(op);
     logit("Pulse: applied stream_volume %d%% to new stream", stream_volume);
   }
@@ -429,7 +429,7 @@ fail:
   return 0;
 }
 
-static void pulse_close(void)
+static void pulse_close()
 {
   pa_operation *op;
   int result = 0;
@@ -447,7 +447,7 @@ static void pulse_close(void)
 
   pa_stream_disconnect(stream);
   pa_stream_unref(stream);
-  stream = NULL;
+  stream = nullptr;
 
   pa_threaded_mainloop_unlock(mainloop);
 }
@@ -476,7 +476,7 @@ static int pulse_play(const char *buff, const size_t size)
 
     /* We have no working way of dealing with errors
      * (see below). */
-    if (pa_stream_write(stream, buff + offset, towrite, NULL, 0,
+    if (pa_stream_write(stream, buff + offset, towrite, nullptr, 0,
                         PA_SEEK_RELATIVE))
     {
       error("pa_stream_write failed");
@@ -539,7 +539,7 @@ static void volume_cb(const pa_cvolume *v, void *userdata)
 static void sink_volume_cb(pa_context *c ATTR_UNUSED, const pa_sink_info *i,
                            int eol ATTR_UNUSED, void *userdata)
 {
-  volume_cb(i ? &i->volume : NULL, userdata);
+  volume_cb(i ? &i->volume : nullptr, userdata);
 }
 
 static void sink_input_volume_cb(pa_context *c ATTR_UNUSED,
@@ -547,10 +547,10 @@ static void sink_input_volume_cb(pa_context *c ATTR_UNUSED,
                                  int eol ATTR_UNUSED,
                                  void *userdata)
 {
-  volume_cb(i ? &i->volume : NULL, userdata);
+  volume_cb(i ? &i->volume : nullptr, userdata);
 }
 
-static int pulse_read_mixer(void)
+static int pulse_read_mixer()
 {
   pa_operation *op;
   int result = 0;
@@ -606,7 +606,7 @@ static void pulse_set_mixer(int vol)
     op = pa_context_set_sink_volume_by_index(
         context,
         stream ? pa_stream_get_device_index(stream) : pa_default_sink_index, &v,
-        NULL, NULL);
+        nullptr, nullptr);
   }
   else
   {
@@ -615,7 +615,7 @@ static void pulse_set_mixer(int vol)
     if (stream)
     {
       op = pa_context_set_sink_input_volume(context, pa_stream_get_index(stream),
-                                            &v, NULL, NULL);
+                                            &v, nullptr, nullptr);
       pa_operation_unref(op);
     }
   }
@@ -623,7 +623,7 @@ static void pulse_set_mixer(int vol)
   pa_threaded_mainloop_unlock(mainloop);
 }
 
-static int pulse_get_buff_fill(void)
+static int pulse_get_buff_fill()
 {
   /* This function is problematic. MOC uses it to for the "time
    * remaining" in the UI, but calls it more than once per
@@ -668,7 +668,7 @@ static int pulse_get_buff_fill(void)
    * Deal with stream being NULL too, just in case this is
    * called in a racy fashion similar to how reset() is.
    */
-  if (stream && pa_stream_get_latency(stream, &buffered_usecs, NULL) >= 0)
+  if (stream && pa_stream_get_latency(stream, &buffered_usecs, nullptr) >= 0)
   {
     /* Cap latency to 1 second.  pa_stream_get_latency() normally
      * returns more (PA's default ~2s buffer), but reporting that
@@ -702,7 +702,7 @@ static void flush_callback(pa_stream *s ATTR_UNUSED, int success,
   pa_threaded_mainloop_signal(mainloop, 0);
 }
 
-static int pulse_reset(void)
+static int pulse_reset()
 {
   pa_operation *op;
   int result = 0;
@@ -733,7 +733,7 @@ static int pulse_reset(void)
   return result;
 }
 
-static int pulse_get_rate(void)
+static int pulse_get_rate()
 {
   /* This is called once right after open. Do not bother making
    * this fast. */
@@ -757,7 +757,7 @@ static int pulse_get_rate(void)
   return result;
 }
 
-static void pulse_toggle_mixer_channel(void)
+static void pulse_toggle_mixer_channel()
 {
   showing_sink_volume = !showing_sink_volume;
 }
@@ -776,9 +776,9 @@ static void sink_name_cb(pa_context *c ATTR_UNUSED, const pa_sink_info *i,
   pa_threaded_mainloop_signal(mainloop, 0);
 }
 
-static char *pulse_get_mixer_channel_name(void)
+static char *pulse_get_mixer_channel_name()
 {
-  char *result = NULL;
+  char *result = nullptr;
 
   pa_threaded_mainloop_lock(mainloop);
 
@@ -823,7 +823,7 @@ static void cork_callback(pa_stream *s ATTR_UNUSED, int success,
   pa_threaded_mainloop_signal(mainloop, 0);
 }
 
-static void pulse_hw_pause(void)
+static void pulse_hw_pause()
 {
   pa_operation *op;
   int result = 0;
@@ -851,7 +851,7 @@ static void pulse_hw_pause(void)
   pa_threaded_mainloop_unlock(mainloop);
 }
 
-static void pulse_hw_unpause(void)
+static void pulse_hw_unpause()
 {
   pa_operation *op;
   int result = 0;

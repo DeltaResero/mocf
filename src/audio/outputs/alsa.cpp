@@ -59,7 +59,7 @@
   } while (0)
 #endif
 
-static snd_pcm_t *handle = NULL;
+static snd_pcm_t *handle = nullptr;
 
 static struct
 {
@@ -76,10 +76,10 @@ static int alsa_buf_fill = 0;
 static int bytes_per_frame;
 static int bytes_per_sample;
 
-static snd_mixer_t *mixer_handle = NULL;
-static snd_mixer_elem_t *mixer_elem1 = NULL;
-static snd_mixer_elem_t *mixer_elem2 = NULL;
-static snd_mixer_elem_t *mixer_elem_curr = NULL;
+static snd_mixer_t *mixer_handle = nullptr;
+static snd_mixer_elem_t *mixer_elem1 = nullptr;
+static snd_mixer_elem_t *mixer_elem2 = nullptr;
+static snd_mixer_elem_t *mixer_elem_curr = nullptr;
 static long mixer1_min = -1, mixer1_max = -1;
 static long mixer2_min = -1, mixer2_max = -1;
 
@@ -266,15 +266,15 @@ static snd_pcm_hw_params_t *alsa_open_device(const char *device)
     goto err3;
   }
 
-  if (0)
+  if (false)
   {
   err3:
     snd_pcm_hw_params_free(result);
   err2:
     snd_pcm_close(handle);
   err1:
-    result = NULL;
-    handle = NULL;
+    result = nullptr;
+    handle = nullptr;
   }
 
   return result;
@@ -325,7 +325,7 @@ static int fill_capabilities(struct output_driver_caps *caps)
       break;
     }
 
-    rc = snd_pcm_hw_params_get_rate_min(hw_params, &val, 0);
+    rc = snd_pcm_hw_params_get_rate_min(hw_params, &val, nullptr);
     if (rc < 0)
     {
       error_errno("Can't get the minimum sample rate", rc);
@@ -333,7 +333,7 @@ static int fill_capabilities(struct output_driver_caps *caps)
     }
     caps->min_rate = val;
 
-    rc = snd_pcm_hw_params_get_rate_max(hw_params, &val, 0);
+    rc = snd_pcm_hw_params_get_rate_max(hw_params, &val, nullptr);
     if (rc < 0)
     {
       error_errno("Can't get the maximum sample rate", rc);
@@ -352,11 +352,11 @@ static int fill_capabilities(struct output_driver_caps *caps)
     snd_pcm_format_mask_free(format_mask);
 
     result = 1;
-  } while (0);
+  } while (false);
 
   snd_pcm_hw_params_free(hw_params);
   snd_pcm_close(handle);
-  handle = NULL;
+  handle = nullptr;
 
   return result;
 }
@@ -404,7 +404,7 @@ static void handle_mixer_events(snd_mixer_t *mixer_handle)
     {
       log_errno("snd_mixer_handle_events() failed", rc);
     }
-  } while (0);
+  } while (false);
 }
 
 static int alsa_read_mixer_raw(snd_mixer_elem_t *elem, bool raw)
@@ -474,7 +474,7 @@ static snd_mixer_elem_t *alsa_init_mixer_channel(const char *name,
                                                  bool *use_linear_volume_scale)
 {
   snd_mixer_selem_id_t *sid;
-  snd_mixer_elem_t *elem = NULL;
+  snd_mixer_elem_t *elem = nullptr;
 
   long db_min, db_max;
 
@@ -489,7 +489,7 @@ static snd_mixer_elem_t *alsa_init_mixer_channel(const char *name,
   else if (!snd_mixer_selem_has_playback_volume(elem))
   {
     error("Mixer device has no playback volume (%s).", name);
-    elem = NULL;
+    elem = nullptr;
   }
   else
   {
@@ -508,7 +508,7 @@ static snd_mixer_elem_t *alsa_init_mixer_channel(const char *name,
     else if (*vol_min >= *vol_max)
     {
       logit("Mixer (%s) has no usable volume range", name);
-      elem = NULL;
+      elem = nullptr;
       *vol_min = -1;
       *vol_max = -1;
     }
@@ -536,7 +536,7 @@ static void alsa_close_mixer()
       log_errno("Can't close mixer", rc);
     }
 
-    mixer_handle = NULL;
+    mixer_handle = nullptr;
   }
 }
 
@@ -560,7 +560,7 @@ static void alsa_open_mixer(const char *device)
     goto err;
   }
 
-  rc = snd_mixer_selem_register(mixer_handle, NULL, NULL);
+  rc = snd_mixer_selem_register(mixer_handle, nullptr, nullptr);
   if (rc < 0)
   {
     error_errno("Can't register mixer", rc);
@@ -574,7 +574,7 @@ static void alsa_open_mixer(const char *device)
     goto err;
   }
 
-  if (0)
+  if (false)
   {
   err:
     alsa_close_mixer();
@@ -592,7 +592,7 @@ static void alsa_set_current_mixer()
   }
   else
   {
-    mixer_elem1 = NULL;
+    mixer_elem1 = nullptr;
     mixer_elem_curr = mixer_elem2;
   }
 
@@ -605,7 +605,7 @@ static void alsa_set_current_mixer()
   }
   else
   {
-    mixer_elem2 = NULL;
+    mixer_elem2 = nullptr;
     mixer_elem_curr = mixer_elem1;
   }
 }
@@ -613,7 +613,7 @@ static void alsa_set_current_mixer()
 /* Check for a running PulseAudio or PipeWire-PulseAudio instance via
  * environment variables and the well-known socket path.  No libpulse
  * linkage; this is a lightweight heuristic. */
-static bool is_pulseaudio_present(void)
+static bool is_pulseaudio_present()
 {
   if (getenv("PULSE_SERVER") || getenv("PULSE_SINK") ||
       getenv("PIPEWIRE_REMOTE"))
@@ -723,7 +723,7 @@ static int alsa_init(struct output_driver_caps *caps)
     goto err;
   }
 
-  if (0)
+  if (false)
   {
   err:
     alsa_shutdown();
@@ -778,7 +778,7 @@ static int alsa_open(struct sound_params *sound_params)
   logit("Set sample width: %d bytes", bytes_per_sample);
 
   params.rate = sound_params->rate;
-  rc = snd_pcm_hw_params_set_rate_near(handle, hw_params, &params.rate, 0);
+  rc = snd_pcm_hw_params_set_rate_near(handle, hw_params, &params.rate, nullptr);
   if (rc < 0)
   {
     error_errno("Can't set sample rate", rc);
@@ -797,7 +797,7 @@ static int alsa_open(struct sound_params *sound_params)
 
   logit("Set channels: %d", sound_params->channels);
 
-  rc = snd_pcm_hw_params_get_buffer_time_max(hw_params, &buffer_time, 0);
+  rc = snd_pcm_hw_params_get_buffer_time_max(hw_params, &buffer_time, nullptr);
   if (rc < 0)
   {
     error_errno("Can't get maximum buffer time", rc);
@@ -808,7 +808,7 @@ static int alsa_open(struct sound_params *sound_params)
   period_time = buffer_time / 4;
 
   rc = snd_pcm_hw_params_set_period_time_near(handle, hw_params, &period_time,
-                                              0);
+                                              nullptr);
   if (rc < 0)
   {
     error_errno("Can't set period time", rc);
@@ -816,7 +816,7 @@ static int alsa_open(struct sound_params *sound_params)
   }
 
   rc = snd_pcm_hw_params_set_buffer_time_near(handle, hw_params, &buffer_time,
-                                              0);
+                                              nullptr);
   if (rc < 0)
   {
     error_errno("Can't set buffer time", rc);
@@ -830,7 +830,7 @@ static int alsa_open(struct sound_params *sound_params)
     goto err;
   }
 
-  snd_pcm_hw_params_get_period_size(hw_params, &chunk_frames, 0);
+  snd_pcm_hw_params_get_period_size(hw_params, &chunk_frames, nullptr);
   debug("Chunk size: %lu frames", chunk_frames);
 
   snd_pcm_hw_params_get_buffer_size(hw_params, &buffer_frames);
@@ -972,7 +972,7 @@ static void alsa_close()
   buffer_frames = 0;
   chunk_frames = 0;
   chunk_bytes = -1;
-  handle = NULL;
+  handle = nullptr;
 }
 
 static int alsa_play(const char *buff, const size_t size)
@@ -1137,7 +1137,7 @@ static int alsa_get_buff_fill()
 
     /* delay can be negative if an underrun occurs */
     result = MAX(delay, 0) * bytes_per_frame;
-  } while (0);
+  } while (false);
 
   return result;
 }
@@ -1172,7 +1172,7 @@ static int alsa_reset()
 
     alsa_buf_fill = 0;
     result = 1;
-  } while (0);
+  } while (false);
 
   return result;
 }
@@ -1195,7 +1195,7 @@ static char *alsa_get_mixer_channel_name()
 {
   if (!mixer_elem_curr)
   {
-    return NULL;
+    return nullptr;
   }
 
   char *result;

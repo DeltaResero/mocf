@@ -74,11 +74,11 @@ void softmixer_set_value(const int val)
   mixer_real = exp((mixer_val * mixer_amp) / 100 * 0.06908);
   if (mixer_val < 10)
   {
-    mixer_real = (int)(mixer_real * mixer_val /
+    mixer_real = static_cast<int>(mixer_real * mixer_val /
                        10.f); // linear roll-off to zero for low values
   }
   mixer_real = CLAMP(SOFTMIXER_MIN, mixer_real, SOFTMIXER_MAX);
-  mixer_realf = ((float)mixer_real) / 1000.0f;
+  mixer_realf = (static_cast<float>(mixer_real)) / 1000.0f;
 
   debug("Softmixer value: %d, gain: %d", mixer_val, mixer_real);
 }
@@ -140,13 +140,13 @@ static void softmixer_read_config()
 
   FILE *cf = fopen(cfname, "r");
 
-  if (cf == NULL)
+  if (cf == nullptr)
   {
     logit("Unable to read softmixer configuration");
     return;
   }
 
-  char *linebuffer = NULL;
+  char *linebuffer = nullptr;
 
   int tmp;
 
@@ -225,7 +225,7 @@ static void softmixer_write_config()
 
   FILE *cf = fopen(cfname, "w");
 
-  if (cf == NULL)
+  if (cf == nullptr)
   {
     logit("Unable to write softmixer configuration");
     return;
@@ -380,7 +380,7 @@ static void process_buffer_u8(uint8_t *buf, size_t samples)
     tmp /= 1000;
     tmp += (UINT8_MAX >> 1);
     tmp = CLAMP(0, tmp, UINT8_MAX);
-    buf[i] = (uint8_t)tmp;
+    buf[i] = static_cast<uint8_t>(tmp);
   }
 }
 
@@ -396,7 +396,7 @@ static void process_buffer_s8(int8_t *buf, size_t samples)
     tmp *= mixer_real;
     tmp /= 1000;
     tmp = CLAMP(INT8_MIN, tmp, INT8_MAX);
-    buf[i] = (int8_t)tmp;
+    buf[i] = static_cast<int8_t>(tmp);
   }
 }
 
@@ -414,7 +414,7 @@ static void process_buffer_u16(uint16_t *buf, size_t samples)
     tmp /= 1000;
     tmp += (UINT16_MAX >> 1);
     tmp = CLAMP(0, tmp, UINT16_MAX);
-    buf[i] = (uint16_t)tmp;
+    buf[i] = static_cast<uint16_t>(tmp);
   }
 }
 
@@ -430,7 +430,7 @@ static void process_buffer_s16(int16_t *buf, size_t samples)
     tmp *= mixer_real;
     tmp /= 1000;
     tmp = CLAMP(INT16_MIN, tmp, INT16_MAX);
-    buf[i] = (int16_t)tmp;
+    buf[i] = static_cast<int16_t>(tmp);
   }
 }
 
@@ -448,7 +448,7 @@ static void process_buffer_u24(uint32_t *buf, size_t samples)
     tmp /= 1000;
     tmp += S24_MIN;
     tmp = CLAMP(0, tmp, U24_MAX);
-    buf[i] = (uint32_t)tmp;
+    buf[i] = static_cast<uint32_t>(tmp);
   }
 }
 
@@ -464,7 +464,7 @@ static void process_buffer_s24(int32_t *buf, size_t samples)
     tmp *= mixer_real;
     tmp /= 1000;
     tmp = CLAMP(S24_MIN, tmp, S24_MAX);
-    buf[i] = (int32_t)tmp;
+    buf[i] = static_cast<int32_t>(tmp);
   }
 }
 
@@ -482,7 +482,7 @@ static void process_buffer_u32(uint32_t *buf, size_t samples)
     tmp /= 1000;
     tmp += (UINT32_MAX >> 1);
     tmp = CLAMP(0, tmp, UINT32_MAX);
-    buf[i] = (uint32_t)tmp;
+    buf[i] = static_cast<uint32_t>(tmp);
   }
 }
 
@@ -498,7 +498,7 @@ static void process_buffer_s32(int32_t *buf, size_t samples)
     tmp *= mixer_real;
     tmp /= 1000;
     tmp = CLAMP(INT32_MIN, tmp, INT32_MAX);
-    buf[i] = (int32_t)tmp;
+    buf[i] = static_cast<int32_t>(tmp);
   }
 }
 
@@ -543,7 +543,7 @@ static void mix_mono_u8(uint8_t *buf, int channels, size_t samples)
 
     for (c = 0; c < channels; c++)
     {
-      *buf++ = (uint8_t)mono;
+      *buf++ = static_cast<uint8_t>(mono);
     }
 
     i += channels;
@@ -575,7 +575,7 @@ static void mix_mono_s8(int8_t *buf, int channels, size_t samples)
 
     for (c = 0; c < channels; c++)
     {
-      *buf++ = (int8_t)mono;
+      *buf++ = static_cast<int8_t>(mono);
     }
 
     i += channels;
@@ -607,7 +607,7 @@ static void mix_mono_u16(uint16_t *buf, int channels, size_t samples)
 
     for (c = 0; c < channels; c++)
     {
-      *buf++ = (uint16_t)mono;
+      *buf++ = static_cast<uint16_t>(mono);
     }
 
     i += channels;
@@ -639,7 +639,7 @@ static void mix_mono_s16(int16_t *buf, int channels, size_t samples)
 
     for (c = 0; c < channels; c++)
     {
-      *buf++ = (int16_t)mono;
+      *buf++ = static_cast<int16_t>(mono);
     }
 
     i += channels;
@@ -674,7 +674,7 @@ static void mix_mono_u24(uint32_t *buf, int channels, size_t samples)
 
     for (c = 0; c < channels; c++)
     {
-      *buf++ = (uint32_t)mono;
+      *buf++ = static_cast<uint32_t>(mono);
     }
 
     i += channels;
@@ -709,7 +709,7 @@ static void mix_mono_s24(int32_t *buf, int channels, size_t samples)
 
     for (c = 0; c < channels; c++)
     {
-      *buf++ = (int32_t)mono;
+      *buf++ = static_cast<int32_t>(mono);
     }
 
     i += channels;
@@ -741,7 +741,7 @@ static void mix_mono_u32(uint32_t *buf, int channels, size_t samples)
 
     for (c = 0; c < channels; c++)
     {
-      *buf++ = (uint32_t)mono;
+      *buf++ = static_cast<uint32_t>(mono);
     }
 
     i += channels;
@@ -773,7 +773,7 @@ static void mix_mono_s32(int32_t *buf, int channels, size_t samples)
 
     for (c = 0; c < channels; c++)
     {
-      *buf++ = (int32_t)mono;
+      *buf++ = static_cast<int32_t>(mono);
     }
 
     i += channels;

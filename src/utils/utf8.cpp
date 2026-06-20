@@ -48,7 +48,7 @@
 #include "core/options.h"
 #include "utils/utf8.h"
 
-static char *terminal_charset = NULL;
+static char *terminal_charset = nullptr;
 static int using_utf8 = 0;
 
 static iconv_t iconv_desc = (iconv_t)(-1);
@@ -73,7 +73,7 @@ char *iconv_str(const iconv_t desc, const char *str)
 
   if (!str)
   {
-    return NULL;
+    return nullptr;
   }
   if (desc == (iconv_t)(-1))
   {
@@ -85,12 +85,12 @@ char *iconv_str(const iconv_t desc, const char *str)
   inbytesleft = strlen(inbuf);
   outbytesleft = sizeof(buf) - 1;
 
-  iconv(desc, NULL, NULL, NULL, NULL);
+  iconv(desc, nullptr, nullptr, nullptr, nullptr);
 
   while (inbytesleft)
   {
     if (iconv(desc, &inbuf, &inbytesleft, &outbuf, &outbytesleft) ==
-        (size_t)(-1))
+        static_cast<size_t>(-1))
     {
       if (errno == EILSEQ)
       {
@@ -183,10 +183,10 @@ static size_t xmbstowcs(wchar_t *dest, const char *src, size_t len,
     size_t res;
 
     res = mbsrtowcs(dest, &src, len, &ps);
-    if (res != (size_t)-1)
+    if (res != static_cast<size_t>(-1))
     {
       count += res;
-      src = NULL;
+      src = nullptr;
     }
     else
     {
@@ -239,7 +239,7 @@ int xwaddnstr(WINDOW *win, const char *str, const int n)
 
   mstr = iconv_str(iconv_desc, str);
 
-  size = xmbstowcs(NULL, mstr, -1, NULL) + 1;
+  size = xmbstowcs(nullptr, mstr, -1, nullptr) + 1;
   std::vector<wchar_t> ucs(size);
   xmbstowcs(ucs.data(), mstr, size, &inv_char);
   width = wcswidth(ucs.data(), WIDTH_MAX);
@@ -267,7 +267,7 @@ int xwaddnstr(WINDOW *win, const char *str, const int n)
     ucs[size] = L'\0';
   }
 
-  num_chars = wcstombs(NULL, ucs.data(), 0);
+  num_chars = wcstombs(nullptr, ucs.data(), 0);
   std::vector<char> lstr(num_chars + 1);
 
   if (inv_char)
@@ -421,9 +421,9 @@ size_t strwidth(const char *s)
 
   assert(s != NULL);
 
-  size = xmbstowcs(NULL, s, -1, NULL) + 1;
+  size = xmbstowcs(nullptr, s, -1, nullptr) + 1;
   std::vector<wchar_t> ucs(size);
-  xmbstowcs(ucs.data(), s, size, NULL);
+  xmbstowcs(ucs.data(), s, size, nullptr);
   width = wcswidth(ucs.data(), WIDTH_MAX);
 
   return width;
@@ -439,9 +439,9 @@ char *xstrtail(const char *str, const int len)
   assert(str != NULL);
   assert(len > 0);
 
-  size = xmbstowcs(NULL, str, -1, NULL) + 1;
+  size = xmbstowcs(nullptr, str, -1, nullptr) + 1;
   std::vector<wchar_t> ucs(size);
-  xmbstowcs(ucs.data(), str, size, NULL);
+  xmbstowcs(ucs.data(), str, size, nullptr);
   wchar_t *ucs_tail = ucs.data();
 
   width = wcswidth(ucs.data(), WIDTH_MAX);
@@ -452,7 +452,7 @@ char *xstrtail(const char *str, const int len)
     width -= wcwidth(*ucs_tail++);
   }
 
-  size = wcstombs(NULL, ucs_tail, 0) + 1;
+  size = wcstombs(nullptr, ucs_tail, 0) + 1;
   std::vector<char> tail_buf(size);
   wcstombs(tail_buf.data(), ucs_tail, size);
 

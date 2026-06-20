@@ -103,13 +103,13 @@ static enum {
 } tags_source;
 
 /* Tags of the currently played file. */
-static struct file_tags *curr_tags = NULL;
+static struct file_tags *curr_tags = nullptr;
 
 /* Mutex for curr_tags and tags_source. */
 static pthread_mutex_t curr_tags_mtx = PTHREAD_MUTEX_INITIALIZER;
 
 /* Stream associated with the currently playing decoder. */
-static struct io_stream *decoder_stream = NULL;
+static struct io_stream *decoder_stream = nullptr;
 static pthread_mutex_t decoder_stream_mtx = PTHREAD_MUTEX_INITIALIZER;
 
 static struct bitrate_list bitrate_list;
@@ -118,9 +118,9 @@ static void bitrate_list_init(struct bitrate_list *b)
 {
   assert(b != NULL);
 
-  b->head = NULL;
-  b->tail = NULL;
-  pthread_mutex_init(&b->mtx, NULL);
+  b->head = nullptr;
+  b->tail = nullptr;
+  pthread_mutex_init(&b->mtx, nullptr);
 }
 
 static void bitrate_list_empty(struct bitrate_list *b)
@@ -138,7 +138,7 @@ static void bitrate_list_empty(struct bitrate_list *b)
       b->head = t;
     }
 
-    b->tail = NULL;
+    b->tail = nullptr;
   }
 
   debug("Bitrate list elements removed.");
@@ -170,7 +170,7 @@ static void bitrate_list_add(struct bitrate_list *b, const int time,
   if (!b->tail)
   {
     b->head = b->tail = new bitrate_list_node;
-    b->tail->next = NULL;
+    b->tail->next = nullptr;
     b->tail->time = time;
     b->tail->bitrate = bitrate;
 
@@ -182,7 +182,7 @@ static void bitrate_list_add(struct bitrate_list *b, const int time,
 
     b->tail->next = new bitrate_list_node;
     b->tail = b->tail->next;
-    b->tail->next = NULL;
+    b->tail->next = nullptr;
     b->tail->time = time;
     b->tail->bitrate = bitrate;
 
@@ -249,7 +249,7 @@ static void update_time()
 
 static void *precache_thread(void *data)
 {
-  struct precache *precache = (struct precache *)data;
+  struct precache *precache = static_cast<struct precache *>(data);
   int decoded;
   struct sound_params new_sound_params;
   struct decoder_error err;
@@ -268,7 +268,7 @@ static void *precache_thread(void *data)
     logit("Failed to open the file for precache: %s", err.err.c_str());
     decoder_error_clear(&err);
     precache->decoder_data.reset();
-    return NULL;
+    return nullptr;
   }
 
   audio_plist_set_time(precache->file.c_str(),
@@ -287,7 +287,7 @@ static void *precache_thread(void *data)
        * in precache, so give up. */
       logit("EOF when precaching.");
       precache->decoder_data.reset();
-      return NULL;
+      return nullptr;
     }
 
     precache->decoder_data->get_error(&err);
@@ -297,7 +297,7 @@ static void *precache_thread(void *data)
       logit("Error reading file for precache: %s", err.err.c_str());
       decoder_error_clear(&err);
       precache->decoder_data.reset();
-      return NULL;
+      return nullptr;
     }
 
     if (!precache->sound_params.channels)
@@ -312,7 +312,7 @@ static void *precache_thread(void *data)
       logit("Sound parameters have changed when precaching.");
       decoder_error_clear(&err);
       precache->decoder_data.reset();
-      return NULL;
+      return nullptr;
     }
 
     bitrate_list_add(&precache->bitrate_list, precache->decoded_time,
@@ -320,7 +320,7 @@ static void *precache_thread(void *data)
 
     precache->buf_fill += decoded;
     precache->decoded_time +=
-        decoded / (float)(sfmt_Bps(new_sound_params.fmt) *
+        decoded / static_cast<float>(sfmt_Bps(new_sound_params.fmt) *
                           new_sound_params.rate * new_sound_params.channels);
 
     if (err.type != ERROR_OK)
@@ -332,7 +332,7 @@ static void *precache_thread(void *data)
 
   precache->ok = 1;
   logit("Successfully precached file (%d bytes)", precache->buf_fill);
-  return NULL;
+  return nullptr;
 }
 
 static void start_precache(struct precache *precache, const char *file)
@@ -346,7 +346,7 @@ static void start_precache(struct precache *precache, const char *file)
   bitrate_list_init(&precache->bitrate_list);
   logit("Precaching file %s", file);
   precache->ok = 0;
-  rc = pthread_create(&precache->tid, NULL, precache_thread, precache);
+  rc = pthread_create(&precache->tid, nullptr, precache_thread, precache);
   if (rc != 0)
   {
     log_errno("Could not run precache thread", rc);
@@ -364,7 +364,7 @@ static void precache_wait(struct precache *precache)
   if (precache->running)
   {
     debug("Waiting for precache thread...");
-    rc = pthread_join(precache->tid, NULL);
+    rc = pthread_join(precache->tid, nullptr);
     if (rc != 0)
     {
       fatal("pthread_join() for precache thread failed: %s", xstrerror(rc));
@@ -478,7 +478,7 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
 
   status_msg("Playing...");
 
-  while (1)
+  while (true)
   {
     debug("loop...");
 
@@ -493,7 +493,7 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
 
       if (decoded)
       {
-        decode_time += decoded / (float)(sfmt_Bps(new_sound_params.fmt) *
+        decode_time += decoded / static_cast<float>(sfmt_Bps(new_sound_params.fmt) *
                                          new_sound_params.rate *
                                          new_sound_params.channels);
       }
@@ -634,7 +634,7 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
   status_msg("");
 
   LOCK(decoder_stream_mtx);
-  decoder_stream = NULL;
+  decoder_stream = nullptr;
   decoder_data.reset();
   UNLOCK(decoder_stream_mtx);
 
@@ -644,7 +644,7 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
   if (curr_tags)
   {
     tags_free(curr_tags);
-    curr_tags = NULL;
+    curr_tags = nullptr;
   }
   UNLOCK(curr_tags_mtx);
 
@@ -796,8 +796,8 @@ static void play_file(const char *file, AudioPlugin *f,
     bitrate_list.tail = precache.bitrate_list.tail;
 
     /* don't free list elements when resetting precache */
-    precache.bitrate_list.head = NULL;
-    precache.bitrate_list.tail = NULL;
+    precache.bitrate_list.head = nullptr;
+    precache.bitrate_list.tail = nullptr;
   }
   else
   {
@@ -850,7 +850,7 @@ void player(const char *file, const char *next_file, struct out_buf *out_buf)
 
   f = get_decoder(file);
   LOCK(decoder_stream_mtx);
-  decoder_stream = NULL;
+  decoder_stream = nullptr;
   UNLOCK(decoder_stream_mtx);
 
   if (!f)
