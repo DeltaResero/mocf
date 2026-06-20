@@ -11,11 +11,10 @@
 #ifndef SNDIO_OUT_H
 #define SNDIO_OUT_H
 
-#include "audio/audio.h"
+#include <memory>
+class AudioOutput;
 
-
-  void sndio_funcs(struct hw_funcs *funcs);
-
+std::unique_ptr<AudioOutput> create_sndio_output();
 
 #endif
 

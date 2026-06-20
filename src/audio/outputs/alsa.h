@@ -11,9 +11,10 @@
 #ifndef ALSA_H
 #define ALSA_H
 
+#include <memory>
+class AudioOutput;
 
-  void alsa_funcs(struct hw_funcs *funcs);
-
+std::unique_ptr<AudioOutput> create_alsa_output();
 
 #endif
 

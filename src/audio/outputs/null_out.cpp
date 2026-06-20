@@ -18,6 +18,7 @@
 
 #include "core/common.h"
 #include "audio/audio.h"
+#include "audio/outputs/null_out.h"
 
 static struct sound_params params = {0, 0, 0};
 
@@ -60,19 +61,24 @@ static void null_toggle_mixer_channel() {}
 
 static char *null_get_mixer_channel_name() { return xstrdup("FakeMixer"); }
 
-void null_funcs(struct hw_funcs *funcs)
-{
-  funcs->init = null_init;
-  funcs->open = null_open;
-  funcs->close = null_close;
-  funcs->play = null_play;
-  funcs->read_mixer = null_read_mixer;
-  funcs->set_mixer = null_set_mixer;
-  funcs->get_buff_fill = null_get_buff_fill;
-  funcs->reset = null_reset;
-  funcs->get_rate = null_get_rate;
-  funcs->toggle_mixer_channel = null_toggle_mixer_channel;
-  funcs->get_mixer_channel_name = null_get_mixer_channel_name;
+class NullOutput : public AudioOutput {
+public:
+    int init(struct output_driver_caps *caps) override { return null_init(caps); }
+    void shutdown() override {}
+    int open(struct sound_params *sound_params) override { return null_open(sound_params); }
+    void close() override { null_close(); }
+    int play(const char *buff, const size_t size) override { return null_play(buff, size); }
+    int read_mixer() override { return null_read_mixer(); }
+    void set_mixer(int vol) override { null_set_mixer(vol); }
+    int get_buff_fill() override { return null_get_buff_fill(); }
+    int reset() override { return null_reset(); }
+    int get_rate() override { return null_get_rate(); }
+    void toggle_mixer_channel() override { null_toggle_mixer_channel(); }
+    char* get_mixer_channel_name() override { return null_get_mixer_channel_name(); }
+};
+
+std::unique_ptr<AudioOutput> create_null_output() {
+    return std::make_unique<NullOutput>();
 }
 
 // EOF

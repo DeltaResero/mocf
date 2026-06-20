@@ -12,7 +12,7 @@
 #define AUDIO_H
 
 #include <cstdlib>
-
+#include <memory>
 
   /** Sound format and endianness flags.
    *
@@ -98,140 +98,31 @@
     int max_rate;     /*!< Maximum sample rate in Hz */
   };
 
-  /** \struct hw_funcs
-   * Functions to control the audio "driver".
-   *
-   * The structure holds pointers to functions that must be provided by the
-   * audio "driver". All functions are executed only by one thread, so you don't
-   * need to worry if they are thread safe.
+  /** @class AudioOutput
+   * Abstract base class for audio output drivers.
    */
-  struct hw_funcs
+  class AudioOutput
   {
-    /** Initialize the driver.
-     *
-     * This function is invoked only once when the MOC server starts.
-     *
-     * \param caps Capabilities of the driver which must be filled by the
-     * function.
-     * \return 1 on success and 0 otherwise.
-     */
-    int (*init)(struct output_driver_caps *caps);
+  public:
+    virtual ~AudioOutput() = default;
 
-    /** Clean up at exit.
-     *
-     * This function is invoked only once when the MOC server exits. The
-     * audio device is not in use at this moment. The function should close
-     * any opened devices and free any resources the driver allocated.
-     * After this function was used, no other functions will be invoked.
-     */
-    void (*shutdown)();
+    virtual int init(struct output_driver_caps *caps) = 0;
+    virtual void shutdown() = 0;
+    virtual int open(struct sound_params *sound_params) = 0;
+    virtual void close() = 0;
+    virtual int play(const char *buff, const size_t size) = 0;
+    virtual int read_mixer() = 0;
+    virtual void set_mixer(int vol) = 0;
+    virtual int get_buff_fill() = 0;
+    virtual int reset() = 0;
+    virtual int get_rate() = 0;
+    virtual void toggle_mixer_channel() = 0;
+    virtual char *get_mixer_channel_name() = 0;
 
-    /** Open the sound device.
-     *
-     * This function should open the sound device with the proper
-     * parameters. The function should return 1 on success and 0 otherwise.
-     * After returning 1 functions like play(), get_buff_fill() can be used.
-     *
-     * The sample rate of the driver can differ from the requested rate.
-     * If so, get_rate() should return the actual rate.
-     *
-     * \param sound_params Pointer to the sound_params structure holding
-     * the required parameters.
-     * \return 1 on success and 0 otherwise.
-     */
-    int (*open)(struct sound_params *sound_params);
-
-    /** Close the device.
-     *
-     * Request for closing the device.
-     */
-    void (*close)();
-
-    /** Play sound.
-     *
-     * Play sound provided in the buffer. The sound is in the format
-     * requested when the open() function was invoked. The function should
-     * play all sound in the buffer.
-     *
-     * \param buff Pointer to the buffer with the sound.
-     * \param size Size (in bytes) of the buffer.
-     *
-     * \return The number of bytes played or a value less than zero on
-     * error.
-     */
-    int (*play)(const char *buff, const size_t size);
-
-    /** Read the volume setting.
-     *
-     * Read the current volume setting. This must work regardless if the
-     * functions open()/close() where used.
-     *
-     * \return Volume value from 0% to 100%.
-     */
-    int (*read_mixer)();
-
-    /** Set the volume setting.
-     *
-     * Set the volume. This must work regardless if the functions
-     * open()/close() where used.
-     *
-     * \param vol Volume from 0% to 100%.
-     */
-    void (*set_mixer)(int vol);
-
-    /** Read the hardware/internal buffer fill.
-     *
-     * The function should return the number of bytes of any
-     * hardware or internal buffers are filled. For example: if we play()
-     * 4KB, but only 1KB was really played (could be heard by the user),
-     * the function should return 3072 (3KB).
-     *
-     * \return Current hardware/internal buffer fill in bytes.
-     */
-    int (*get_buff_fill)();
-
-    /** Stop playing immediately.
-     *
-     * Request that the sound should not be played. This should involve
-     * flushing any internal buffer filled with data sent by the play()
-     * function and resetting the device to flush its buffer (if possible).
-     *
-     * \return 1 on success or 0 otherwise.
-     */
-    int (*reset)();
-
-    /** Get the current sample rate setting.
-     *
-     * Get the actual sample rate setting of the audio driver.
-     *
-     * \return Sample rate in Hz.
-     */
-    int (*get_rate)();
-
-    /** Toggle the mixer channel.
-     *
-     * Toggle between the first and the second mixer channel.
-     */
-    void (*toggle_mixer_channel)();
-
-    /** Get the mixer channel's name.
-     *
-     * Get the currently used mixer channel's name.
-     *
-     * \return malloc()ed channel's name.
-     */
-    char *(*get_mixer_channel_name)();
-
-    /** Pause the stream without closing it.
-     *
-     * If non-nullptr the backend supports pausing the stream in place
-     * (e.g. PulseAudio cork).  Buffered audio is preserved so that
-     * unpause resumes exactly where it left off.
-     */
-    void (*hw_pause)();
-
-    /** Unpause a previously paused stream. */
-    void (*hw_unpause)();
+    /* Optional hardware pause/unpause */
+    virtual void hw_pause() {}
+    virtual void hw_unpause() {}
+    virtual bool can_hw_pause() const { return false; }
   };
 
 /* Are the parameters p1 and p2 equal? */

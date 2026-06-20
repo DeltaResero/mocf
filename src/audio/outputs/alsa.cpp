@@ -36,6 +36,7 @@
 #include "audio/audio.h"
 #include "core/options.h"
 #include "core/log.h"
+#include "audio/outputs/alsa.h"
 
 #define BUFFER_MAX_USEC 300000
 #define MAX_LINEAR_DB_SCALE 2400
@@ -1212,20 +1213,24 @@ static char *alsa_get_mixer_channel_name()
   return result;
 }
 
-void alsa_funcs(struct hw_funcs *funcs)
-{
-  funcs->init = alsa_init;
-  funcs->shutdown = alsa_shutdown;
-  funcs->open = alsa_open;
-  funcs->close = alsa_close;
-  funcs->play = alsa_play;
-  funcs->read_mixer = alsa_read_mixer;
-  funcs->set_mixer = alsa_set_mixer;
-  funcs->get_buff_fill = alsa_get_buff_fill;
-  funcs->reset = alsa_reset;
-  funcs->get_rate = alsa_get_rate;
-  funcs->toggle_mixer_channel = alsa_toggle_mixer_channel;
-  funcs->get_mixer_channel_name = alsa_get_mixer_channel_name;
+class AlsaOutput : public AudioOutput {
+public:
+    int init(struct output_driver_caps *caps) override { return alsa_init(caps); }
+    void shutdown() override { alsa_shutdown(); }
+    int open(struct sound_params *sound_params) override { return alsa_open(sound_params); }
+    void close() override { alsa_close(); }
+    int play(const char *buff, const size_t size) override { return alsa_play(buff, size); }
+    int read_mixer() override { return alsa_read_mixer(); }
+    void set_mixer(int vol) override { alsa_set_mixer(vol); }
+    int get_buff_fill() override { return alsa_get_buff_fill(); }
+    int reset() override { return alsa_reset(); }
+    int get_rate() override { return alsa_get_rate(); }
+    void toggle_mixer_channel() override { alsa_toggle_mixer_channel(); }
+    char *get_mixer_channel_name() override { return alsa_get_mixer_channel_name(); }
+};
+
+std::unique_ptr<AudioOutput> create_alsa_output() {
+    return std::make_unique<AlsaOutput>();
 }
 
 // EOF

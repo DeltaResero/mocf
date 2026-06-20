@@ -34,6 +34,7 @@
 #include "audio/audio.h"
 #include "core/log.h"
 #include "core/options.h"
+#include "audio/outputs/oss.h"
 
 #if OSS_VERSION >= 0x40000 || SOUND_VERSION >= 0x40000
 #define OSSv4_MIXER
@@ -569,20 +570,24 @@ static char *oss_get_mixer_channel_name()
 
 static int oss_get_rate() { return params.rate; }
 
-void oss_funcs(struct hw_funcs *funcs)
-{
-  funcs->init = oss_init;
-  funcs->shutdown = oss_shutdown;
-  funcs->open = oss_open;
-  funcs->close = oss_close;
-  funcs->play = oss_play;
-  funcs->read_mixer = oss_read_mixer;
-  funcs->set_mixer = oss_set_mixer;
-  funcs->get_buff_fill = oss_get_buff_fill;
-  funcs->reset = oss_reset;
-  funcs->get_rate = oss_get_rate;
-  funcs->toggle_mixer_channel = oss_toggle_mixer_channel;
-  funcs->get_mixer_channel_name = oss_get_mixer_channel_name;
+class OssOutput : public AudioOutput {
+public:
+    int init(struct output_driver_caps *caps) override { return oss_init(caps); }
+    void shutdown() override { oss_shutdown(); }
+    int open(struct sound_params *sound_params) override { return oss_open(sound_params); }
+    void close() override { oss_close(); }
+    int play(const char *buff, const size_t size) override { return oss_play(buff, size); }
+    int read_mixer() override { return oss_read_mixer(); }
+    void set_mixer(int vol) override { oss_set_mixer(vol); }
+    int get_buff_fill() override { return oss_get_buff_fill(); }
+    int reset() override { return oss_reset(); }
+    int get_rate() override { return oss_get_rate(); }
+    void toggle_mixer_channel() override { oss_toggle_mixer_channel(); }
+    char *get_mixer_channel_name() override { return oss_get_mixer_channel_name(); }
+};
+
+std::unique_ptr<AudioOutput> create_oss_output() {
+    return std::make_unique<OssOutput>();
 }
 
 // EOF

@@ -11,9 +11,10 @@
 #ifndef JACK_H
 #define JACK_H
 
+#include <memory>
+class AudioOutput;
 
-  void moc_jack_funcs(struct hw_funcs *funcs);
-
+std::unique_ptr<AudioOutput> create_jack_output();
 
 #endif
 

@@ -30,6 +30,7 @@
 #include "audio/audio.h"
 #include "core/log.h"
 #include "core/options.h"
+#include "audio/outputs/jack.h"
 
 #define RINGBUF_SZ 32768
 
@@ -367,20 +368,24 @@ static char *moc_jack_get_mixer_channel_name() { return xstrdup("soft mixer"); }
 
 static void moc_jack_toggle_mixer_channel() {}
 
-void moc_jack_funcs(struct hw_funcs *funcs)
-{
-  funcs->init = moc_jack_init;
-  funcs->open = moc_jack_open;
-  funcs->close = moc_jack_close;
-  funcs->play = moc_jack_play;
-  funcs->read_mixer = moc_jack_read_mixer;
-  funcs->set_mixer = moc_jack_set_mixer;
-  funcs->get_buff_fill = moc_jack_get_buff_fill;
-  funcs->reset = moc_jack_reset;
-  funcs->shutdown = moc_jack_shutdown;
-  funcs->get_rate = moc_jack_get_rate;
-  funcs->get_mixer_channel_name = moc_jack_get_mixer_channel_name;
-  funcs->toggle_mixer_channel = moc_jack_toggle_mixer_channel;
+class JackOutput : public AudioOutput {
+public:
+    int init(struct output_driver_caps *caps) override { return moc_jack_init(caps); }
+    void shutdown() override { moc_jack_shutdown(); }
+    int open(struct sound_params *sound_params) override { return moc_jack_open(sound_params); }
+    void close() override { moc_jack_close(); }
+    int play(const char *buff, const size_t size) override { return moc_jack_play(buff, size); }
+    int read_mixer() override { return moc_jack_read_mixer(); }
+    void set_mixer(int vol) override { moc_jack_set_mixer(vol); }
+    int get_buff_fill() override { return moc_jack_get_buff_fill(); }
+    int reset() override { return moc_jack_reset(); }
+    int get_rate() override { return moc_jack_get_rate(); }
+    void toggle_mixer_channel() override { moc_jack_toggle_mixer_channel(); }
+    char *get_mixer_channel_name() override { return moc_jack_get_mixer_channel_name(); }
+};
+
+std::unique_ptr<AudioOutput> create_jack_output() {
+    return std::make_unique<JackOutput>();
 }
 
 // EOF

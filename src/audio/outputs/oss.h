@@ -11,11 +11,10 @@
 #ifndef OSS_H
 #define OSS_H
 
-#include "audio/audio.h"
+#include <memory>
+class AudioOutput;
 
-
-  void oss_funcs(struct hw_funcs *funcs);
-
+std::unique_ptr<AudioOutput> create_oss_output();
 
 #endif
 

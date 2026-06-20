@@ -11,9 +11,10 @@
 #ifndef PULSE_H
 #define PULSE_H
 
+#include <memory>
+class AudioOutput;
 
-  void pulse_funcs(struct hw_funcs *funcs);
-
+std::unique_ptr<AudioOutput> create_pulse_output();
 
 #endif
 

@@ -80,7 +80,7 @@ static bool started_playing_in_queue = false;
 static std::mutex curr_playing_mtx;
 
 static struct out_buf *out_buf;
-static struct hw_funcs hw;
+static std::unique_ptr<AudioOutput> hw;
 static struct output_driver_caps hw_caps; /* capabilities of the output
                driver */
 
@@ -787,9 +787,9 @@ static void play_thread_func()
 
 void audio_reset()
 {
-  if (hw.reset)
+  if (hw)
   {
-    hw.reset();
+    hw->reset();
   }
 }
 
@@ -1038,13 +1038,13 @@ int audio_open(struct sound_params *sound_params)
   driver_sound_params.channels = CLAMP(
       hw_caps.min_channels, req_sound_params.channels, hw_caps.max_channels);
 
-  res = hw.open(&driver_sound_params);
+  res = hw->open(&driver_sound_params);
 
   if (res)
   {
     char fmt_name[SFMT_STR_MAX] LOGIT_ONLY;
 
-    driver_sound_params.rate = hw.get_rate();
+    driver_sound_params.rate = hw->get_rate();
     debug("Driver sfmt: 0x%lX, req sfmt 0x%lX", driver_sound_params.fmt,
           req_sound_params.fmt);
     debug("Driver channels: %d, req channels %d", driver_sound_params.channels,
@@ -1058,7 +1058,7 @@ int audio_open(struct sound_params *sound_params)
       logit("Conversion of the sound is needed.");
       if (!audio_conv_new(&sound_conv, &req_sound_params, &driver_sound_params))
       {
-        hw.close();
+        hw->close();
         reset_sound_params(&req_sound_params);
         return 0;
       }
@@ -1121,20 +1121,20 @@ int audio_get_bpf()
  * May return 0 if the audio device is closed. */
 int audio_get_bps() { return driver_sound_params.rate * audio_get_bpf(); }
 
-int audio_get_buf_fill() { return hw.get_buff_fill(); }
+int audio_get_buf_fill() { return hw ? hw->get_buff_fill() : 0; }
 
-int audio_can_hw_pause() { return hw.hw_pause != nullptr; }
+int audio_can_hw_pause() { return hw ? hw->can_hw_pause() : 0; }
 
 void audio_hw_pause()
 {
-  if (hw.hw_pause)
-    hw.hw_pause();
+  if (hw)
+    hw->hw_pause();
 }
 
 void audio_hw_unpause()
 {
-  if (hw.hw_unpause)
-    hw.hw_unpause();
+  if (hw)
+    hw->hw_unpause();
 }
 
 int audio_send_pcm(const char *buf, const size_t size)
@@ -1156,7 +1156,7 @@ int audio_send_pcm(const char *buf, const size_t size)
     buf = softmixed.data();
   }
 
-  int played = hw.play(buf, size);
+  int played = hw->play(buf, size);
 
   if (played < 0)
   {
@@ -1178,7 +1178,7 @@ void audio_close()
   {
     reset_sound_params(&req_sound_params);
     reset_sound_params(&driver_sound_params);
-    hw.close();
+    hw->close();
     if (need_audio_conversion)
     {
       audio_conv_destroy(&sound_conv);
@@ -1190,9 +1190,9 @@ void audio_close()
 
 /* Try to initialize drivers from the list and fill funcs with
  * those of the first working driver. */
-static void find_working_driver(const std::vector<std::string> &drivers, struct hw_funcs *funcs)
+static void find_working_driver(const std::vector<std::string> &drivers)
 {
-  memset(funcs, 0, sizeof(*funcs));
+  hw.reset();
 
   for (const auto &driver : drivers)
   {
@@ -1201,72 +1201,60 @@ static void find_working_driver(const std::vector<std::string> &drivers, struct 
 #ifdef HAVE_SNDIO
     if (!strcasecmp(name, "sndio"))
     {
-      sndio_funcs(funcs);
+      hw = create_sndio_output();
       printf("Trying SNDIO...\n");
-      if (funcs->init(&hw_caps))
-      {
-        return;
-      }
+      if (hw->init(&hw_caps)) return;
+      hw.reset();
     }
 #endif
 
 #ifdef HAVE_PULSE
     if (!strcasecmp(name, "pulseaudio"))
     {
-      pulse_funcs(funcs);
+      hw = create_pulse_output();
       printf("Trying PulseAudio...\n");
-      if (funcs->init(&hw_caps))
-      {
-        return;
-      }
+      if (hw->init(&hw_caps)) return;
+      hw.reset();
     }
 #endif
 
 #ifdef HAVE_OSS
     if (!strcasecmp(name, "oss"))
     {
-      oss_funcs(funcs);
+      hw = create_oss_output();
       printf("Trying OSS...\n");
-      if (funcs->init(&hw_caps))
-      {
-        return;
-      }
+      if (hw->init(&hw_caps)) return;
+      hw.reset();
     }
 #endif
 
 #ifdef HAVE_ALSA
     if (!strcasecmp(name, "alsa"))
     {
-      alsa_funcs(funcs);
+      hw = create_alsa_output();
       printf("Trying ALSA...\n");
-      if (funcs->init(&hw_caps))
-      {
-        return;
-      }
+      if (hw->init(&hw_caps)) return;
+      hw.reset();
     }
 #endif
 
 #ifdef HAVE_JACK
     if (!strcasecmp(name, "jack"))
     {
-      moc_jack_funcs(funcs);
+      hw = create_jack_output();
       printf("Trying JACK...\n");
-      if (funcs->init(&hw_caps))
-      {
-        return;
-      }
+      if (hw->init(&hw_caps)) return;
+      hw.reset();
     }
 #endif
 
 #ifndef NDEBUG
     if (!strcasecmp(name, "null"))
     {
-      null_funcs(funcs);
-      printf("Trying nullptr...\n");
-      if (funcs->init(&hw_caps))
-      {
-        return;
-      }
+      hw = create_null_output();
+      printf("Trying null...\n");
+      if (hw->init(&hw_caps)) return;
+      hw.reset();
     }
 #endif
   }
@@ -1353,7 +1341,7 @@ void audio_initialize()
   long masked_formats;
   int max_channels;
 
-  find_working_driver(options_get_list("SoundDriver"), &hw);
+  find_working_driver(options_get_list("SoundDriver"));
 
   if (hw_caps.max_channels < hw_caps.min_channels)
   {
@@ -1404,9 +1392,9 @@ void audio_initialize()
 void audio_exit()
 {
   audio_stop();
-  if (hw.shutdown)
+  if (hw)
   {
-    hw.shutdown();
+    hw->shutdown();
   }
   out_buf_free(out_buf);
   out_buf = nullptr;
@@ -1515,7 +1503,7 @@ int audio_get_mixer()
     return softmixer_get_value();
   }
 
-  return hw.read_mixer();
+  return hw->read_mixer();
 }
 
 void audio_set_mixer(const int val)
@@ -1532,7 +1520,7 @@ void audio_set_mixer(const int val)
   }
   else
   {
-    hw.set_mixer(val);
+    hw->set_mixer(val);
   }
 }
 
@@ -1651,7 +1639,7 @@ char *audio_get_mixer_channel_name()
     return softmixer_name();
   }
 
-  return hw.get_mixer_channel_name();
+  return hw->get_mixer_channel_name();
 }
 
 void audio_toggle_mixer_channel()
@@ -1666,7 +1654,7 @@ void audio_toggle_mixer_channel()
 
     if (current_mixer < 2)
     {
-      hw.toggle_mixer_channel();
+      hw->toggle_mixer_channel();
       if (prev_mixer == 2)
       {
         softmixer_set_active(0);

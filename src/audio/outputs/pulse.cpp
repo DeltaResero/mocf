@@ -73,6 +73,7 @@
 #include "core/common.h"
 #include "core/log.h"
 #include "audio/audio.h"
+#include "audio/outputs/pulse.h"
 
 /* The pulse mainloop and context are initialized in pulse_init and
  * destroyed in pulse_shutdown.
@@ -879,22 +880,27 @@ static void pulse_hw_unpause()
   pa_threaded_mainloop_unlock(mainloop);
 }
 
-void pulse_funcs(struct hw_funcs *funcs)
-{
-  funcs->init = pulse_init;
-  funcs->shutdown = pulse_shutdown;
-  funcs->open = pulse_open;
-  funcs->close = pulse_close;
-  funcs->play = pulse_play;
-  funcs->read_mixer = pulse_read_mixer;
-  funcs->set_mixer = pulse_set_mixer;
-  funcs->get_buff_fill = pulse_get_buff_fill;
-  funcs->reset = pulse_reset;
-  funcs->get_rate = pulse_get_rate;
-  funcs->toggle_mixer_channel = pulse_toggle_mixer_channel;
-  funcs->get_mixer_channel_name = pulse_get_mixer_channel_name;
-  funcs->hw_pause = pulse_hw_pause;
-  funcs->hw_unpause = pulse_hw_unpause;
+class PulseOutput : public AudioOutput {
+public:
+    int init(struct output_driver_caps *caps) override { return pulse_init(caps); }
+    void shutdown() override { pulse_shutdown(); }
+    int open(struct sound_params *sound_params) override { return pulse_open(sound_params); }
+    void close() override { pulse_close(); }
+    int play(const char *buff, const size_t size) override { return pulse_play(buff, size); }
+    int read_mixer() override { return pulse_read_mixer(); }
+    void set_mixer(int vol) override { pulse_set_mixer(vol); }
+    int get_buff_fill() override { return pulse_get_buff_fill(); }
+    int reset() override { return pulse_reset(); }
+    int get_rate() override { return pulse_get_rate(); }
+    void toggle_mixer_channel() override { pulse_toggle_mixer_channel(); }
+    char *get_mixer_channel_name() override { return pulse_get_mixer_channel_name(); }
+    void hw_pause() override { pulse_hw_pause(); }
+    void hw_unpause() override { pulse_hw_unpause(); }
+    bool can_hw_pause() const override { return true; }
+};
+
+std::unique_ptr<AudioOutput> create_pulse_output() {
+    return std::make_unique<PulseOutput>();
 }
 
 // EOF

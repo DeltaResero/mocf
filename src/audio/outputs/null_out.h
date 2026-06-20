@@ -11,9 +11,10 @@
 #ifndef NULL_OUT_H
 #define NULL_OUT_H
 
+#include <memory>
+class AudioOutput;
 
-  void null_funcs(struct hw_funcs *funcs);
-
+std::unique_ptr<AudioOutput> create_null_output();
 
 #endif
 
