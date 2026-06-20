@@ -104,24 +104,36 @@ static std::mutex bitrate_list_mtx;
 
 static void bitrate_list_add(std::map<int, int>& b, std::mutex* mtx, const int time, const int bitrate)
 {
-  if (mtx) mtx->lock();
-  if (b.empty() || b.rbegin()->second != bitrate)
+  std::unique_lock<std::mutex> lock;
+  if (mtx) lock = std::unique_lock<std::mutex>(*mtx);
+
+  if (b.empty())
   {
     b[time] = bitrate;
     debug("Adding bitrate %d at time %d", bitrate, time);
   }
-  else
+  else if (b.rbegin()->second != bitrate && b.rbegin()->first != time)
+  {
+    b[time] = bitrate;
+    debug("Appending bitrate %d at time %d", bitrate, time);
+  }
+  else if (b.rbegin()->second == bitrate)
   {
     debug("Not adding bitrate %d at time %d because the bitrate hasn't changed", bitrate, time);
   }
-  if (mtx) mtx->unlock();
+  else
+  {
+    debug("Not adding bitrate %d at time %d because it is for the same time as the last bitrate", bitrate, time);
+  }
 }
 
 static int bitrate_list_get(std::map<int, int>& b, std::mutex* mtx, const int time)
 {
   int bitrate = -1;
 
-  if (mtx) mtx->lock();
+  std::unique_lock<std::mutex> lock;
+  if (mtx) lock = std::unique_lock<std::mutex>(*mtx);
+
   if (!b.empty())
   {
     auto it = b.upper_bound(time);
@@ -141,7 +153,6 @@ static int bitrate_list_get(std::map<int, int>& b, std::mutex* mtx, const int ti
   {
     debug("Getting bitrate for time %d (no bitrate information)", time);
   }
-  if (mtx) mtx->unlock();
 
   return bitrate;
 }
