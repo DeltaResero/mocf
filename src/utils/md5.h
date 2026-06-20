@@ -32,10 +32,6 @@
 #define __md5_stream md5_stream
 #endif
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   /* Structure to save state of computation between the single steps.  */
   struct md5_ctx
@@ -96,9 +92,6 @@ extern "C"
   extern void *__md5_buffer(const char *buffer, size_t len,
                             void *resblock);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* md5.h */
 

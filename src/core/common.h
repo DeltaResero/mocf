@@ -133,11 +133,6 @@ struct timespec;
     error(format ": %s", err##__LINE__.c_str());                               \
   } while (0)
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
   void *xmalloc(size_t size);
   void *xcalloc(size_t nmemb, size_t size);
   void *xrealloc(void *ptr, const size_t size);
@@ -155,10 +150,6 @@ extern "C"
   const char *get_home();
   void common_cleanup();
   char *pathstrcpy(char *restrict dst, const char *restrict src);
-
-#ifdef __cplusplus
-}
-#endif
 
 std::string xstrerror(int errnum);
 std::string create_file_name(const char *file);

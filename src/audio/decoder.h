@@ -169,10 +169,6 @@ class AudioDecoder;
    * type. The function must return a pointer to the plugin's AudioPlugin
    * instance.
    */
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   typedef AudioPlugin *plugin_init_func();
 
@@ -183,9 +179,6 @@ extern "C"
   void decoder_cleanup();
   char *file_type_name(const char *file);
 
-#ifdef __cplusplus
-}
-#endif
 
 /** @defgroup decoder_error_funcs Decoder error functions
  *

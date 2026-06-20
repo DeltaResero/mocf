@@ -14,10 +14,6 @@
 #include "core/protocol.h"
 #include "library/playlist.h"
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   /* -----------------------------------------------------------------------
    * Engine event queue — thread-safe push (engine threads) / drain (UI thread)
@@ -126,9 +122,6 @@ extern "C"
   void engine_equalizer_next(void);
   void engine_toggle_make_mono(void);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

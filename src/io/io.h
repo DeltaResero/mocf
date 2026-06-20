@@ -18,10 +18,6 @@
 
 #include <string>
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   enum io_source
   {
@@ -85,9 +81,6 @@ extern "C"
                                 buf_fill_callback_t callback, void *data_ptr);
   int io_seekable(const struct io_stream *s);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

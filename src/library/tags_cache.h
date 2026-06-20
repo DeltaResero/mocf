@@ -11,10 +11,6 @@
 #ifndef TAGS_CACHE_H
 #define TAGS_CACHE_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   struct file_tags;
   struct tags_cache;
@@ -34,9 +30,6 @@ extern "C"
   struct file_tags *tags_cache_get_immediate(struct tags_cache *c,
                                              const char *file, int tags_sel);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

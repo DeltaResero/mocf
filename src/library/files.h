@@ -18,10 +18,6 @@
 
 #include "library/playlist.h"
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
 #define FILES_LIST_INIT_SIZE 64
 
@@ -51,9 +47,6 @@ extern "C"
   char *absolute_path(const char *path, const char *cwd);
   bool is_secure(const char *file);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

@@ -11,10 +11,6 @@
 #ifndef EQUALIZER_H
 #define EQUALIZER_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   void equalizer_init();
   void equalizer_shutdown();
@@ -27,9 +23,6 @@ extern "C"
   void equalizer_next();
   void equalizer_prev();
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

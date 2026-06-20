@@ -11,10 +11,6 @@
 #ifndef FIFO_BUF_H
 #define FIFO_BUF_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   struct fifo_buf;
 
@@ -29,9 +25,6 @@ extern "C"
   size_t fifo_buf_get_fill(const struct fifo_buf *b);
   size_t fifo_buf_get_size(const struct fifo_buf *b);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

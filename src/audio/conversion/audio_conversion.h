@@ -23,10 +23,6 @@
 
 #include "audio/audio.h"
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   struct audio_conversion
   {
@@ -47,9 +43,6 @@ extern "C"
                    const size_t size, size_t *conv_len);
   void audio_conv_destroy(struct audio_conversion *conv);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

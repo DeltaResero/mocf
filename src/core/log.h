@@ -16,10 +16,6 @@
 #include <string>
 #endif
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
 /* Suppress overly-enthusiastic GNU variadic macro extensions warning. */
 #if defined(__clang__) && HAVE_VARIADIC_MACRO_WARNING
@@ -93,9 +89,6 @@ extern "C"
   } while (0)
 #endif
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

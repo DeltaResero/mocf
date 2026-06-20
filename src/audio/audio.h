@@ -13,10 +13,6 @@
 
 #include <cstdlib>
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   /** Sound format and endianness flags.
    *
@@ -292,9 +288,6 @@ extern "C"
   void audio_queue_clear();
   struct plist *audio_queue_get_contents();
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

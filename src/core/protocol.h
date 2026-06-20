@@ -13,10 +13,6 @@
 
 #include "library/playlist.h"
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   /* -----------------------------------------------------------------------
    * In-process event queue — used both for the local (UI-side) queue and
@@ -101,9 +97,6 @@ extern "C"
   void free_move_ev_data(struct move_ev_data *m);
   struct move_ev_data *move_ev_data_dup(const struct move_ev_data *m);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

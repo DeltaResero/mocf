@@ -27,10 +27,6 @@
 #include <map>
 #include <string>
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   enum menu_request
   {
@@ -161,9 +157,6 @@ extern "C"
   void menu_make_visible(struct menu *menu, const char *file);
   void menu_set_cursor(const struct menu *m);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

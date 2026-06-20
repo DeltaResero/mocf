@@ -879,7 +879,7 @@ static void pulse_hw_unpause()
   pa_threaded_mainloop_unlock(mainloop);
 }
 
-extern "C" void pulse_funcs(struct hw_funcs *funcs)
+void pulse_funcs(struct hw_funcs *funcs)
 {
   funcs->init = pulse_init;
   funcs->shutdown = pulse_shutdown;

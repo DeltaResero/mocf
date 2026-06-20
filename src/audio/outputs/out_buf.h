@@ -13,10 +13,6 @@
 
 #include "utils/fifo_buf.h"
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   typedef void out_buf_free_callback();
 
@@ -37,9 +33,6 @@ extern "C"
   int out_buf_get_fill(struct out_buf *buf);
   void out_buf_wait(struct out_buf *buf);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

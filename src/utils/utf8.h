@@ -28,10 +28,6 @@
 #include <iconv.h>
 #endif
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
 /* parameter passed to wcswidth() as a maximum width */
 #define WIDTH_MAX 2048
@@ -50,9 +46,6 @@ extern "C"
   char *files_iconv_str(const char *str);
   char *xterm_iconv_str(const char *str);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

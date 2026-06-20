@@ -11,10 +11,6 @@
 #ifndef KEYS_H
 #define KEYS_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   enum key_cmd
   {
@@ -141,9 +137,6 @@ extern "C"
   char **get_keys_help(int *num);
   bool is_help_still_h();
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

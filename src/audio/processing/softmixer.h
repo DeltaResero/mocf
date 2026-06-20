@@ -11,10 +11,6 @@
 #ifndef SOFTMIXER_H
 #define SOFTMIXER_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
 #define SOFTMIXER_MIN 0
 /* Allow amplification, might result in clipping... */
@@ -48,9 +44,6 @@ extern "C"
   void softmixer_process_buffer(char *buf, const size_t size,
                                 const struct sound_params *sound_params);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

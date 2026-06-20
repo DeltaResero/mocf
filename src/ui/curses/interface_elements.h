@@ -32,10 +32,6 @@
 #include "library/files.h"
 #include "ui/input/keys.h"
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   /* Interface's menus */
   enum iface_menu
@@ -165,9 +161,6 @@ extern "C"
   void iface_update_theme_selection(const char *file);
   void iface_mark_file_error(const char *file);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

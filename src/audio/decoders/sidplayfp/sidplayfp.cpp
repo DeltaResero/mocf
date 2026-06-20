@@ -151,7 +151,7 @@ static sidplayfp *make_engine(ReSIDBuilder *builder, int frequency)
 // open / close
 // ---------------------------------------------------------------------------
 
-extern "C" void *sidplayfp_open(const char *file)
+void *sidplayfp_open(const char *file)
 {
     if (init_db)
         init_database();
@@ -254,7 +254,7 @@ extern "C" void *sidplayfp_open(const char *file)
     return s;
 }
 
-extern "C" void sidplayfp_close(void *void_data)
+void sidplayfp_close(void *void_data)
 {
     struct sidplayfp_data *s = (struct sidplayfp_data *)void_data;
 
@@ -272,14 +272,14 @@ extern "C" void sidplayfp_close(void *void_data)
 // Error / metadata
 // ---------------------------------------------------------------------------
 
-extern "C" void sidplayfp_get_error(void *prv_data,
+void sidplayfp_get_error(void *prv_data,
                                      struct decoder_error *error)
 {
     struct sidplayfp_data *s = (struct sidplayfp_data *)prv_data;
     decoder_error_copy(error, &s->error);
 }
 
-extern "C" void sidplayfp_info(const char *file_name, struct file_tags *info,
+void sidplayfp_info(const char *file_name, struct file_tags *info,
                                 const int /* tags_sel */)
 {
     if (init_db)
@@ -334,13 +334,13 @@ extern "C" void sidplayfp_info(const char *file_name, struct file_tags *info,
 // Decode
 // ---------------------------------------------------------------------------
 
-extern "C" int sidplayfp_seek(void *, int)
+int sidplayfp_seek(void *, int)
 {
     // Accurate seeking would require replaying from the start; not supported.
     return -1;
 }
 
-extern "C" int sidplayfp_decode(void *void_data, char *buf, int buf_len,
+int sidplayfp_decode(void *void_data, char *buf, int buf_len,
                                  struct sound_params *sound_params)
 {
     struct sidplayfp_data *s = (struct sidplayfp_data *)void_data;
@@ -392,18 +392,18 @@ extern "C" int sidplayfp_decode(void *void_data, char *buf, int buf_len,
 // Bitrate / duration / format
 // ---------------------------------------------------------------------------
 
-extern "C" int sidplayfp_get_bitrate(void *)
+int sidplayfp_get_bitrate(void *)
 {
     return -1; // synthesized — no meaningful bitrate
 }
 
-extern "C" int sidplayfp_get_duration(void *void_data)
+int sidplayfp_get_duration(void *void_data)
 {
     struct sidplayfp_data *s = (struct sidplayfp_data *)void_data;
     return s->length_ms / 1000;
 }
 
-extern "C" int sidplayfp_our_format_ext(const char *ext)
+int sidplayfp_our_format_ext(const char *ext)
 {
     return !strcasecmp(ext, "SID") || !strcasecmp(ext, "MUS");
 }

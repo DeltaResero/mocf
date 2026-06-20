@@ -14,10 +14,6 @@
 #include <string>
 #include <vector>
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   enum option_type
   {
@@ -55,9 +51,6 @@ extern "C"
   int options_was_defaulted(const char *name);
   enum option_type options_get_type(const char *name);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

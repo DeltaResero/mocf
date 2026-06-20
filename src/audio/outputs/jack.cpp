@@ -367,7 +367,7 @@ static char *moc_jack_get_mixer_channel_name() { return xstrdup("soft mixer"); }
 
 static void moc_jack_toggle_mixer_channel() {}
 
-extern "C" void moc_jack_funcs(struct hw_funcs *funcs)
+void moc_jack_funcs(struct hw_funcs *funcs)
 {
   funcs->init = moc_jack_init;
   funcs->open = moc_jack_open;

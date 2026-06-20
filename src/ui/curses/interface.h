@@ -16,10 +16,6 @@
 
 #include "core/server.h"
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   /* The desired state of the application. */
   enum want_quit
@@ -35,9 +31,6 @@ extern "C"
   void interface_error(const char *msg);
   void interface_fatal(const char *format, ...) ATTR_PRINTF(1, 2);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

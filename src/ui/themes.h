@@ -11,10 +11,6 @@
 #ifndef THEMES_H
 #define THEMES_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
   enum color_index
   {
@@ -62,9 +58,6 @@ extern "C"
   void themes_switch_theme(const char *file);
   const char *get_current_theme();
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

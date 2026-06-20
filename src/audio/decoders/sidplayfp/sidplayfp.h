@@ -66,10 +66,6 @@ struct sidplayfp_data
 
 #endif /* __cplusplus */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 void  *sidplayfp_open           (const char *file);
 void   sidplayfp_close          (void *void_data);
 void   sidplayfp_get_error      (void *prv_data, struct decoder_error *error);
@@ -81,10 +77,7 @@ int    sidplayfp_decode         (void *void_data, char *buf, int buf_len,
 int    sidplayfp_get_bitrate    (void *void_data);
 int    sidplayfp_get_duration   (void *void_data);
 int    sidplayfp_our_format_ext (const char *ext);
-class AudioPlugin *sidplayfp_plugin_init (void);
+extern "C" class AudioPlugin *sidplayfp_plugin_init (void);
 
-#ifdef __cplusplus
-}
-#endif
 
 // EOF
