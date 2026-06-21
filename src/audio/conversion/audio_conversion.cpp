@@ -1225,7 +1225,7 @@ std::vector<char> AudioConversion::process(const char *buf, const size_t size)
       (curr_sfmt & SFMT_MASK_FORMAT) != SFMT_FLOAT)
   {
     auto float_sound = fixed_to_float(curr_sound.data(), curr_sound.size(), curr_sfmt);
-    curr_sound.assign(reinterpret_cast<char*>(float_sound.data()), reinterpret_cast<char*>(float_sound.data() + float_sound.size() * sizeof(float)));
+    curr_sound.assign(reinterpret_cast<char*>(float_sound.data()), reinterpret_cast<char*>(float_sound.data() + float_sound.size()));
     curr_sfmt = sfmt_set_fmt(curr_sfmt, SFMT_FLOAT);
   }
 
@@ -1235,7 +1235,7 @@ std::vector<char> AudioConversion::process(const char *buf, const size_t size)
     auto resampled = resample_sound(reinterpret_cast<float *>(curr_sound.data()),
                                     curr_sound.size() / sizeof(float),
                                     from_params.channels);
-    curr_sound.assign(reinterpret_cast<char*>(resampled.data()), reinterpret_cast<char*>(resampled.data() + resampled.size() * sizeof(float)));
+    curr_sound.assign(reinterpret_cast<char*>(resampled.data()), reinterpret_cast<char*>(resampled.data() + resampled.size()));
   }
 #endif
 
