@@ -1119,7 +1119,7 @@ static int add_to_menu(struct menu *menu, const struct plist *plist,
     if (!full_paths)
     {
       size_t slash = title.rfind('/');
-      if (slash != std::string::npos && slash != title.length() - 1)
+      if (slash != std::string::npos && slash != 0)
       {
         title = title.substr(slash + 1);
       }
@@ -1505,7 +1505,7 @@ static void update_menu_item(struct menu_item *mi, const struct plist *plist,
     if (!full_path)
     {
       size_t slash = title.rfind('/');
-      if (slash != std::string::npos && slash != title.length() - 1)
+      if (slash != std::string::npos && slash != 0)
       {
         title = title.substr(slash + 1);
       }
