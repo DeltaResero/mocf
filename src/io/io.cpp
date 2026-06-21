@@ -202,7 +202,7 @@ static off_t io_seek_buffered(struct io_stream *s, const off_t where)
   }
 
   std::lock_guard<std::mutex> lock(s->buf_mtx);
-  fifo_buf_clear(s->buf);
+  s->buf->clear();
   s->buf_free_cond.notify_one();
   s->after_seek = 1;
   s->eof = 0;
@@ -350,7 +350,7 @@ void io_close(struct io_stream *s)
 
     if (s->buffered)
     {
-      fifo_buf_free(s->buf);
+      delete s->buf;
       s->buf = nullptr;
     }
   }
@@ -416,9 +416,9 @@ static void io_read_thread(struct io_stream *s)
     {
       size_t put;
 
-      debug("Buffer fill: %zu", fifo_buf_get_fill(s->buf));
+      debug("Buffer fill: %zu", s->buf->fill());
 
-      put = fifo_buf_put(s->buf, read_buf + read_buf_pos,
+      put = s->buf->put(read_buf + read_buf_pos,
                          read_buf_fill - read_buf_pos);
 
       if (s->stop_read_thread)
@@ -432,8 +432,8 @@ static void io_read_thread(struct io_stream *s)
         if (s->buf_fill_callback)
         {
           buf_lock.unlock();
-          s->buf_fill_callback(s, fifo_buf_get_fill(s->buf),
-                               fifo_buf_get_size(s->buf),
+          s->buf_fill_callback(s, s->buf->fill(),
+                               s->buf->capacity(),
                                s->buf_fill_callback_data);
           buf_lock.lock();
         }
@@ -531,7 +531,7 @@ struct io_stream *io_open(const char *file, const int buffered)
 
   if (buffered)
   {
-    s->buf = fifo_buf_new(options_get_int("InputBuffer") * 1024);
+    s->buf = new fifo_buf(options_get_int("InputBuffer") * 1024);
     s->read_thread = std::thread(io_read_thread, s);
   }
 
@@ -567,14 +567,14 @@ static ssize_t io_peek_internal(struct io_stream *s, void *buf, size_t count)
 
   /* Wait until enough data will be available */
   while (io_ok_nolock(s) && !s->stop_read_thread &&
-         count > fifo_buf_get_fill(s->buf) && fifo_buf_get_space(s->buf) &&
+         count > s->buf->fill() && s->buf->space() &&
          !s->eof)
   {
     debug("waiting...");
     s->buf_fill_cond.wait(lock);
   }
 
-  received = fifo_buf_peek(s->buf, static_cast<char *>(buf), count);
+  received = s->buf->peek(static_cast<char *>(buf), count);
   debug("Read %zd bytes", received);
 
   lock.unlock();
@@ -589,12 +589,12 @@ static ssize_t io_read_buffered(struct io_stream *s, void *buf, size_t count)
   std::unique_lock<std::mutex> lock(s->buf_mtx);
 
   while (received < static_cast<ssize_t>(count) && !s->stop_read_thread &&
-         ((!s->eof && !s->read_error) || fifo_buf_get_fill(s->buf)))
+         ((!s->eof && !s->read_error) || s->buf->fill()))
   {
-    if (fifo_buf_get_fill(s->buf))
+    if (s->buf->fill())
     {
       received +=
-          fifo_buf_get(s->buf, static_cast<char *>(buf) + received, count - received);
+          s->buf->get(static_cast<char *>(buf) + received, count - received);
       debug("Read %zd bytes so far", received);
       s->buf_free_cond.notify_one();
       continue;
@@ -733,7 +733,7 @@ int io_eof(struct io_stream *s)
   assert(s != nullptr);
 
   std::lock_guard<std::mutex> lock(s->buf_mtx);
-  eof = (s->eof && (!s->buffered || !fifo_buf_get_fill(s->buf))) ||
+  eof = (s->eof && (!s->buffered || !s->buf->fill())) ||
         s->stop_read_thread;
 
   return eof;

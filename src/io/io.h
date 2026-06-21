@@ -52,7 +52,7 @@
     off_t mem_pos;
 #endif
 
-    struct fifo_buf *buf;
+    fifo_buf *buf;
     std::mutex buf_mtx;
     std::condition_variable buf_free_cond; /* some space became available in the
              buffer */

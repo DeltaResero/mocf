@@ -11,20 +11,42 @@
 #ifndef FIFO_BUF_H
 #define FIFO_BUF_H
 
+#include <cstddef>
+#include <vector>
 
-  struct fifo_buf;
+class fifo_buf
+{
+public:
+  explicit fifo_buf(size_t size);
 
-  struct fifo_buf *fifo_buf_new(const size_t size);
-  void fifo_buf_free(struct fifo_buf *b);
-  size_t fifo_buf_put(struct fifo_buf *b, const char *data, size_t size);
-  size_t fifo_buf_get(struct fifo_buf *b, char *user_buf, size_t user_buf_size);
-  size_t fifo_buf_peek(struct fifo_buf *b, char *user_buf,
-                       size_t user_buf_size);
-  size_t fifo_buf_get_space(const struct fifo_buf *b);
-  void fifo_buf_clear(struct fifo_buf *b);
-  size_t fifo_buf_get_fill(const struct fifo_buf *b);
-  size_t fifo_buf_get_size(const struct fifo_buf *b);
+  /* Put data into the buffer. Returns number of bytes actually written. */
+  size_t put(const char *data, size_t size);
 
+  /* Copy and consume data from the front of the buffer. Returns bytes read. */
+  size_t get(char *user_buf, size_t user_buf_size);
+
+  /* Copy without consuming data from the front of the buffer. Returns bytes
+   * copied. */
+  size_t peek(char *user_buf, size_t user_buf_size) const;
+
+  /* Return the number of bytes that can still be written. */
+  size_t space() const;
+
+  /* Return the number of bytes currently in the buffer. */
+  size_t fill() const;
+
+  /* Return the total capacity of the buffer. */
+  size_t capacity() const;
+
+  /* Discard all buffered data. */
+  void clear();
+
+private:
+  int size_;
+  int pos_;
+  int fill_;
+  std::vector<char> buf_;
+};
 
 #endif
 

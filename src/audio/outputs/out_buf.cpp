@@ -42,7 +42,7 @@
 
 struct out_buf
 {
-  struct fifo_buf *buf;
+  fifo_buf *buf;
   std::mutex mutex;
   std::thread tid; /* Thread id of the reading thread. */
 
@@ -126,7 +126,7 @@ static void read_thread(struct out_buf *buf)
 
     if (buf->stop)
     {
-      fifo_buf_clear(buf->buf);
+      buf->buf->clear();
     }
 
     if (buf->free_callback)
@@ -141,7 +141,7 @@ static void read_thread(struct out_buf *buf)
     debug("sending the signal");
     buf->ready_cond.notify_all();
 
-    if ((fifo_buf_get_fill(buf->buf) == 0 || buf->pause || buf->stop) &&
+    if ((buf->buf->fill() == 0 || buf->pause || buf->stop) &&
         !buf->exit)
     {
       if (buf->pause && !audio_dev_closed && !hw_paused)
@@ -188,7 +188,7 @@ static void read_thread(struct out_buf *buf)
       }
     }
 
-    if (fifo_buf_get_fill(buf->buf) == 0)
+    if (buf->buf->fill() == 0)
     {
       if (buf->exit)
       {
@@ -223,7 +223,7 @@ static void read_thread(struct out_buf *buf)
           MIN(audio_get_bps() * AUDIO_MAX_PLAY, AUDIO_MAX_PLAY_BYTES) /
           audio_bpf;
       play_buf_fill =
-          fifo_buf_get(buf->buf, play_buf, play_buf_frames * audio_bpf);
+          buf->buf->get(play_buf, play_buf_frames * audio_bpf);
       lock.unlock();
 
       debug("playing %d bytes", play_buf_fill);
@@ -267,7 +267,7 @@ struct out_buf *out_buf_new(int size)
 
   buf = new out_buf;
 
-  buf->buf = fifo_buf_new(size);
+  buf->buf = new fifo_buf(size);
   buf->exit = 0;
   buf->pause = 0;
   buf->stop = 0;
@@ -300,11 +300,11 @@ void out_buf_free(struct out_buf *buf)
    * buffer has changed. */
   {
     std::lock_guard<std::mutex> lock(buf->mutex);
-    fifo_buf_clear(buf->buf);
+    buf->buf->clear();
     buf->ready_cond.notify_all();
   }
 
-  fifo_buf_free(buf->buf);
+  delete buf->buf;
   buf->buf = nullptr;
 
   delete buf;
@@ -328,7 +328,7 @@ int out_buf_put(struct out_buf *buf, const char *data, int size)
     int written;
     std::unique_lock<std::mutex> lock(buf->mutex);
 
-    if (fifo_buf_get_space(buf->buf) == 0 && !buf->stop)
+    if (buf->buf->space() == 0 && !buf->stop)
     {
       /*logit ("buffer full, waiting for the signal");*/
       buf->ready_cond.wait(lock);
@@ -341,7 +341,7 @@ int out_buf_put(struct out_buf *buf, const char *data, int size)
       return 0;
     }
 
-    written = fifo_buf_put(buf->buf, data + pos, size);
+    written = buf->buf->put(data + pos, size);
 
     if (written)
     {
@@ -390,7 +390,7 @@ void out_buf_reset(struct out_buf *buf)
   logit("resetting the buffer");
 
   std::lock_guard<std::mutex> lock(buf->mutex);
-  fifo_buf_clear(buf->buf);
+  buf->buf->clear();
   buf->stop = 0;
   buf->pause = 0;
   buf->reset_dev = 0;
@@ -435,7 +435,7 @@ int out_buf_get_free(struct out_buf *buf)
   assert(buf != nullptr);
 
   std::lock_guard<std::mutex> lock(buf->mutex);
-  space = fifo_buf_get_space(buf->buf);
+  space = buf->buf->space();
 
   return space;
 }
@@ -447,7 +447,7 @@ int out_buf_get_fill(struct out_buf *buf)
   assert(buf != nullptr);
 
   std::lock_guard<std::mutex> lock(buf->mutex);
-  fill = fifo_buf_get_fill(buf->buf);
+  fill = buf->buf->fill();
 
   return fill;
 }

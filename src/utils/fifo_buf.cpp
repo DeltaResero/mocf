@@ -19,54 +19,35 @@
 #include <cstring>
 #include <vector>
 
-#include "core/common.h"
 #include "utils/fifo_buf.h"
 
-struct fifo_buf
-{
-  int size;   /* Size of the buffer */
-  int pos;    /* Current position */
-  int fill;   /* Current fill */
-  std::vector<char> buf; /* The buffer content */
-
-  explicit fifo_buf(size_t s) : size(s), pos(0), fill(0), buf(s) {}
-};
-
-/* Initialize and return a new fifo_buf structure of the size requested. */
-struct fifo_buf *fifo_buf_new(const size_t size)
+fifo_buf::fifo_buf(size_t size)
+  : size_(size), pos_(0), fill_(0), buf_(size)
 {
   assert(size > 0);
-  return new struct fifo_buf(size);
-}
-
-/* Destroy the buffer object. */
-void fifo_buf_free(struct fifo_buf *b)
-{
-  delete b;
 }
 
 /* Put data into the buffer. Returns number of bytes actually put. */
-size_t fifo_buf_put(struct fifo_buf *b, const char *data, size_t size)
+size_t fifo_buf::put(const char *data, size_t size)
 {
   size_t written = 0;
 
-  assert(b != nullptr);
-  assert(!b->buf.empty());
+  assert(!buf_.empty());
 
-  while (b->fill < b->size && written < size)
+  while (fill_ < size_ && written < size)
   {
     size_t write_from;
     size_t to_write;
 
-    if (b->pos + b->fill < b->size)
+    if (pos_ + fill_ < size_)
     {
-      write_from = b->pos + b->fill;
-      to_write = b->size - (b->pos + b->fill);
+      write_from = pos_ + fill_;
+      to_write = size_ - (pos_ + fill_);
     }
     else
     {
-      write_from = b->fill - b->size + b->pos;
-      to_write = b->size - b->fill;
+      write_from = fill_ - size_ + pos_;
+      to_write = size_ - fill_;
     }
 
     if (to_write > size - written)
@@ -74,43 +55,42 @@ size_t fifo_buf_put(struct fifo_buf *b, const char *data, size_t size)
       to_write = size - written;
     }
 
-    memcpy(b->buf.data() + write_from, data + written, to_write);
-    b->fill += to_write;
+    memcpy(buf_.data() + write_from, data + written, to_write);
+    fill_ += to_write;
     written += to_write;
   }
 
   return written;
 }
 
-/* Copy data from the beginning of the buffer to the user buffer. Returns the
- * number of bytes copied. */
-size_t fifo_buf_peek(struct fifo_buf *b, char *user_buf, size_t user_buf_size)
+/* Copy data from the beginning of the buffer to the user buffer without
+ * consuming it. Returns the number of bytes copied. */
+size_t fifo_buf::peek(char *user_buf, size_t user_buf_size) const
 {
   size_t user_buf_pos = 0, written = 0;
   ssize_t left, pos;
 
-  assert(b != nullptr);
-  assert(!b->buf.empty());
+  assert(!buf_.empty());
 
-  left = b->fill;
-  pos = b->pos;
+  left = fill_;
+  pos = pos_;
 
   while (left && written < user_buf_size)
   {
-    size_t to_copy = pos + left <= b->size ? left : b->size - pos;
+    size_t to_copy = pos + left <= size_ ? left : size_ - pos;
 
     if (to_copy > user_buf_size - written)
     {
       to_copy = user_buf_size - written;
     }
 
-    memcpy(user_buf + user_buf_pos, b->buf.data() + pos, to_copy);
+    memcpy(user_buf + user_buf_pos, buf_.data() + pos, to_copy);
     user_buf_pos += to_copy;
     written += to_copy;
 
     left -= to_copy;
     pos += to_copy;
-    if (pos == b->size)
+    if (pos == size_)
     {
       pos = 0;
     }
@@ -119,62 +99,58 @@ size_t fifo_buf_peek(struct fifo_buf *b, char *user_buf, size_t user_buf_size)
   return written;
 }
 
-size_t fifo_buf_get(struct fifo_buf *b, char *user_buf, size_t user_buf_size)
+/* Copy and consume data from the beginning of the buffer. Returns the number
+ * of bytes read. */
+size_t fifo_buf::get(char *user_buf, size_t user_buf_size)
 {
   size_t user_buf_pos = 0, written = 0;
 
-  assert(b != nullptr);
-  assert(!b->buf.empty());
+  assert(!buf_.empty());
 
-  while (b->fill && written < user_buf_size)
+  while (fill_ && written < user_buf_size)
   {
-    size_t to_copy = b->pos + b->fill <= b->size ? b->fill : b->size - b->pos;
+    size_t to_copy = pos_ + fill_ <= size_ ? fill_ : size_ - pos_;
 
     if (to_copy > user_buf_size - written)
     {
       to_copy = user_buf_size - written;
     }
 
-    memcpy(user_buf + user_buf_pos, b->buf.data() + b->pos, to_copy);
+    memcpy(user_buf + user_buf_pos, buf_.data() + pos_, to_copy);
     user_buf_pos += to_copy;
     written += to_copy;
 
-    b->fill -= to_copy;
-    b->pos += to_copy;
-    if (b->pos == b->size)
+    fill_ -= to_copy;
+    pos_ += to_copy;
+    if (pos_ == size_)
     {
-      b->pos = 0;
+      pos_ = 0;
     }
   }
 
   return written;
 }
 
-/* Get the amount of free space in the buffer. */
-size_t fifo_buf_get_space(const struct fifo_buf *b)
+/* Return the amount of free space in the buffer. */
+size_t fifo_buf::space() const
 {
-  assert(b != nullptr);
-  assert(!b->buf.empty());
-
-  return b->size - b->fill;
+  assert(!buf_.empty());
+  return size_ - fill_;
 }
 
-size_t fifo_buf_get_fill(const struct fifo_buf *b)
+size_t fifo_buf::fill() const
 {
-  assert(b != nullptr);
-  return b->fill;
+  return fill_;
 }
 
-size_t fifo_buf_get_size(const struct fifo_buf *b)
+size_t fifo_buf::capacity() const
 {
-  assert(b != nullptr);
-  return b->size;
+  return size_;
 }
 
-void fifo_buf_clear(struct fifo_buf *b)
+void fifo_buf::clear()
 {
-  assert(b != nullptr);
-  b->fill = 0;
+  fill_ = 0;
 }
 
 // EOF
