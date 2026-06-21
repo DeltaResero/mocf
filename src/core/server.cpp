@@ -609,25 +609,22 @@ void engine_jump_to(int sec)
     int percent = -sec;
     assert(percent >= 0 && percent <= 100);
 
-    char *file = audio_get_sname();
-    if (!file || !*file)
+    std::string file = audio_get_sname();
+    if (file.empty())
     {
-      free(file);
       return;
     }
 
     struct file_tags *tags;
-    tags = tags_cache_get_immediate(tags_cache, file, TAGS_TIME);
+    tags = tags_cache_get_immediate(tags_cache, file.c_str(), TAGS_TIME);
     if (!tags || !(tags->filled & TAGS_TIME))
     {
       tags_free(tags);
-      free(file);
       return;
     }
 
     sec = (tags->time * percent) / 100;
     tags_free(tags);
-    free(file);
   }
 
   logit("Jumping to %ds", sec);
