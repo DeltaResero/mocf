@@ -23,6 +23,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <memory>
 
 #include "core/common.h"
 #include "audio/decoder.h"
@@ -59,7 +60,7 @@ struct decoder_s_preference
 {
   struct decoder_s_preference *next; /* chain pointer */
 #ifdef DEBUG
-  const char *source; /* entry in PreferredDecoders */
+  std::string source; /* entry in PreferredDecoders */
 #endif
   int decoders;                  /* number of decoders */
   int decoder_list[PLUGINS_NUM]; /* decoder indices */
@@ -70,21 +71,17 @@ typedef struct decoder_s_preference decoder_t_preference;
 static decoder_t_preference *preferences = nullptr;
 static int default_decoder_list[PLUGINS_NUM];
 
-static char *clean_mime_subtype(char *subtype)
+static std::string clean_mime_subtype(std::string subtype)
 {
-  char *ptr;
-
-  assert(subtype && subtype[0]);
-
-  if (!strncasecmp(subtype, "x-", 2))
+  if (subtype.length() >= 2 && !strncasecmp(subtype.c_str(), "x-", 2))
   {
-    subtype += 2;
+    subtype = subtype.substr(2);
   }
 
-  ptr = strchr(subtype, ';');
-  if (ptr)
+  size_t ptr = subtype.find(';');
+  if (ptr != std::string::npos)
   {
-    *ptr = 0x00;
+    subtype.resize(ptr);
   }
 
   return subtype;
@@ -120,15 +117,13 @@ static std::vector<std::string> split_on_chars(const char *s, const char *delims
 /* Find a preference entry matching the given filename extension and/or
  * MIME media type, or nullptr. */
 static decoder_t_preference *lookup_preference(const char *extn,
-                                               const char *file, char **mime)
+                                               const char *file, std::string &mime)
 {
-  char *type, *subtype;
+  std::string type, subtype;
   decoder_t_preference *result;
 
-  assert((extn && extn[0]) || (file && file[0]) || (mime && *mime && *mime[0]));
+  assert((extn && extn[0]) || (file && file[0]) || !mime.empty());
 
-  type = nullptr;
-  subtype = nullptr;
   for (result = preferences; result; result = result->next)
   {
     if (result->subtype.empty())
@@ -140,31 +135,30 @@ static decoder_t_preference *lookup_preference(const char *extn,
     }
     else
     {
-      if (!type)
+      if (type.empty())
       {
-        if (mime && *mime == nullptr && file && file[0])
+        if (mime.empty() && file && file[0])
         {
           if (options_get_bool("UseMimeMagic"))
           {
-            *mime = file_mime_type(file);
+            mime = file_mime_type(file);
           }
         }
-        if (mime && *mime && strchr(*mime, '/'))
+        if (!mime.empty())
         {
-          type = xstrdup(*mime);
-        }
-        if (type)
-        {
-          subtype = strchr(type, '/');
-          *subtype++ = 0x00;
-          subtype = clean_mime_subtype(subtype);
+          size_t slash = mime.find('/');
+          if (slash != std::string::npos)
+          {
+            type = mime.substr(0, slash);
+            subtype = clean_mime_subtype(mime.substr(slash + 1));
+          }
         }
       }
 
-      if (type)
+      if (!type.empty())
       {
-        if (!strcasecmp(result->type.c_str(), type) &&
-            !strcasecmp(result->subtype.c_str(), subtype))
+        if (!strcasecmp(result->type.c_str(), type.c_str()) &&
+            !strcasecmp(result->subtype.c_str(), subtype.c_str()))
         {
           break;
         }
@@ -172,7 +166,6 @@ static decoder_t_preference *lookup_preference(const char *extn,
     }
   }
 
-  free(type);
   return result;
 }
 
@@ -220,19 +213,19 @@ static int find_mime_decoder(int *decoder_list, int count, const char *mime)
 
 /* Return the index of the first decoder able to handle audio with the
  * given filename extension and/or MIME media type, or -1 if none can. */
-static int find_decoder(const char *extn, const char *file, char **mime)
+static int find_decoder(const char *extn, const char *file, std::string &mime)
 {
   int result;
   decoder_t_preference *pref;
 
-  assert((extn && extn[0]) || (file && file[0]) || (mime && *mime));
+  assert((extn && extn[0]) || (file && file[0]) || !mime.empty());
 
   pref = lookup_preference(extn, file, mime);
   if (pref)
   {
     if (!pref->subtype.empty())
     {
-      return find_mime_decoder(pref->decoder_list, pref->decoders, *mime);
+      return find_mime_decoder(pref->decoder_list, pref->decoders, mime.c_str());
     }
     else
     {
@@ -241,9 +234,9 @@ static int find_decoder(const char *extn, const char *file, char **mime)
   }
 
   result = -1;
-  if (mime && *mime)
+  if (!mime.empty())
   {
-    result = find_mime_decoder(default_decoder_list, plugins_num, *mime);
+    result = find_mime_decoder(default_decoder_list, plugins_num, mime.c_str());
   }
   if (result == -1 && extn && *extn)
   {
@@ -258,14 +251,13 @@ static int find_decoder(const char *extn, const char *file, char **mime)
 static int find_type(const char *file)
 {
   int result = -1;
-  char *extn, *mime;
+  char *extn;
+  std::string mime;
 
   extn = ext_pos(file);
-  mime = nullptr;
 
-  result = find_decoder(extn, file, &mime);
+  result = find_decoder(extn, file, mime);
 
-  free(mime);
   return result;
 }
 
@@ -375,7 +367,7 @@ static int lookup_decoder_by_name(const char *name)
 }
 
 /* Return a string of concatenated driver names. */
-static char *list_decoder_names(int *decoder_list, int count)
+static std::string list_decoder_names(int *decoder_list, int count)
 {
   int ix;
   std::string result;
@@ -383,7 +375,7 @@ static char *list_decoder_names(int *decoder_list, int count)
 
   if (count == 0)
   {
-    return xstrdup("");
+    return "";
   }
 
   names.reserve(count);
@@ -415,11 +407,11 @@ static char *list_decoder_names(int *decoder_list, int count)
 
   for (const auto &name : names)
   {
-    result += " ";
+    if (!result.empty()) result += " ";
     result += name;
   }
 
-  return xstrdup(result.c_str());
+  return result;
 }
 
 
@@ -427,7 +419,6 @@ static char *list_decoder_names(int *decoder_list, int count)
 static decoder_t_preference *make_preference(const char *prefix)
 {
   decoder_t_preference *result;
-  char *buf, *subtype;
 
   assert(prefix && prefix[0]);
 
@@ -436,15 +427,17 @@ static decoder_t_preference *make_preference(const char *prefix)
   result->decoders = 0;
   result->subtype = "";
 
-  buf = xstrdup(prefix);
-  subtype = strchr(buf, '/');
-  if (subtype)
+  std::string p(prefix);
+  size_t slash = p.find('/');
+  if (slash != std::string::npos)
   {
-    *subtype++ = 0x00;
-    result->subtype = clean_mime_subtype(subtype);
+    result->type = p.substr(0, slash);
+    result->subtype = clean_mime_subtype(p.substr(slash + 1));
   }
-  result->type = buf;
-  free(buf);
+  else
+  {
+    result->type = p;
+  }
 
   return result;
 }
@@ -580,14 +573,12 @@ static void load_preferences()
 
 #ifdef DEBUG
   {
-    char *names;
     decoder_t_preference *pref;
 
     for (pref = preferences; pref; pref = pref->next)
     {
-      names = list_decoder_names(pref->decoder_list, pref->decoders);
-      debug("%s:%s", pref->source, names);
-      free(names);
+      std::string names = list_decoder_names(pref->decoder_list, pref->decoders);
+      debug("%s:%s", pref->source.c_str(), names.c_str());
     }
   }
 #endif
@@ -596,7 +587,6 @@ static void load_preferences()
 static void load_plugins(int debug_info)
 {
   size_t ix;
-  char *names;
 
   (void)debug_info;
 
@@ -631,9 +621,8 @@ static void load_plugins(int debug_info)
     default_decoder_list[ix] = static_cast<int>(ix);
   }
 
-  names = list_decoder_names(default_decoder_list, plugins_num);
-  logit("Loaded %d decoders:%s", plugins_num, names);
-  free(names);
+  std::string names = list_decoder_names(default_decoder_list, plugins_num);
+  logit("Loaded %d decoders: %s", plugins_num, names.c_str());
 }
 
 void decoder_init(int debug_info)

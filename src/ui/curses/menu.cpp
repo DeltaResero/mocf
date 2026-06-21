@@ -93,11 +93,8 @@ static void draw_item(const struct menu *menu, const struct menu_item *mi,
   }
   else
   {
-    char *ptr;
-
-    ptr = xstrtail(mi->title.c_str(), title_space);
-    xwaddstr(menu->win, ptr);
-    free(ptr);
+    std::string tail = xstrtail(mi->title.c_str(), title_space);
+    xwaddstr(menu->win, tail.c_str());
   }
 
   /* Fill the remainder of the title field with spaces. */

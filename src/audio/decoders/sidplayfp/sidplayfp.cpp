@@ -373,7 +373,7 @@ int sidplayfp_decode(void *void_data, char *buf, int buf_len,
         return 0;
 
     int samples_to_render = frames_to_render * 2;
-    int samples_rendered = s->engine->play(reinterpret_cast<int16_t *>(buf), samples_to_render);
+    int samples_rendered = s->engine->play(reinterpret_cast<int_least16_t *>(buf), samples_to_render);
 
     if (samples_rendered <= 0)
         return 0;
@@ -434,7 +434,7 @@ public:
     void *data;
     SidplayfpDecoder(void *d) : data(d) {}
     ~SidplayfpDecoder() override { sidplayfp_close(data); }
-    
+
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
         return sidplayfp_decode(data, buf, buf_len, sound_params);
     }

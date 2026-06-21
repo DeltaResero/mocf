@@ -1104,21 +1104,28 @@ static int add_to_menu(struct menu *menu, const struct plist *plist,
   bool made_from_tags;
   struct menu_item *added;
   const struct plist_item *item = &plist->items[num];
-  char *title;
+  std::string title;
   const char *type_name;
 
   made_from_tags = (options_get_bool("ReadTags") && !item->title_tags.empty());
 
   if (made_from_tags)
   {
-    title = make_menu_title(item->title_tags.c_str(), 1, 0);
+    title = item->title_tags;
   }
   else
   {
-    title = make_menu_title(item->title_file.c_str(), 0, full_paths);
+    title = item->title_file;
+    if (!full_paths)
+    {
+      size_t slash = title.rfind('/');
+      if (slash != std::string::npos && slash != title.length() - 1)
+      {
+        title = title.substr(slash + 1);
+      }
+    }
   }
-  added = menu_add(menu, title, plist_file_type(plist, num), item->file.c_str());
-  free(title);
+  added = menu_add(menu, title.c_str(), plist_file_type(plist, num), item->file.c_str());
 
   if (item->tags && item->tags->time != -1)
   {
@@ -1201,25 +1208,20 @@ static void side_menu_make_list_content(struct side_menu *m,
 
   for (i = 0; i < static_cast<int>(dirs.size()); i++)
   {
-    char title[PATH_MAX];
+    std::string title;
 
-        if (options_get_bool("FileNamesIconv"))
+    if (options_get_bool("FileNamesIconv"))
     {
-      char *conv_title =
-          files_iconv_str(strrchr(dirs[i].c_str(), '/') + 1);
-
-      strcpy(title, conv_title);
-      strcat(title, "/");
-
-      free(conv_title);
+      title = files_iconv_str(strrchr(dirs[i].c_str(), '/') + 1);
+      title += "/";
     }
     else
     {
-      strcpy(title, strrchr(dirs[i].c_str(), '/') + 1);
-      strcat(title, "/");
+      title = strrchr(dirs[i].c_str(), '/') + 1;
+      title += "/";
     }
 
-    added = menu_add(m->menu.list.main, title, F_DIR, dirs[i].c_str());
+    added = menu_add(m->menu.list.main, title.c_str(), F_DIR, dirs[i].c_str());
     menu_item_set_attr_normal(added, get_color(CLR_MENU_ITEM_DIR));
     menu_item_set_attr_sel(added, get_color(CLR_MENU_ITEM_DIR_SELECTED));
   }
@@ -1268,7 +1270,7 @@ static void clear_area(WINDOW *w, const int posx, const int posy,
 
 static void side_menu_draw_frame(const struct side_menu *m)
 {
-  char *title;
+  std::string title;
 
   assert(m != nullptr);
   assert(m->visible);
@@ -1277,21 +1279,13 @@ static void side_menu_draw_frame(const struct side_menu *m)
   {
     if (static_cast<int>(strwidth(m->title.c_str())) > m->width - 4)
     {
-      char *tail;
-
-      tail = xstrtail(m->title.c_str(), m->width - 7);
-      title = static_cast<char *>(xmalloc(strlen(tail) + 4));
-      snprintf(title, strlen(tail) + 4, "...%s", tail);
-      free(tail);
+      std::string tail = xstrtail(m->title.c_str(), m->width - 7);
+      title = "..." + tail;
     }
     else
     {
-      title = xstrdup(m->title.c_str());
+      title = m->title;
     }
-  }
-  else
-  {
-    title = nullptr;
   }
 
   /* Border */
@@ -1331,20 +1325,18 @@ static void side_menu_draw_frame(const struct side_menu *m)
   }
 
   /* The title */
-  if (title)
+  if (!title.empty())
   {
-    wmove(m->win, m->posy, m->posx + m->width / 2 - strwidth(title) / 2 - 1);
+    wmove(m->win, m->posy, m->posx + m->width / 2 - strwidth(title.c_str()) / 2 - 1);
 
     wattrset(m->win, get_color(CLR_FRAME));
     waddch(m->win, lines.rtee);
 
     wattrset(m->win, get_color(CLR_WIN_TITLE));
-    xwaddstr(m->win, title);
+    xwaddstr(m->win, title.c_str());
 
     wattrset(m->win, get_color(CLR_FRAME));
     waddch(m->win, lines.ltee);
-
-    free(title);
   }
 }
 
@@ -1480,7 +1472,7 @@ static void update_menu_item(struct menu_item *mi, const struct plist *plist,
                              const int n, const int full_path)
 {
   bool made_from_tags;
-  char *title;
+  std::string title;
   const struct plist_item *item;
 
   assert(mi != nullptr);
@@ -1505,14 +1497,22 @@ static void update_menu_item(struct menu_item *mi, const struct plist *plist,
 
   if (made_from_tags)
   {
-    title = make_menu_title(item->title_tags.c_str(), 1, 0);
+    title = item->title_tags;
   }
   else
   {
-    title = make_menu_title(item->title_file.c_str(), 0, full_path);
+    title = item->title_file;
+    if (!full_path)
+    {
+      size_t slash = title.rfind('/');
+      if (slash != std::string::npos && slash != title.length() - 1)
+      {
+        title = title.substr(slash + 1);
+      }
+    }
   }
 
-  menu_item_set_title(mi, title);
+  menu_item_set_title(mi, title.c_str());
 
   if (full_path && !made_from_tags)
   {
@@ -1524,8 +1524,6 @@ static void update_menu_item(struct menu_item *mi, const struct plist *plist,
   }
 
   menu_item_set_queue_pos(mi, item->queue_pos);
-
-  free(title);
 }
 
 /* Update item title and time for this item if it's present on this menu.
@@ -2484,9 +2482,8 @@ static void xterm_set_title(const int state, const char *title)
       soft_write(1, " - ", sizeof(" - ") - 1);
       if (options_get_bool("NonUTFXterm"))
       {
-        char *iconv_title = xterm_iconv_str(title);
-        soft_write(1, iconv_title, strlen(iconv_title));
-        free(iconv_title);
+        std::string iconv_title = xterm_iconv_str(title);
+        soft_write(1, iconv_title.c_str(), iconv_title.length());
       }
       else
       {
@@ -4100,14 +4097,11 @@ void iface_set_title(const enum iface_menu menu, const char *title)
 
   if (options_get_bool("FileNamesIconv"))
   {
-    char *conv_title = nullptr;
-    conv_title = files_iconv_str(title);
+    std::string conv_title = files_iconv_str(title);
 
     main_win_set_title(&main_win,
                        menu == IFACE_MENU_DIR ? MENU_DIR : MENU_PLAYLIST,
-                       conv_title);
-
-    free(conv_title);
+                       conv_title.c_str());
   }
   else
   {

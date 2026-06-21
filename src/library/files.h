@@ -30,9 +30,9 @@
   void resolve_path(char *buf, size_t size, const char *file);
   char *ext_pos(const char *file);
   enum file_type file_type(const char *file);
-  char *file_mime_type(const char *file);
+  std::string file_mime_type(const char *file);
   std::optional<std::string> read_line(FILE *file);
-  char *find_match_dir(char *dir);
+  std::string find_match_dir(const std::string &pattern);
   int file_exists(const char *file);
   time_t get_mtime(const char *file);
   struct file_tags *read_file_tags(const char *file,
@@ -45,7 +45,7 @@
                        const bool hide_extension);
   int is_dir(const char *file);
   int can_read_file(const char *file);
-  char *absolute_path(const char *path, const char *cwd);
+  std::string absolute_path(const char *path, const char *cwd);
   bool is_secure(const char *file);
 
 

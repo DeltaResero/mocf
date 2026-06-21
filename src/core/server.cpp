@@ -32,6 +32,8 @@
 #include <atomic>
 #include <chrono>
 #include <queue>
+#include <string>
+#include <memory>
 
 #define DEBUG
 
@@ -343,23 +345,23 @@ static void add_event_all(const int event, const void *data)
     }
     else if (event == EV_QUEUE_DEL || event == EV_STATUS_MSG)
     {
-      data_copy = xstrdup(static_cast<const char *>(data));
+      data_copy = new std::string(static_cast<const char *>(data));
     }
     else if (event == EV_SRV_ERROR)
     {
-      const struct srv_error_ev *src = static_cast<const struct srv_error_ev *>(data);
-      auto *e = new srv_error_ev;
-      e->file = xstrdup(src->file);
-      e->msg  = xstrdup(src->msg);
-      data_copy = e;
+      data_copy = new srv_error_ev(*static_cast<const srv_error_ev *>(data));
     }
     else if (event == EV_QUEUE_MOVE)
     {
-      data_copy = move_ev_data_dup((struct move_ev_data *)data);
+      data_copy = new move_ev_data(*static_cast<const move_ev_data *>(data));
     }
     else if (event == EV_FILE_TAGS)
     {
-      data_copy = tag_ev_data_dup((struct tag_ev_response *)data);
+      const auto *src = static_cast<const tag_ev_response *>(data);
+      auto *n = new tag_ev_response;
+      n->file = src->file;
+      n->tags = src->tags ? std::unique_ptr<file_tags>(tags_dup(src->tags.get())) : nullptr;
+      data_copy = n;
     }
     else
     {
@@ -482,8 +484,8 @@ void tags_response(const char *file, const struct file_tags *tags)
   if (!g_eq) return;
 
   auto *data = new tag_ev_response;
-  data->file = xstrdup(file);
-  data->tags = tags_dup(tags);
+  data->file = file;
+  data->tags = std::unique_ptr<file_tags>(tags_dup(tags));
   eq_push(g_eq, EV_FILE_TAGS, data);
 }
 
@@ -499,8 +501,8 @@ void server_queue_pop(const char *filename)
 void engine_error(const char *file, const char *msg)
 {
   struct srv_error_ev e;
-  e.file = const_cast<char *>(file);
-  e.msg  = const_cast<char *>(msg);
+  e.file = file;
+  e.msg  = msg;
   add_event_all(EV_SRV_ERROR, &e);
 }
 
@@ -569,7 +571,7 @@ void engine_queue_add(const char *file)
   audio_queue_add(file);
 
   item = plist_new_item();
-  item->file  = xstrdup(file);
+  item->file  = file;
   item->type  = file_type(file);
   item->mtime = get_mtime(file);
 

@@ -13,6 +13,8 @@
 
 #include "library/playlist.h"
 #include <queue>
+#include <string>
+#include <memory>
 
 
   /* -----------------------------------------------------------------------
@@ -29,23 +31,23 @@
   /* Used as data field in the event queue for EV_FILE_TAGS. */
   struct tag_ev_response
   {
-    char *file;
-    struct file_tags *tags;
+    std::string file;
+    std::unique_ptr<struct file_tags> tags;
   };
 
   /* Used as data field in the event queue for EV_QUEUE_MOVE. */
   struct move_ev_data
   {
     /* Two files that are to be exchanged. */
-    char *from;
-    char *to;
+    std::string from;
+    std::string to;
   };
 
   /* Data carried by EV_SRV_ERROR events. */
   struct srv_error_ev
   {
-    char *file; /* path of the file that failed to open */
-    char *msg;  /* human-readable error message         */
+    std::string file; /* path of the file that failed to open */
+    std::string msg;  /* human-readable error message         */
   };
 
 /* Definition of events sent by the engine to the UI. */
@@ -79,11 +81,6 @@
    * Event data API
    * ----------------------------------------------------------------------- */
   void free_event_data(const int type, void *data);
-
-  struct tag_ev_response *tag_ev_data_dup(const struct tag_ev_response *d);
-  void free_tag_ev_data(struct tag_ev_response *d);
-  void free_move_ev_data(struct move_ev_data *m);
-  struct move_ev_data *move_ev_data_dup(const struct move_ev_data *m);
 
 
 #endif

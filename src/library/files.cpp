@@ -127,10 +127,10 @@ enum file_type file_type(const char *file)
   return F_OTHER;
 }
 
-/* Given a file name, return the mime type or nullptr. */
-char *file_mime_type(const char *file ASSERT_ONLY)
+/* Given a file name, return the mime type or empty string. */
+std::string file_mime_type(const char *file ASSERT_ONLY)
 {
-  char *result = nullptr;
+  std::string result;
 
   assert(file != nullptr);
 
@@ -142,22 +142,23 @@ char *file_mime_type(const char *file ASSERT_ONLY)
     std::lock_guard<std::mutex> lock(magic_mtx);
     if (cached_file && !strcmp(cached_file, file))
     {
-      result = xstrdup(cached_result);
+      result = cached_result;
     }
     else
     {
       free(cached_file);
       free(cached_result);
       cached_file = cached_result = nullptr;
-      result = xstrdup(magic_file(cookie, file));
-      if (result == nullptr)
+      const char *magic_res = magic_file(cookie, file);
+      if (magic_res == nullptr)
       {
         logit("Error interrogating file: %s", magic_error(cookie));
       }
       else
       {
+        result = magic_res;
         cached_file = xstrdup(file);
-        cached_result = xstrdup(result);
+        cached_result = xstrdup(result.c_str());
       }
     }
   }
@@ -175,28 +176,23 @@ void make_file_title(struct plist *plist, const int num,
   assert(LIMIT(num, plist->num));
   assert(!plist_deleted(plist, num));
 
-  char *file = xstrdup(plist->items[num].file.c_str());
+  std::string file = plist->items[num].file;
 
   if (hide_extension)
   {
-    char *extn;
-
-    extn = ext_pos(file);
+    char *extn = ext_pos(file.c_str());
     if (extn)
     {
-      *(extn - 1) = 0;
+      file.resize(extn - file.c_str() - 1);
     }
   }
 
   if (options_get_bool("FileNamesIconv"))
   {
-    char *old_title = file;
-    file = files_iconv_str(file);
-    free(old_title);
+    file = files_iconv_str(file.c_str());
   }
 
-  plist_set_title_file(plist, num, file);
-  free(file);
+  plist_set_title_file(plist, num, file.c_str());
 }
 
 /* Make a title from the tags for the item. */
@@ -627,107 +623,61 @@ std::optional<std::string> read_line(FILE *file)
   return line;
 }
 
-/* Return malloc()ed string in form "base/name". */
-static char *add_dir_file(const char *base, const char *name)
-{
-  bool base_is_root = !strcmp(base, "/");
-  std::string path = std::string(base_is_root ? "" : base) + "/" + name;
-  return xstrdup(path.c_str());
-}
-
 /* Find directories having a prefix of 'pattern'.
- * - If there are no matches, nullptr is returned.
+ * - If there are no matches, empty string is returned.
  * - If there is one such directory, it is returned with a trailing '/'.
  * - Otherwise the longest common prefix is returned (with no trailing '/').
- * (This is used for directory auto-completion.)
- * Returned memory is malloc()ed.
- * 'pattern' is temporarily modified! */
-char *find_match_dir(char *pattern)
+ * (This is used for directory auto-completion.) */
+std::string find_match_dir(const std::string& pattern)
 {
-  char *slash;
-  DIR *dir;
+  if (pattern.empty()) return "";
+
+  size_t slash_pos = pattern.rfind('/');
+  if (slash_pos == std::string::npos) return "";
+
+  std::string search_dir;
+  if (slash_pos == 0) search_dir = "/";
+  else search_dir = pattern.substr(0, slash_pos);
+
+  std::string name = pattern.substr(slash_pos + 1);
+
+  DIR *dir = opendir(search_dir.c_str());
+  if (!dir) return "";
+
+  std::string matching_dir;
+  bool unambiguous = true;
   struct dirent *entry;
-  int name_len;
-  char *name;
-  char *matching_dir = nullptr;
-  char *search_dir;
-  int unambiguous = 1;
-
-  if (!pattern[0])
-  {
-    return nullptr;
-  }
-
-  /* strip the last directory */
-  slash = strrchr(pattern, '/');
-  if (!slash)
-  {
-    return nullptr;
-  }
-  if (slash == pattern)
-  {
-    /* only '/dir' */
-    search_dir = xstrdup("/");
-  }
-  else
-  {
-    *slash = 0;
-    search_dir = xstrdup(pattern);
-    *slash = '/';
-  }
-
-  name = slash + 1;
-  name_len = strlen(name);
-
-  if (!(dir = opendir(search_dir)))
-  {
-    return nullptr;
-  }
 
   while ((entry = readdir(dir)))
   {
     if (strcmp(entry->d_name, ".") && strcmp(entry->d_name, "..") &&
-        !strncmp(entry->d_name, name, name_len))
+        !strncmp(entry->d_name, name.c_str(), name.length()))
     {
-      char *path = add_dir_file(search_dir, entry->d_name);
+      std::string path = search_dir;
+      if (path != "/") path += "/";
+      path += entry->d_name;
 
-      if (is_dir(path) == 1)
+      if (is_dir(path.c_str()) == 1)
       {
-        if (matching_dir)
+        if (!matching_dir.empty())
         {
-          /* More matching directories - strip
-           * matching_dir to the part that is
-           * common to both paths */
-          int i = 0;
-
-          while (matching_dir[i] == path[i] && path[i])
-          {
-            i++;
-          }
-          matching_dir[i] = 0;
-          free(path);
-          unambiguous = 0;
+          size_t i = 0;
+          while (i < matching_dir.length() && i < path.length() && matching_dir[i] == path[i]) i++;
+          matching_dir.resize(i);
+          unambiguous = false;
         }
         else
         {
           matching_dir = path;
         }
       }
-      else
-      {
-        free(path);
-      }
     }
   }
-
   closedir(dir);
-  free(search_dir);
 
-  if (matching_dir && unambiguous)
+  if (!matching_dir.empty() && unambiguous)
   {
-    matching_dir = static_cast<char *>(xrealloc(matching_dir,
-                                    sizeof(char) * (strlen(matching_dir) + 2)));
-    strcat(matching_dir, "/");
+    matching_dir += "/";
   }
 
   return matching_dir;
@@ -765,24 +715,22 @@ time_t get_mtime(const char *file)
   return static_cast<time_t>(-1);
 }
 
-/* Convert file path to absolute path;
- * resulting string is allocated and must be freed afterwards. */
-char *absolute_path(const char *path, const char *cwd)
+/* Convert file path to absolute path */
+std::string absolute_path(const char *path, const char *cwd)
 {
-  char tmp[2 * PATH_MAX];
-
   assert(path);
   assert(cwd);
 
   if (path[0] != '/')
   {
+    char tmp[2 * PATH_MAX];
     strncpy(tmp, cwd, sizeof(tmp));
     tmp[sizeof(tmp) - 1] = 0;
     resolve_path(tmp, sizeof(tmp), path);
-    return xstrdup(tmp);
+    return std::string(tmp);
   }
 
-  return xstrdup(path);
+  return std::string(path);
 }
 
 /* Check that a file which may cause other applications to be invoked

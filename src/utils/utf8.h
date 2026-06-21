@@ -24,6 +24,7 @@
 #endif
 
 #include <cstdarg>
+#include <string>
 #ifdef HAVE_ICONV
 #include <iconv.h>
 #endif
@@ -41,10 +42,10 @@
                   const int n);
   int xwprintw(WINDOW *win, const char *fmt, ...) ATTR_PRINTF(2, 3);
   std::size_t strwidth(const char *s);
-  char *xstrtail(const char *str, const int len);
-  char *iconv_str(const iconv_t desc, const char *str);
-  char *files_iconv_str(const char *str);
-  char *xterm_iconv_str(const char *str);
+  std::string xstrtail(const char *str, const int len);
+  std::string iconv_str(const iconv_t desc, const char *str);
+  std::string files_iconv_str(const char *str);
+  std::string xterm_iconv_str(const char *str);
 
 
 #endif

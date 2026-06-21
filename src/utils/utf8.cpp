@@ -20,6 +20,7 @@
 #include <cstring>
 #include <cwchar>
 #include <vector>
+#include <string>
 
 #ifdef HAVE_ICONV
 #include <iconv.h>
@@ -55,40 +56,37 @@ static iconv_t iconv_desc = (iconv_t)(-1);
 static iconv_t files_iconv_desc = (iconv_t)(-1);
 static iconv_t xterm_iconv_desc = (iconv_t)(-1);
 
-/* Return a malloc()ed string converted using iconv().
+/* Return a string converted using iconv().
  * If for_file_name is not 0, use the conversion defined for file names.
- * For nullptr returns nullptr. */
-char *iconv_str(const iconv_t desc, const char *str)
+ * For nullptr returns empty string. */
+std::string iconv_str(const iconv_t desc, const char *str)
 {
-  char buf[512];
-#ifdef FREEBSD
-  const char *inbuf;
-#else
-  char *inbuf;
-#endif
-  char *outbuf;
-  char *str_copy;
-  size_t inbytesleft, outbytesleft;
-  char *converted;
-
   if (!str)
   {
-    return nullptr;
+    return "";
   }
   if (desc == (iconv_t)(-1))
   {
-    return xstrdup(str);
+    return str;
   }
 
-  inbuf = str_copy = xstrdup(str);
-  outbuf = buf;
-  inbytesleft = strlen(inbuf);
-  outbytesleft = sizeof(buf) - 1;
+  char buf[512];
+  std::string str_copy = str;
+#ifdef FREEBSD
+  const char *inbuf = str_copy.c_str();
+#else
+  char *inbuf = &str_copy[0];
+#endif
+  size_t inbytesleft = str_copy.length();
+  std::string result;
 
   iconv(desc, nullptr, nullptr, nullptr, nullptr);
 
   while (inbytesleft)
   {
+    char *outbuf = buf;
+    size_t outbytesleft = sizeof(buf) - 1;
+
     if (iconv(desc, &inbuf, &inbytesleft, &outbuf, &outbytesleft) ==
         static_cast<size_t>(-1))
     {
@@ -99,6 +97,7 @@ char *iconv_str(const iconv_t desc, const char *str)
         if (!--outbytesleft)
         {
           *outbuf = 0;
+          result += buf;
           break;
         }
         *(outbuf++) = '#';
@@ -107,29 +106,29 @@ char *iconv_str(const iconv_t desc, const char *str)
       {
         *(outbuf++) = '#';
         *outbuf = 0;
+        result += buf;
         break;
       }
       else if (errno == E2BIG)
       {
-        outbuf[sizeof(buf) - 1] = 0;
-        break;
+        *outbuf = 0;
+        result += buf;
+        continue;
       }
     }
+    *outbuf = 0;
+    result += buf;
   }
 
-  *outbuf = 0;
-  converted = xstrdup(buf);
-  free(str_copy);
-
-  return converted;
+  return result;
 }
 
-char *files_iconv_str(const char *str)
+std::string files_iconv_str(const char *str)
 {
   return iconv_str(files_iconv_desc, str);
 }
 
-char *xterm_iconv_str(const char *str)
+std::string xterm_iconv_str(const char *str)
 {
   return iconv_str(xterm_iconv_desc, str);
 }
@@ -144,10 +143,8 @@ int xwaddstr(WINDOW *win, const char *str)
   }
   else
   {
-    char *lstr = iconv_str(iconv_desc, str);
-
-    res = waddstr(win, lstr);
-    free(lstr);
+    std::string lstr = iconv_str(iconv_desc, str);
+    res = waddstr(win, lstr.c_str());
   }
 
   return res;
@@ -231,17 +228,16 @@ static size_t xmbstowcs(wchar_t *dest, const char *src, size_t len,
 int xwaddnstr(WINDOW *win, const char *str, const int n)
 {
   int res, width, inv_char;
-  char *mstr;
   size_t size, num_chars;
 
   assert(n > 0);
   assert(str != nullptr);
 
-  mstr = iconv_str(iconv_desc, str);
+  std::string mstr = iconv_str(iconv_desc, str);
 
-  size = xmbstowcs(nullptr, mstr, -1, nullptr) + 1;
+  size = xmbstowcs(nullptr, mstr.c_str(), -1, nullptr) + 1;
   std::vector<wchar_t> ucs(size);
-  xmbstowcs(ucs.data(), mstr, size, &inv_char);
+  xmbstowcs(ucs.data(), mstr.c_str(), size, &inv_char);
   width = wcswidth(ucs.data(), WIDTH_MAX);
 
   if (width == -1)
@@ -276,12 +272,11 @@ int xwaddnstr(WINDOW *win, const char *str, const int n)
   }
   else
   {
-    snprintf(lstr.data(), num_chars + 1, "%s", mstr);
+    snprintf(lstr.data(), num_chars + 1, "%s", mstr.c_str());
   }
 
   res = waddstr(win, lstr.data());
 
-  free(mstr);
   return res;
 }
 
@@ -295,10 +290,8 @@ int xmvwaddstr(WINDOW *win, const int y, const int x, const char *str)
   }
   else
   {
-    char *lstr = iconv_str(iconv_desc, str);
-
-    res = mvwaddstr(win, y, x, lstr);
-    free(lstr);
+    std::string lstr = iconv_str(iconv_desc, str);
+    res = mvwaddstr(win, y, x, lstr.c_str());
   }
 
   return res;
@@ -315,10 +308,8 @@ int xmvwaddnstr(WINDOW *win, const int y, const int x, const char *str,
   }
   else
   {
-    char *lstr = iconv_str(iconv_desc, str);
-
-    res = mvwaddnstr(win, y, x, lstr, n);
-    free(lstr);
+    std::string lstr = iconv_str(iconv_desc, str);
+    res = mvwaddnstr(win, y, x, lstr.c_str(), n);
   }
 
   return res;
@@ -340,10 +331,8 @@ int xwprintw(WINDOW *win, const char *fmt, ...)
   }
   else
   {
-    char *lstr = iconv_str(iconv_desc, buf.c_str());
-
-    res = waddstr(win, lstr);
-    free(lstr);
+    std::string lstr = iconv_str(iconv_desc, buf.c_str());
+    res = waddstr(win, lstr.c_str());
   }
 
   return res;
@@ -429,9 +418,9 @@ size_t strwidth(const char *s)
   return width;
 }
 
-/* Return a malloc()ed string containing the tail of 'str' up to a
+/* Return a string containing the tail of 'str' up to a
  * maximum of 'len' characters (in columns occupied on the screen). */
-char *xstrtail(const char *str, const int len)
+std::string xstrtail(const char *str, const int len)
 {
   size_t size;
   int width;
@@ -456,7 +445,7 @@ char *xstrtail(const char *str, const int len)
   std::vector<char> tail_buf(size);
   wcstombs(tail_buf.data(), ucs_tail, size);
 
-  return xstrdup(tail_buf.data());
+  return std::string(tail_buf.data());
 }
 
 // EOF

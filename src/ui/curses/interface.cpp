@@ -320,17 +320,17 @@ private:
 
     void ev_file_tags(const tag_ev_response *data) {
         int n;
-        file_tags *mutable_tags = const_cast<file_tags *>(data->tags);
+        file_tags *mutable_tags = data->tags.get();
         sanitise_string(mutable_tags->title);
         sanitise_string(mutable_tags->artist);
         sanitise_string(mutable_tags->album);
 
-        if ((n = plist_find_fname(&dir_plist, data->file)) != -1) {
-            update_item_tags(&dir_plist, n, data->tags);
+        if ((n = plist_find_fname(&dir_plist, data->file.c_str())) != -1) {
+            update_item_tags(&dir_plist, n, data->tags.get());
             iface_update_item(IFACE_MENU_DIR, &dir_plist, n);
         }
-        if ((n = plist_find_fname(&playlist, data->file)) != -1) {
-            update_item_tags(&playlist, n, data->tags);
+        if ((n = plist_find_fname(&playlist, data->file.c_str())) != -1) {
+            update_item_tags(&playlist, n, data->tags.get());
             iface_update_item(IFACE_MENU_PLIST, &playlist, n);
         }
         if (!curr_file.file.empty() && curr_file.file == data->file) {
@@ -347,10 +347,10 @@ private:
                 }
             }
             if (!data->tags->title.empty()) {
-                curr_file.title = build_title(data->tags);
+                curr_file.title = build_title(data->tags.get());
                 iface_set_played_file_title(curr_file.title.c_str());
             }
-            curr_file.tags.reset(tags_dup(data->tags));
+            curr_file.tags.reset(tags_dup(data->tags.get()));
         }
     }
 
@@ -387,9 +387,8 @@ private:
                 curr_file.title = file;
             } else {
                 if (options_get_bool("FileNamesIconv")) {
-                    char *iconv_str = files_iconv_str(file.c_str() + file.rfind('/') + 1);
+                    std::string iconv_str = files_iconv_str(file.c_str() + file.rfind('/') + 1);
                     curr_file.title = iconv_str;
-                    free(iconv_str);
                 } else {
                     curr_file.title = file.substr(file.rfind('/') + 1);
                 }
@@ -438,8 +437,8 @@ private:
     }
 
     void update_error(srv_error_ev *data) {
-        if (data->msg) iface_error(data->msg);
-        if (data->file && data->file[0]) iface_mark_file_error(data->file);
+        if (!data->msg.empty()) iface_error(data->msg.c_str());
+        if (!data->file.empty()) iface_mark_file_error(data->file.c_str());
     }
 
     void recv_engine_queue(plist *q) {
@@ -484,7 +483,7 @@ private:
     }
 
     void event_queue_move(const move_ev_data *d) {
-        plist_swap_files(&queue, d->from, d->to);
+        plist_swap_files(&queue, d->from.c_str(), d->to.c_str());
     }
 
     void server_event(const int event, void *data) {
@@ -496,12 +495,12 @@ private:
             case EV_CHANNELS: update_channels(); break;
             case EV_SRV_ERROR: update_error(static_cast<srv_error_ev *>(data)); break;
             case EV_OPTIONS: get_engine_options(); break;
-            case EV_STATUS_MSG: iface_set_status(static_cast<char *>(data)); break;
+            case EV_STATUS_MSG: iface_set_status(static_cast<std::string *>(data)->c_str()); break;
             case EV_MIXER_CHANGE: update_mixer_name(); break;
             case EV_FILE_TAGS: ev_file_tags(static_cast<tag_ev_response *>(data)); break;
             case EV_AVG_BITRATE: curr_file.avg_bitrate = engine_get_avg_bitrate(); break;
             case EV_QUEUE_ADD: event_queue_add(static_cast<plist_item *>(data)); break;
-            case EV_QUEUE_DEL: event_queue_del(static_cast<char *>(data)); break;
+            case EV_QUEUE_DEL: event_queue_del(static_cast<std::string *>(data)->c_str()); break;
             case EV_QUEUE_CLEAR: clear_queue(); break;
             case EV_QUEUE_MOVE: event_queue_move(static_cast<move_ev_data *>(data)); break;
             case EV_AUDIO_START: break;
@@ -537,7 +536,7 @@ private:
 
             if (type == EV_FILE_TAGS) {
                 tag_ev_response *ev = static_cast<tag_ev_response *>(data);
-                if (plist_find_fname(p, ev->file) != -1) {
+                if (plist_find_fname(p, ev->file.c_str()) != -1) {
                     if (ev->tags->filled & tags_sel) files--;
                 }
                 if (!no_iface) server_event(type, data);
@@ -1028,10 +1027,10 @@ private:
             free(entry_text);
             if (!dir) return;
 
-            char *complete_dir = find_match_dir(dir);
-            if (complete_dir) {
+            std::string complete_dir = find_match_dir(dir);
+            if (!complete_dir.empty()) {
                 free(dir);
-                dir = complete_dir;
+                dir = xstrdup(complete_dir.c_str());
             }
 
             char buf[PATH_MAX];
