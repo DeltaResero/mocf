@@ -79,7 +79,7 @@ static std::string curr_playing_fname;
 static bool started_playing_in_queue = false;
 static std::mutex curr_playing_mtx;
 
-static struct out_buf *out_buf;
+static std::unique_ptr<OutBuf> out_buf;
 static std::unique_ptr<AudioOutput> hw;
 static struct output_driver_caps hw_caps; /* capabilities of the output
                driver */
@@ -743,18 +743,18 @@ static void play_thread_func()
 
           curr_playing_fname = file;
 
-          out_buf_time_set(out_buf, 0.0);
+          out_buf->time_set(0.0);
 
           int next = plist_next(curr_plist, curr_playing);
           next_file = next != -1 ? plist_get_file(curr_plist, next) : std::string{};
       }
 
-      player(file.c_str(), next_file.empty() ? nullptr : next_file.c_str(), out_buf);
+      player(file.c_str(), next_file.empty() ? nullptr : next_file.c_str(), out_buf.get());
 
       set_info_rate(0);
       set_info_bitrate(0);
       set_info_channels(1);
-      out_buf_time_set(out_buf, 0.0);
+      out_buf->time_set(0.0);
     }
 
     if (stop_playing)
@@ -910,7 +910,7 @@ void audio_pause()
 
   if (curr_playing != -1)
   {
-    out_buf_pause(out_buf);
+    out_buf->pause();
 
     prev_state = state.load();
     state = STATE_PAUSE;
@@ -923,7 +923,7 @@ void audio_unpause()
   std::lock_guard<std::mutex> lock(curr_playing_mtx);
   if (curr_playing != -1)
   {
-    out_buf_unpause(out_buf);
+    out_buf->unpause();
     prev_state = state.load();
     state = STATE_PLAY;
     state_change();
@@ -1084,11 +1084,11 @@ int audio_send_buf(const char *buf, const size_t size)
 
   if (need_audio_conversion && converted)
   {
-    res = out_buf_put(out_buf, converted, out_data_len);
+    res = out_buf->put(converted, out_data_len);
   }
   else if (!need_audio_conversion)
   {
-    res = out_buf_put(out_buf, buf, size);
+    res = out_buf->put(buf, size);
   }
   else
   {
@@ -1163,7 +1163,7 @@ int audio_send_pcm(const char *buf, const size_t size)
 /* Get current time of the song in seconds. */
 int audio_get_time()
 {
-  return state.load() != STATE_STOP ? out_buf_time_get(out_buf) : 0;
+  return state.load() != STATE_STOP ? out_buf->time_get() : 0;
 }
 
 void audio_close()
@@ -1372,7 +1372,7 @@ void audio_initialize()
     hw_caps.max_channels = max_channels;
   }
 
-  out_buf = out_buf_new(options_get_int("OutputBuffer") * 1024);
+  out_buf = std::make_unique<OutBuf>(options_get_int("OutputBuffer") * 1024);
 
   softmixer_init();
   equalizer_init();
@@ -1390,8 +1390,7 @@ void audio_exit()
   {
     hw->shutdown();
   }
-  out_buf_free(out_buf);
-  out_buf = nullptr;
+  out_buf.reset();
   plist_free(&playlist);
   plist_free(&shuffled_plist);
   plist_free(&queue);

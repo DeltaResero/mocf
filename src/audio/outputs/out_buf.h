@@ -12,27 +12,53 @@
 #define BUF_H
 
 #include "utils/fifo_buf.h"
+#include <functional>
+#include <mutex>
+#include <thread>
+#include <condition_variable>
+#include <memory>
 
+using out_buf_free_callback = std::function<void()>;
 
-  typedef void out_buf_free_callback();
+class OutBuf
+{
+public:
+  OutBuf(int size);
+  ~OutBuf();
 
-  struct out_buf;
+  int put(const char *data, int size);
+  void pause();
+  void unpause();
+  void stop();
+  void reset();
+  void time_set(const float time);
+  int time_get();
+  void set_free_callback(out_buf_free_callback callback);
+  int get_free();
+  int get_fill();
+  void wait();
 
-  struct out_buf *out_buf_new(int size);
-  void out_buf_free(struct out_buf *buf);
-  int out_buf_put(struct out_buf *buf, const char *data, int size);
-  void out_buf_pause(struct out_buf *buf);
-  void out_buf_unpause(struct out_buf *buf);
-  void out_buf_stop(struct out_buf *buf);
-  void out_buf_reset(struct out_buf *buf);
-  void out_buf_time_set(struct out_buf *buf, const float time);
-  int out_buf_time_get(struct out_buf *buf);
-  void out_buf_set_free_callback(struct out_buf *buf,
-                                 out_buf_free_callback callback);
-  int out_buf_get_free(struct out_buf *buf);
-  int out_buf_get_fill(struct out_buf *buf);
-  void out_buf_wait(struct out_buf *buf);
+private:
+  void read_thread();
 
+  std::unique_ptr<fifo_buf> fifo;
+  std::mutex mutex;
+  std::thread tid;
+
+  std::condition_variable play_cond;
+  std::condition_variable ready_cond;
+
+  out_buf_free_callback free_callback;
+
+  bool is_paused;
+  bool is_exit;
+  bool is_stopped;
+  bool reset_dev;
+
+  float time;
+  int hardware_buf_fill;
+  bool read_thread_waiting;
+};
 
 #endif
 

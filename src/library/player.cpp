@@ -356,7 +356,7 @@ static void buf_free_cb()
 /* Decoder loop for already opened and probably running for some time decoder.
  * next_file will be precached at eof. */
 static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
-                        const char *next_file, struct out_buf *out_buf,
+                        const char *next_file, OutBuf *out_buf,
                         struct sound_params *sound_params, struct md5_data *md5,
                         const float already_decoded_sec)
 {
@@ -369,7 +369,7 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
   float decode_time = already_decoded_sec; /* the position of the decoder
                                               (in seconds) */
 
-  out_buf_set_free_callback(out_buf, buf_free_cb);
+  out_buf->set_free_callback(buf_free_cb);
 
   {
     std::lock_guard<std::mutex> lock(curr_tags_mtx);
@@ -435,8 +435,8 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
 
     /* Wait, if there is no space in the buffer to put the decoded
      * data or EOF occurred and there is something in the buffer. */
-    else if (decoded > out_buf_get_free(out_buf) ||
-             (eof && out_buf_get_fill(out_buf)))
+    else if (decoded > out_buf->get_free() ||
+             (eof && out_buf->get_fill()))
     {
       debug("waiting...");
       if (eof && precache.file.empty() && next_file &&
@@ -461,7 +461,7 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
       logit("stop");
       stopped = true;
       md5->okay = false;
-      out_buf_stop(out_buf);
+      out_buf->stop();
 
       lock.lock();
       if (request == REQ_STOP)
@@ -485,9 +485,9 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
       }
       else
       {
-        out_buf_stop(out_buf);
-        out_buf_reset(out_buf);
-        out_buf_time_set(out_buf, decoder_seek);
+        out_buf->stop();
+        out_buf->reset();
+        out_buf->time_set(decoder_seek);
         {
           std::lock_guard<std::mutex> lck(bitrate_list_mtx);
           bitrate_list.clear();
@@ -504,7 +504,7 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
       }
       lock.unlock();
     }
-    else if (!eof && decoded <= out_buf_get_free(out_buf) &&
+    else if (!eof && decoded <= out_buf->get_free() &&
              !sound_params_change)
     {
       debug("putting into the buffer %d bytes", decoded);
@@ -518,21 +518,21 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
       audio_send_buf(buf, decoded);
       decoded = 0;
     }
-    else if (!eof && sound_params_change && out_buf_get_fill(out_buf) == 0)
+    else if (!eof && sound_params_change && out_buf->get_fill() == 0)
     {
       logit("Sound parameters have changed.");
       *sound_params = new_sound_params;
       sound_params_change = false;
       set_info_channels(sound_params->channels);
       set_info_rate(sound_params->rate / 1000);
-      out_buf_wait(out_buf);
+      out_buf->wait();
       if (!audio_open(sound_params))
       {
         md5->okay = false;
         break;
       }
     }
-    else if (eof && out_buf_get_fill(out_buf) == 0)
+    else if (eof && out_buf->get_fill() == 0)
     {
       logit("played everything");
       break;
@@ -561,7 +561,7 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
     }
   }
 
-  out_buf_wait(out_buf);
+  out_buf->wait();
 
   if (stopped || !options_get_bool("AutoNext"))
   {
@@ -631,7 +631,7 @@ static void log_md5_sum(const char *file, struct sound_params sound_params,
 
 /* Play a file (disk file) using the given decoder. next_file is precached. */
 static void play_file(const char *file, AudioPlugin *f,
-                      const char *next_file, struct out_buf *out_buf)
+                      const char *next_file, OutBuf *out_buf)
 {
   std::unique_ptr<AudioDecoder> decoder_data;
   struct sound_params sound_params = {0, 0, 0};
@@ -644,7 +644,7 @@ static void play_file(const char *file, AudioPlugin *f,
   md5_init_ctx(&md5.ctx);
 #endif
 
-  out_buf_reset(out_buf);
+  out_buf->reset();
 
   precache_wait(&precache);
 
@@ -758,7 +758,7 @@ static void play_file(const char *file, AudioPlugin *f,
 
 /* Open a file, decode it and put output into the buffer. At the end, start
  * precaching next_file. */
-void player(const char *file, const char *next_file, struct out_buf *out_buf)
+void player(const char *file, const char *next_file, OutBuf *out_buf)
 {
   AudioPlugin *f;
 
