@@ -1064,36 +1064,6 @@ static void main_win_destroy(struct main_win *w)
   }
 }
 
-/* Make a title suitable to display in a menu from the title of a playlist item.
- * Returned memory is malloc()ed.
- * made_from tags - was the playlist title made from tags?
- * full_paths - If the title is the file name, use the full path?
- */
-static char *make_menu_title(const char *plist_title, const int made_from_tags,
-                             const int full_path)
-{
-  char *title = xstrdup(plist_title);
-
-  if (!made_from_tags)
-  {
-    if (!full_path)
-    {
-      /* Use only the file name instead of the full path. */
-      char *slash = strrchr(title, '/');
-
-      if (slash && slash != title)
-      {
-        char *old_title = title;
-
-        title = xstrdup(slash + 1);
-        free(old_title);
-      }
-    }
-  }
-
-  return title;
-}
-
 /* Add an item from the playlist to the menu.
  * If full_paths has non-zero value, full paths will be displayed instead of
  * just file names.
