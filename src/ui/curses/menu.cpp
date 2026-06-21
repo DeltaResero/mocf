@@ -17,6 +17,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
+#include <utility>
 
 #include "core/common.h"
 #include "ui/curses/menu.h"
@@ -44,17 +46,17 @@ static void draw_item(const struct menu *menu, const struct menu_item *mi,
 
   wmove(menu->win, pos, menu->posx);
 
-  if (draw_selected && mi == menu->selected && mi == menu->marked)
+  if (draw_selected && mi->num == menu->selected_idx && mi->num == menu->marked_idx)
   {
     title_attr = mi->attr_sel_marked;
     info_attr = menu->info_attr_sel_marked;
   }
-  else if (draw_selected && mi == menu->selected)
+  else if (draw_selected && mi->num == menu->selected_idx)
   {
     title_attr = mi->attr_sel;
     info_attr = menu->info_attr_sel;
   }
-  else if (mi == menu->marked)
+  else if (mi->num == menu->marked_idx)
   {
     title_attr = mi->attr_marked;
     info_attr = menu->info_attr_marked;
@@ -99,7 +101,7 @@ static void draw_item(const struct menu *menu, const struct menu_item *mi,
   }
 
   /* Fill the remainder of the title field with spaces. */
-  if (mi == menu->selected)
+  if (mi->num == menu->selected_idx)
   {
     getyx(menu->win, y, ix);
     while (ix < x + title_space)
@@ -159,7 +161,6 @@ static void draw_item(const struct menu *menu, const struct menu_item *mi,
 
 void menu_draw(const struct menu *menu, const int active)
 {
-  struct menu_item *mi;
   int title_width;
   int info_pos;
   int number_space = 0;
@@ -169,7 +170,7 @@ void menu_draw(const struct menu *menu, const int active)
 
   if (menu->number_items)
   {
-    int count = menu->nitems / 10;
+    int count = menu->items.size() / 10;
 
     number_space = 2; /* begin from 1 digit and a space char */
     while (count)
@@ -204,10 +205,9 @@ void menu_draw(const struct menu *menu, const int active)
 
   title_width -= number_space;
 
-  for (mi = menu->top; mi && mi->num - menu->top->num < menu->height;
-       mi = mi->next)
+  for (int i = menu->top_idx; i < (int)menu->items.size() && i - menu->top_idx < menu->height; ++i)
   {
-    draw_item(menu, mi, mi->num - menu->top->num + menu->posy,
+    draw_item(menu, menu->items[i].get(), i - menu->top_idx + menu->posy,
               menu->posx + info_pos, title_width, number_space, active);
   }
 }
@@ -217,9 +217,9 @@ void menu_set_cursor(const struct menu *m)
 {
   assert(m != nullptr);
 
-  if (m->selected)
+  if (m->selected_idx >= 0 && m->selected_idx < (int)m->items.size())
   {
-    wmove(m->win, m->selected->num - m->top->num + m->posy, m->posx);
+    wmove(m->win, m->selected_idx - m->top_idx + m->posy, m->posx);
   }
 }
 
@@ -240,16 +240,13 @@ struct menu *menu_new(WINDOW *win, const int posx, const int posy,
   menu = new struct menu;
 
   menu->win = win;
-  menu->items = nullptr;
-  menu->nitems = 0;
-  menu->top = nullptr;
-  menu->last = nullptr;
-  menu->selected = nullptr;
+  menu->top_idx = 0;
+  menu->selected_idx = 0;
   menu->posx = posx;
   menu->posy = posy;
   menu->width = width;
   menu->height = height;
-  menu->marked = nullptr;
+  menu->marked_idx = -1;
   menu->show_time = 0;
   menu->show_format = false;
   menu->info_attr_normal = A_NORMAL;
@@ -265,17 +262,15 @@ struct menu *menu_new(WINDOW *win, const int posx, const int posy,
 struct menu_item *menu_add(struct menu *menu, const char *title,
                            const enum file_type type, const char *file)
 {
-  struct menu_item *mi;
-
   assert(menu != nullptr);
   assert(title != nullptr);
 
-  mi = new menu_item;
+  auto mi = std::make_unique<menu_item>();
 
   mi->title = title;
   mi->type = type;
   mi->file = file ? file : "";
-  mi->num = menu->nitems;
+  mi->num = menu->items.size();
 
   mi->attr_normal = A_NORMAL;
   mi->attr_sel = A_NORMAL;
@@ -287,35 +282,15 @@ struct menu_item *menu_add(struct menu *menu, const char *title,
   mi->format[0] = 0;
   mi->queue_pos = 0;
 
-  mi->next = nullptr;
-  mi->prev = menu->last;
-  if (menu->last)
-  {
-    menu->last->next = mi;
-  }
-
-  if (!menu->items)
-  {
-    menu->items = mi;
-  }
-  if (!menu->top)
-  {
-    menu->top = menu->items;
-  }
-  if (!menu->selected)
-  {
-    menu->selected = menu->items;
-  }
+  menu_item *raw_mi = mi.get();
+  menu->items.push_back(std::move(mi));
 
   if (file)
   {
-    menu->search_tree[file] = mi;
+    menu->search_tree[file] = raw_mi;
   }
 
-  menu->last = mi;
-  menu->nitems++;
-
-  return mi;
+  return raw_mi;
 }
 
 static struct menu_item *menu_add_from_item(struct menu *menu,
@@ -340,35 +315,6 @@ static struct menu_item *menu_add_from_item(struct menu *menu,
   return new_item;
 }
 
-static struct menu_item *get_item_relative(struct menu_item *mi, int to_move)
-{
-  assert(mi != nullptr);
-
-  while (to_move)
-  {
-    struct menu_item *prev = mi;
-
-    if (to_move > 0)
-    {
-      mi = mi->next;
-      to_move--;
-    }
-    else
-    {
-      mi = mi->prev;
-      to_move++;
-    }
-
-    if (!mi)
-    {
-      mi = prev;
-      break;
-    }
-  }
-
-  return mi;
-}
-
 void menu_update_size(struct menu *menu, const int posx, const int posy,
                       const int width, const int height)
 {
@@ -383,35 +329,21 @@ void menu_update_size(struct menu *menu, const int posx, const int posy,
   menu->width = width;
   menu->height = height;
 
-  if (menu->selected && menu->top &&
-      menu->selected->num >= menu->top->num + menu->height)
+  if (menu->selected_idx >= menu->top_idx + menu->height)
   {
-    menu->selected = get_item_relative(menu->top, menu->height - 1);
+    menu->selected_idx = menu->top_idx + menu->height - 1;
+    if (menu->selected_idx >= (int)menu->items.size())
+    {
+      menu->selected_idx = menu->items.empty() ? 0 : menu->items.size() - 1;
+    }
   }
-}
-
-static void menu_item_free(struct menu_item *mi)
-{
-  assert(mi != nullptr);
-
-  delete mi;
 }
 
 void menu_free(struct menu *menu)
 {
-  struct menu_item *mi;
-
   assert(menu != nullptr);
 
-  mi = menu->items;
-  while (mi)
-  {
-    struct menu_item *next = mi->next;
-
-    menu_item_free(mi);
-    mi = next;
-  }
-
+  menu->items.clear();
   menu->search_tree.clear();
 
   delete menu;
@@ -421,70 +353,75 @@ void menu_driver(struct menu *menu, const enum menu_request req)
 {
   assert(menu != nullptr);
 
-  if (menu->nitems == 0)
+  if (menu->items.empty())
   {
     return;
   }
 
-  if (req == REQ_DOWN && menu->selected->next)
+  if (req == REQ_DOWN && menu->selected_idx < (int)menu->items.size() - 1)
   {
-    menu->selected = menu->selected->next;
-    if (menu->selected->num >= menu->top->num + menu->height)
+    menu->selected_idx++;
+    if (menu->selected_idx >= menu->top_idx + menu->height)
     {
-      menu->top = get_item_relative(menu->selected, -menu->height / 2);
-      if (menu->top->num > menu->nitems - menu->height)
+      menu->top_idx = menu->selected_idx - menu->height / 2;
+      if (menu->top_idx > (int)menu->items.size() - menu->height)
       {
-        menu->top = get_item_relative(menu->last, -menu->height + 1);
+        menu->top_idx = menu->items.size() - menu->height;
       }
     }
   }
-  else if (req == REQ_UP && menu->selected->prev)
+  else if (req == REQ_UP && menu->selected_idx > 0)
   {
-    menu->selected = menu->selected->prev;
-    if (menu->top->num > menu->selected->num)
+    menu->selected_idx--;
+    if (menu->top_idx > menu->selected_idx)
     {
-      menu->top = get_item_relative(menu->selected, -menu->height / 2);
+      menu->top_idx = menu->selected_idx - menu->height / 2;
     }
   }
-  else if (req == REQ_PGDOWN && menu->selected->num < menu->nitems - 1)
+  else if (req == REQ_PGDOWN && menu->selected_idx < (int)menu->items.size() - 1)
   {
-    if (menu->selected->num + menu->height - 1 < menu->nitems - 1)
+    if (menu->selected_idx + menu->height - 1 < (int)menu->items.size() - 1)
     {
-      menu->selected = get_item_relative(menu->selected, menu->height - 1);
-      menu->top = get_item_relative(menu->top, menu->height - 1);
-      if (menu->top->num > menu->nitems - menu->height)
+      menu->selected_idx += menu->height - 1;
+      menu->top_idx += menu->height - 1;
+      if (menu->top_idx > (int)menu->items.size() - menu->height)
       {
-        menu->top = get_item_relative(menu->last, -menu->height + 1);
+        menu->top_idx = menu->items.size() - menu->height;
       }
     }
     else
     {
-      menu->selected = menu->last;
-      menu->top = get_item_relative(menu->last, -menu->height + 1);
+      menu->selected_idx = menu->items.size() - 1;
+      menu->top_idx = menu->items.size() - menu->height;
     }
   }
-  else if (req == REQ_PGUP && menu->selected->prev)
+  else if (req == REQ_PGUP && menu->selected_idx > 0)
   {
-    if (menu->selected->num - menu->height + 1 > 0)
+    if (menu->selected_idx - menu->height + 1 > 0)
     {
-      menu->selected = get_item_relative(menu->selected, -menu->height + 1);
-      menu->top = get_item_relative(menu->top, -menu->height + 1);
+      menu->selected_idx -= menu->height - 1;
+      menu->top_idx -= menu->height - 1;
     }
     else
     {
-      menu->selected = menu->items;
-      menu->top = menu->items;
+      menu->selected_idx = 0;
+      menu->top_idx = 0;
     }
   }
   else if (req == REQ_TOP)
   {
-    menu->selected = menu->items;
-    menu->top = menu->items;
+    menu->selected_idx = 0;
+    menu->top_idx = 0;
   }
   else if (req == REQ_BOTTOM)
   {
-    menu->selected = menu->last;
-    menu->top = get_item_relative(menu->selected, -menu->height + 1);
+    menu->selected_idx = menu->items.size() - 1;
+    menu->top_idx = menu->selected_idx - menu->height + 1;
+  }
+
+  if (menu->top_idx < 0)
+  {
+    menu->top_idx = 0;
   }
 }
 
@@ -493,7 +430,12 @@ struct menu_item *menu_curritem(struct menu *menu)
 {
   assert(menu != nullptr);
 
-  return menu->selected;
+  if (menu->items.empty() || menu->selected_idx < 0 || menu->selected_idx >= (int)menu->items.size())
+  {
+    return nullptr;
+  }
+
+  return menu->items[menu->selected_idx].get();
 }
 
 static void make_item_visible(struct menu *menu, struct menu_item *mi)
@@ -501,23 +443,24 @@ static void make_item_visible(struct menu *menu, struct menu_item *mi)
   assert(menu != nullptr);
   assert(mi != nullptr);
 
-  if (mi->num < menu->top->num || mi->num >= menu->top->num + menu->height)
+  if (mi->num < menu->top_idx || mi->num >= menu->top_idx + menu->height)
   {
-    menu->top = get_item_relative(mi, -menu->height / 2);
+    menu->top_idx = mi->num - menu->height / 2;
 
-    if (menu->top->num > menu->nitems - menu->height)
+    if (menu->top_idx > (int)menu->items.size() - menu->height)
     {
-      menu->top = get_item_relative(menu->last, -menu->height + 1);
+      menu->top_idx = menu->items.size() - menu->height;
+    }
+    if (menu->top_idx < 0)
+    {
+      menu->top_idx = 0;
     }
   }
 
-  if (menu->selected)
+  if (menu->selected_idx < menu->top_idx ||
+      menu->selected_idx >= menu->top_idx + menu->height)
   {
-    if (menu->selected->num < menu->top->num ||
-        menu->selected->num >= menu->top->num + menu->height)
-    {
-      menu->selected = mi;
-    }
+    menu->selected_idx = mi->num;
   }
 }
 
@@ -527,57 +470,54 @@ static void menu_setcurritem(struct menu *menu, struct menu_item *mi)
   assert(menu != nullptr);
   assert(mi != nullptr);
 
-  menu->selected = mi;
+  menu->selected_idx = mi->num;
   make_item_visible(menu, mi);
 }
 
 /* Make the item with this title selected. */
 void menu_setcurritem_title(struct menu *menu, const char *title)
 {
-  struct menu_item *mi;
-
   /* Find it */
-  for (mi = menu->top; mi; mi = mi->next)
+  for (int i = menu->top_idx; i < (int)menu->items.size(); ++i)
   {
-    if (mi->title == title)
+    if (menu->items[i]->title == title)
     {
+      menu_setcurritem(menu, menu->items[i].get());
       break;
     }
-  }
-
-  if (mi)
-  {
-    menu_setcurritem(menu, mi);
   }
 }
 
 static struct menu_item *menu_find_by_position(struct menu *menu, const int num)
 {
-  struct menu_item *mi;
-
   assert(menu != nullptr);
 
-  mi = menu->top;
-  while (mi && mi->num != num)
+  if (num >= 0 && num < (int)menu->items.size())
   {
-    mi = mi->next;
+    return menu->items[num].get();
   }
 
-  return mi;
+  return nullptr;
 }
 
 void menu_set_state(struct menu *menu, const struct menu_state *st)
 {
   assert(menu != nullptr);
 
-  if (!(menu->selected = menu_find_by_position(menu, st->selected_item)))
+  menu->selected_idx = st->selected_item;
+  if (menu->selected_idx < 0 || menu->selected_idx >= (int)menu->items.size())
   {
-    menu->selected = menu->last;
+    menu->selected_idx = menu->items.empty() ? 0 : menu->items.size() - 1;
   }
 
-  if (!(menu->top = menu_find_by_position(menu, st->top_item)))
+  menu->top_idx = st->top_item;
+  if (menu->top_idx < 0 || menu->top_idx >= (int)menu->items.size())
   {
-    menu->top = get_item_relative(menu->last, menu->height + 1);
+    menu->top_idx = menu->items.empty() ? 0 : menu->items.size() - menu->height;
+    if (menu->top_idx < 0)
+    {
+      menu->top_idx = 0;
+    }
   }
 }
 
@@ -592,21 +532,20 @@ void menu_get_state(const struct menu *menu, struct menu_state *st)
 {
   assert(menu != nullptr);
 
-  st->top_item = menu->top ? menu->top->num : -1;
-  st->selected_item = menu->selected ? menu->selected->num : -1;
+  st->top_item = menu->top_idx;
+  st->selected_item = menu->selected_idx;
 }
 
 void menu_unmark_item(struct menu *menu)
 {
   assert(menu != nullptr);
-  menu->marked = nullptr;
+  menu->marked_idx = -1;
 }
 
 /* Make a new menu from elements matching pattern. */
 struct menu *menu_filter_pattern(const struct menu *menu, const char *pattern)
 {
   struct menu *new_menu;
-  const struct menu_item *mi;
 
   assert(menu != nullptr);
   assert(pattern != nullptr);
@@ -619,17 +558,17 @@ struct menu *menu_filter_pattern(const struct menu *menu, const char *pattern)
   menu_set_info_attr_marked(new_menu, menu->info_attr_marked);
   menu_set_info_attr_sel_marked(new_menu, menu->info_attr_sel_marked);
 
-  for (mi = menu->items; mi; mi = mi->next)
+  for (const auto& mi : menu->items)
   {
     if (strcasestr(mi->title.c_str(), pattern))
     {
-      menu_add_from_item(new_menu, mi);
+      menu_add_from_item(new_menu, mi.get());
     }
   }
 
-  if (menu->marked)
+  if (menu->marked_idx >= 0 && menu->marked_idx < (int)menu->items.size())
   {
-    menu_mark_item(new_menu, menu->marked->file.c_str());
+    menu_mark_item(new_menu, menu->items[menu->marked_idx]->file.c_str());
   }
 
   return new_menu;
@@ -755,7 +694,7 @@ int menu_nitems(const struct menu *menu)
 {
   assert(menu != nullptr);
 
-  return menu->nitems;
+  return menu->items.size();
 }
 
 struct menu_item *menu_find(struct menu *menu, const char *fname)
@@ -782,23 +721,18 @@ void menu_mark_item(struct menu *menu, const char *file)
   item = menu_find(menu, file);
   if (item)
   {
-    menu->marked = item;
+    menu->marked_idx = item->num;
   }
 }
 
 static void menu_renumber_items(struct menu *menu)
 {
-  int i = 0;
-  struct menu_item *mi;
-
   assert(menu != nullptr);
 
-  for (mi = menu->items; mi; mi = mi->next)
+  for (size_t i = 0; i < menu->items.size(); ++i)
   {
-    mi->num = i++;
+    menu->items[i]->num = i;
   }
-
-  assert(i == menu->nitems);
 }
 
 static void menu_delete(struct menu *menu, struct menu_item *mi)
@@ -806,46 +740,53 @@ static void menu_delete(struct menu *menu, struct menu_item *mi)
   assert(menu != nullptr);
   assert(mi != nullptr);
 
-  if (mi->prev)
-  {
-    mi->prev->next = mi->next;
-  }
-  if (mi->next)
-  {
-    mi->next->prev = mi->prev;
-  }
-
-  if (menu->items == mi)
-  {
-    menu->items = mi->next;
-  }
-  if (menu->last == mi)
-  {
-    menu->last = mi->prev;
-  }
-
-  if (menu->marked == mi)
-  {
-    menu->marked = nullptr;
-  }
-  if (menu->selected == mi)
-  {
-    menu->selected = mi->next ? mi->next : mi->prev;
-  }
-  if (menu->top == mi)
-  {
-    menu->top = mi->next ? mi->next : mi->prev;
-  }
+  int idx = mi->num;
 
   if (!mi->file.empty())
   {
     menu->search_tree.erase(mi->file);
   }
 
-  menu->nitems--;
+  menu->items.erase(menu->items.begin() + idx);
   menu_renumber_items(menu);
 
-  menu_item_free(mi);
+  if (menu->marked_idx == idx)
+  {
+    menu->marked_idx = -1;
+  }
+  else if (menu->marked_idx > idx)
+  {
+    menu->marked_idx--;
+  }
+
+  if (menu->selected_idx == idx)
+  {
+    if (menu->selected_idx >= (int)menu->items.size())
+    {
+      menu->selected_idx = menu->items.empty() ? 0 : menu->items.size() - 1;
+    }
+  }
+  else if (menu->selected_idx > idx)
+  {
+    menu->selected_idx--;
+  }
+
+  if (menu->top_idx == idx)
+  {
+    if (menu->top_idx >= (int)menu->items.size())
+    {
+      menu->top_idx = menu->items.empty() ? 0 : menu->items.size() - 1;
+    }
+  }
+  else if (menu->top_idx > idx)
+  {
+    menu->top_idx--;
+  }
+
+  if (menu->top_idx < 0)
+  {
+    menu->top_idx = 0;
+  }
 }
 
 void menu_del_item(struct menu *menu, const char *fname)
@@ -887,7 +828,7 @@ int menu_is_visible(const struct menu *menu, const struct menu_item *mi)
   assert(menu != nullptr);
   assert(mi != nullptr);
 
-  if (mi->num >= menu->top->num && mi->num < menu->top->num + menu->height)
+  if (mi->num >= menu->top_idx && mi->num < menu->top_idx + menu->height)
   {
     return 1;
   }
@@ -898,93 +839,34 @@ int menu_is_visible(const struct menu *menu, const struct menu_item *mi)
 static void menu_items_swap(struct menu *menu, struct menu_item *mi1,
                             struct menu_item *mi2)
 {
-  int t;
-
   assert(menu != nullptr);
   assert(mi1 != nullptr);
   assert(mi2 != nullptr);
   assert(mi1 != mi2);
 
-  /* if they are next to each other, change the pointers so that mi2
-   * is the second one */
-  if (mi2->next == mi1)
-  {
-    struct menu_item *i = mi1;
+  int idx1 = mi1->num;
+  int idx2 = mi2->num;
 
-    mi1 = mi2;
-    mi2 = i;
+  std::swap(menu->items[idx1], menu->items[idx2]);
+  menu->items[idx1]->num = idx1;
+  menu->items[idx2]->num = idx2;
+
+  if (menu->selected_idx == idx1)
+  {
+    menu->selected_idx = idx2;
+  }
+  else if (menu->selected_idx == idx2)
+  {
+    menu->selected_idx = idx1;
   }
 
-  if (mi1->next == mi2)
+  if (menu->marked_idx == idx1)
   {
-    if (mi2->next)
-    {
-      mi2->next->prev = mi1;
-    }
-    if (mi1->prev)
-    {
-      mi1->prev->next = mi2;
-    }
-
-    mi1->next = mi2->next;
-    mi2->prev = mi1->prev;
-    mi1->prev = mi2;
-    mi2->next = mi1;
+    menu->marked_idx = idx2;
   }
-  else
+  else if (menu->marked_idx == idx2)
   {
-    if (mi2->next)
-    {
-      mi2->next->prev = mi1;
-    }
-    if (mi2->prev)
-    {
-      mi2->prev->next = mi1;
-    }
-    mi2->next = mi1->next;
-    mi2->prev = mi1->prev;
-
-    if (mi1->next)
-    {
-      mi1->next->prev = mi2;
-    }
-    if (mi1->prev)
-    {
-      mi1->prev->next = mi2;
-    }
-    mi1->next = mi2->next;
-    mi1->prev = mi2->prev;
-  }
-
-  t = mi1->num;
-  mi1->num = mi2->num;
-  mi2->num = t;
-
-  if (menu->top == mi1)
-  {
-    menu->top = mi2;
-  }
-  else if (menu->top == mi2)
-  {
-    menu->top = mi1;
-  }
-
-  if (menu->last == mi1)
-  {
-    menu->last = mi2;
-  }
-  else if (menu->last == mi2)
-  {
-    menu->last = mi1;
-  }
-
-  if (menu->items == mi1)
-  {
-    menu->items = mi2;
-  }
-  else if (menu->items == mi2)
-  {
-    menu->items = mi1;
+    menu->marked_idx = idx1;
   }
 }
 
@@ -1002,7 +884,7 @@ void menu_swap_items(struct menu *menu, const char *file1, const char *file2)
     menu_items_swap(menu, mi1, mi2);
 
     /* make sure that the selected item is visible */
-    menu_setcurritem(menu, menu->selected);
+    menu_setcurritem(menu, menu->items[menu->selected_idx].get());
   }
 }
 

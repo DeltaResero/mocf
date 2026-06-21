@@ -1595,15 +1595,7 @@ static void side_menu_mark_file(struct side_menu *m, const char *file)
 static void side_menu_add_file(struct side_menu *m, const char *file,
                                const char *title, const enum file_type type)
 {
-  struct menu_item *added;
-
-  added = menu_add(m->menu.list.main, title, type, file);
-
-  menu_item_set_attr_normal(added, get_color(CLR_MENU_ITEM_FILE));
-  menu_item_set_attr_sel(added, get_color(CLR_MENU_ITEM_FILE_SELECTED));
-  menu_item_set_attr_marked(added, get_color(CLR_MENU_ITEM_FILE_MARKED));
-  menu_item_set_attr_sel_marked(added,
-                                get_color(CLR_MENU_ITEM_FILE_MARKED_SELECTED));
+  menu_add(m->menu.list.main, title, type, file);
 }
 
 static int side_menu_add_plist_item(struct side_menu *m,
@@ -4006,10 +3998,8 @@ void iface_update_attrs()
 
   for (ix = 0; ix < ARRAY_SIZE(main_win.menus); ix += 1)
   {
-    int item_num;
     struct side_menu *m = &main_win.menus[ix];
     struct menu *menu = m->menu.list.main;
-    struct menu_item *mi;
 
     if (m->type == MENU_DIR || m->type == MENU_PLAYLIST)
     {
@@ -4019,9 +4009,9 @@ void iface_update_attrs()
       menu_set_info_attr_sel_marked(
           menu, get_color(CLR_MENU_ITEM_INFO_MARKED_SELECTED));
 
-      for (mi = menu->items, item_num = 0; mi && item_num < menu->nitems;
-           mi = mi->next, item_num += 1)
+      for (auto& mi_ptr : menu->items)
       {
+        struct menu_item *mi = mi_ptr.get();
         if (mi->type == F_DIR)
         {
           menu_item_set_attr_normal(mi, get_color(CLR_MENU_ITEM_DIR));
@@ -4045,9 +4035,9 @@ void iface_update_attrs()
       menu_set_info_attr_normal(menu, get_color(CLR_MENU_ITEM_FILE));
       menu_set_info_attr_sel(menu, get_color(CLR_MENU_ITEM_FILE_SELECTED));
 
-      for (mi = menu->items, item_num = 0; mi && item_num < menu->nitems;
-           mi = mi->next, item_num += 1)
+      for (auto& mi_ptr : menu->items)
       {
+        struct menu_item *mi = mi_ptr.get();
         menu_item_set_attr_normal(mi, get_color(CLR_MENU_ITEM_FILE));
         menu_item_set_attr_sel(mi, get_color(CLR_MENU_ITEM_FILE_SELECTED));
       }
@@ -4058,7 +4048,7 @@ void iface_update_attrs()
 void iface_update_theme_selection(const char *file)
 {
   /* menus[2] is theme menu. */
-  assert(main_win.menus[2].menu.list.main->selected);
+  assert(main_win.menus[2].menu.list.main->selected_idx >= 0);
 
   menu_setcurritem_file(main_win.menus[2].menu.list.main, file);
 }

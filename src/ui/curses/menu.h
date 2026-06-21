@@ -26,6 +26,8 @@
 #include "library/files.h"
 #include <map>
 #include <string>
+#include <vector>
+#include <memory>
 
 
   enum menu_request
@@ -67,27 +69,21 @@
     char time[FILE_TIME_STR_SZ];     /* File time string */
     char format[FILE_FORMAT_SZ];     /* File format */
     int queue_pos;                   /* Position in the queue */
-
-    struct menu_item *next;
-    struct menu_item *prev;
   };
 
   struct menu
   {
     WINDOW *win;
-    struct menu_item *items;
-    int nitems;             /* number of present items */
-    struct menu_item *top;  /* first visible item */
-    struct menu_item *last; /* last item in the menu */
+    std::vector<std::unique_ptr<menu_item>> items;
+    int top_idx;       /* index of first visible item */
+    int selected_idx;  /* index of selected item */
+    int marked_idx;    /* index of the marked item or -1 */
 
     /* position and size */
     int posx;
     int posy;
     int width;
     int height;
-
-    struct menu_item *selected; /* selected item */
-    struct menu_item *marked;   /* index of the marked item or -1 */
 
     /* Flags for displaying information about the file. */
     int show_time;
