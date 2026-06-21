@@ -1489,11 +1489,10 @@ void audio_queue_clear()
   plist_clear(&queue);
 }
 
-/* Returned memory is malloc()ed. */
-char *audio_get_sname()
+std::string audio_get_sname()
 {
   std::lock_guard<std::mutex> lock(curr_playing_mtx);
-  return curr_playing_fname.empty() ? nullptr : xstrdup(curr_playing_fname.c_str());
+  return curr_playing_fname;
 }
 
 int audio_get_mixer()
@@ -1632,7 +1631,7 @@ struct plist *audio_queue_get_contents()
 }
 
 
-char *audio_get_mixer_channel_name()
+std::string audio_get_mixer_channel_name()
 {
   if (current_mixer == 2)
   {
@@ -1644,10 +1643,9 @@ char *audio_get_mixer_channel_name()
 
 void audio_toggle_mixer_channel()
 {
-  char *old_name = audio_get_mixer_channel_name();
-  int i;
+  std::string old_name = audio_get_mixer_channel_name();
 
-  for (i = 0; i < 2; i++)
+  for (int i = 0; i < 2; i++)
   {
     int prev_mixer = current_mixer;
     current_mixer = (current_mixer + 1) % 3;
@@ -1665,15 +1663,11 @@ void audio_toggle_mixer_channel()
       softmixer_set_active(1);
     }
 
-    char *new_name = audio_get_mixer_channel_name();
-    if (strcmp(old_name, new_name) != 0)
+    if (audio_get_mixer_channel_name() != old_name)
     {
-      free(new_name);
       break;
     }
-    free(new_name);
   }
-  free(old_name);
 }
 
 // EOF

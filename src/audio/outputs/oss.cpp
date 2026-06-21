@@ -555,16 +555,16 @@ static void oss_toggle_mixer_channel()
 #endif
 }
 
-static char *oss_get_mixer_channel_name()
+static std::string oss_get_mixer_channel_name()
 {
 #ifdef OSSv3_MIXER
   if (mixer_channel_current == mixer_channel1)
   {
-    return xstrdup(options_get_symb("OSSMixerChannel1"));
+    return options_get_symb("OSSMixerChannel1");
   }
-  return xstrdup(options_get_symb("OSSMixerChannel2"));
+  return options_get_symb("OSSMixerChannel2");
 #else
-  return xstrdup("mocf");
+  return "mocf";
 #endif
 }
 
@@ -583,7 +583,7 @@ public:
     int reset() override { return oss_reset(); }
     int get_rate() override { return oss_get_rate(); }
     void toggle_mixer_channel() override { oss_toggle_mixer_channel(); }
-    char *get_mixer_channel_name() override { return oss_get_mixer_channel_name(); }
+    std::string get_mixer_channel_name() override { return oss_get_mixer_channel_name(); }
 };
 
 std::unique_ptr<AudioOutput> create_oss_output() {

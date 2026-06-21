@@ -44,9 +44,9 @@ static void softmixer_write_config();
 
 /* public code */
 
-char *softmixer_name()
+std::string softmixer_name()
 {
-  return xstrdup((active) ? SOFTMIXER_NAME : SOFTMIXER_NAME_OFF);
+  return active ? SOFTMIXER_NAME : SOFTMIXER_NAME_OFF;
 }
 
 void softmixer_init()

@@ -11,6 +11,8 @@
 #ifndef SOFTMIXER_H
 #define SOFTMIXER_H
 
+#include <string>
+
 
 #define SOFTMIXER_MIN 0
 /* Allow amplification, might result in clipping... */
@@ -27,7 +29,7 @@
 #define SOFTMIXER_SAVE_OPTION "Softmixer_SaveState"
 #define SOFTMIXER_SAVE_FILE "softmixer"
 
-  char *softmixer_name();
+  std::string softmixer_name();
 
   void softmixer_init();
   void softmixer_shutdown();

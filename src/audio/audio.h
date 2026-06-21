@@ -13,6 +13,7 @@
 
 #include <cstdlib>
 #include <memory>
+#include <string>
 
   /** Sound format and endianness flags.
    *
@@ -117,7 +118,7 @@
     virtual int reset() = 0;
     virtual int get_rate() = 0;
     virtual void toggle_mixer_channel() = 0;
-    virtual char *get_mixer_channel_name() = 0;
+    virtual std::string get_mixer_channel_name() = 0;
 
     /* Optional hardware pause/unpause */
     virtual void hw_pause() {}
@@ -164,14 +165,14 @@
   int audio_get_prev_state();
   void audio_plist_add(const char *file);
   void audio_plist_clear();
-  char *audio_get_sname();
+  std::string audio_get_sname();
   void audio_set_mixer(const int val);
   int audio_get_mixer();
   void audio_plist_delete(const char *file);
   int audio_get_ftime(const char *file);
   void audio_plist_set_time(const char *file, const int time);
   void audio_state_started_playing();
-  char *audio_get_mixer_channel_name();
+  std::string audio_get_mixer_channel_name();
   void audio_toggle_mixer_channel();
   void audio_plist_move(const char *file1, const char *file2);
   void audio_queue_add(const char *file);

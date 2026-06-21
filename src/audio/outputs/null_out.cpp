@@ -59,7 +59,7 @@ static int null_get_rate() { return params.rate; }
 
 static void null_toggle_mixer_channel() {}
 
-static char *null_get_mixer_channel_name() { return xstrdup("FakeMixer"); }
+static std::string null_get_mixer_channel_name() { return "FakeMixer"; }
 
 class NullOutput : public AudioOutput {
 public:
@@ -74,7 +74,7 @@ public:
     int reset() override { return null_reset(); }
     int get_rate() override { return null_get_rate(); }
     void toggle_mixer_channel() override { null_toggle_mixer_channel(); }
-    char* get_mixer_channel_name() override { return null_get_mixer_channel_name(); }
+    std::string get_mixer_channel_name() override { return null_get_mixer_channel_name(); }
 };
 
 std::unique_ptr<AudioOutput> create_null_output() {

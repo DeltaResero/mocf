@@ -766,20 +766,20 @@ static void pulse_toggle_mixer_channel()
 static void sink_name_cb(pa_context *c ATTR_UNUSED, const pa_sink_info *i,
                          int eol ATTR_UNUSED, void *userdata)
 {
-  char **result = static_cast<char **>(userdata);
+  std::string *result = static_cast<std::string *>(userdata);
 
-  if (i && !*result)
+  if (i && result->empty())
   {
-    *result =
-        xstrdup(pa_proplist_gets(i->proplist, PA_PROP_DEVICE_DESCRIPTION));
+    const char *desc = pa_proplist_gets(i->proplist, PA_PROP_DEVICE_DESCRIPTION);
+    if (desc) *result = desc;
   }
 
   pa_threaded_mainloop_signal(mainloop, 0);
 }
 
-static char *pulse_get_mixer_channel_name()
+static std::string pulse_get_mixer_channel_name()
 {
-  char *result = nullptr;
+  std::string result;
 
   pa_threaded_mainloop_lock(mainloop);
 
@@ -800,15 +800,14 @@ static char *pulse_get_mixer_channel_name()
   }
   else
   {
-    // result = xstrdup(PACKAGE_NAME);
-    result = xstrdup("PulseStream");
+    result = "PulseStream";
   }
 
   pa_threaded_mainloop_unlock(mainloop);
 
-  if (!result)
+  if (result.empty())
   {
-    result = xstrdup("disconnected");
+    result = "disconnected";
   }
 
   return result;
@@ -893,7 +892,7 @@ public:
     int reset() override { return pulse_reset(); }
     int get_rate() override { return pulse_get_rate(); }
     void toggle_mixer_channel() override { pulse_toggle_mixer_channel(); }
-    char *get_mixer_channel_name() override { return pulse_get_mixer_channel_name(); }
+    std::string get_mixer_channel_name() override { return pulse_get_mixer_channel_name(); }
     void hw_pause() override { pulse_hw_pause(); }
     void hw_unpause() override { pulse_hw_unpause(); }
     bool can_hw_pause() const override { return true; }

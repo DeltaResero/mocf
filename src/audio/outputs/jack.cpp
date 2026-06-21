@@ -364,7 +364,7 @@ static void moc_jack_shutdown()
 
 static int moc_jack_get_rate() { return rate; }
 
-static char *moc_jack_get_mixer_channel_name() { return xstrdup("soft mixer"); }
+static std::string moc_jack_get_mixer_channel_name() { return "soft mixer"; }
 
 static void moc_jack_toggle_mixer_channel() {}
 
@@ -381,7 +381,7 @@ public:
     int reset() override { return moc_jack_reset(); }
     int get_rate() override { return moc_jack_get_rate(); }
     void toggle_mixer_channel() override { moc_jack_toggle_mixer_channel(); }
-    char *get_mixer_channel_name() override { return moc_jack_get_mixer_channel_name(); }
+    std::string get_mixer_channel_name() override { return moc_jack_get_mixer_channel_name(); }
 };
 
 std::unique_ptr<AudioOutput> create_jack_output() {

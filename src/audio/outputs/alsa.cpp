@@ -1192,25 +1192,19 @@ static void alsa_toggle_mixer_channel()
   }
 }
 
-static char *alsa_get_mixer_channel_name()
+static std::string alsa_get_mixer_channel_name()
 {
   if (!mixer_elem_curr)
   {
-    return nullptr;
+    return {};
   }
-
-  char *result;
 
   if (mixer_elem_curr == mixer_elem1)
   {
-    result = xstrdup(options_get_str("ALSAMixer1"));
-  }
-  else
-  {
-    result = xstrdup(options_get_str("ALSAMixer2"));
+    return options_get_str("ALSAMixer1");
   }
 
-  return result;
+  return options_get_str("ALSAMixer2");
 }
 
 class AlsaOutput : public AudioOutput {
@@ -1226,7 +1220,7 @@ public:
     int reset() override { return alsa_reset(); }
     int get_rate() override { return alsa_get_rate(); }
     void toggle_mixer_channel() override { alsa_toggle_mixer_channel(); }
-    char *get_mixer_channel_name() override { return alsa_get_mixer_channel_name(); }
+    std::string get_mixer_channel_name() override { return alsa_get_mixer_channel_name(); }
 };
 
 std::unique_ptr<AudioOutput> create_alsa_output() {

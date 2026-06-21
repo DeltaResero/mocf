@@ -244,9 +244,7 @@ private:
     }
 
     void update_mixer_name() {
-        char *name = audio_get_mixer_channel_name();
-        iface_set_mixer_name(name);
-        free(name);
+        iface_set_mixer_name(audio_get_mixer_channel_name().c_str());
         update_mixer_value();
     }
 
@@ -375,38 +373,35 @@ private:
     }
 
     void update_curr_file() {
-        char *file = audio_get_sname();
-        if (!file || !file[0] || curr_file.state == STATE_STOP) {
+        std::string file = audio_get_sname();
+        if (file.empty() || curr_file.state == STATE_STOP) {
             curr_file = file_info{};
             iface_set_played_file(nullptr);
-            free(file);
-        } else if (file[0] && (curr_file.file.empty() || curr_file.file != file)) {
+        } else if (curr_file.file.empty() || curr_file.file != file) {
             if (!curr_file.block_file.empty() && curr_file.block_file != file) {
                 curr_file.block_file.clear();
             }
             iface_set_total_time(-1);
-            iface_set_played_file(file);
-            send_tags_request(file, TAGS_COMMENTS | TAGS_TIME);
+            iface_set_played_file(file.c_str());
+            send_tags_request(file.c_str(), TAGS_COMMENTS | TAGS_TIME);
             curr_file.file = file;
 
-            if (!strchr(file, '/')) {
+            if (file.find('/') == std::string::npos) {
                 curr_file.title = file;
             } else {
                 if (options_get_bool("FileNamesIconv")) {
-                    char *iconv_str = files_iconv_str(strrchr(file, '/') + 1);
+                    char *iconv_str = files_iconv_str(file.c_str() + file.rfind('/') + 1);
                     curr_file.title = iconv_str;
                     free(iconv_str);
                 } else {
-                    curr_file.title = strrchr(file, '/') + 1;
+                    curr_file.title = file.substr(file.rfind('/') + 1);
                 }
             }
-            iface_set_played_file(file);
+            iface_set_played_file(file.c_str());
             iface_set_played_file_title(curr_file.title.c_str());
             silent_seek_pos = -1;
             iface_set_curr_time(curr_file.curr_time);
             if (options_get_bool("FollowPlayedFile")) follow_curr_file();
-        } else {
-            free(file);
         }
     }
 

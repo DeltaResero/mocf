@@ -166,7 +166,7 @@ static int sndio_get_rate()
 
 static void sndio_toggle_mixer_channel() { assert(hdl != nullptr); }
 
-static char *sndio_get_mixer_channel_name() { return xstrdup("mocf"); }
+static std::string sndio_get_mixer_channel_name() { return "mocf"; }
 
 class SndioOutput : public AudioOutput {
 public:
@@ -181,7 +181,7 @@ public:
     int reset() override { return sndio_reset(); }
     int get_rate() override { return sndio_get_rate(); }
     void toggle_mixer_channel() override { sndio_toggle_mixer_channel(); }
-    char *get_mixer_channel_name() override { return sndio_get_mixer_channel_name(); }
+    std::string get_mixer_channel_name() override { return sndio_get_mixer_channel_name(); }
 };
 
 std::unique_ptr<AudioOutput> create_sndio_output() {
