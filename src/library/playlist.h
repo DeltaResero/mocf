@@ -75,7 +75,7 @@
   void plist_init(struct plist *plist);
   int plist_add(struct plist *plist, const char *file_name);
   int plist_add_from_item(struct plist *plist, const struct plist_item *item);
-  char *plist_get_file(const struct plist *plist, int i);
+  std::string plist_get_file(const struct plist *plist, int i);
   int plist_next(struct plist *plist, int num);
   int plist_prev(struct plist *plist, int num);
   void plist_clear(struct plist *plist);
@@ -89,8 +89,8 @@
   void tags_update(struct file_tags *dst, struct file_tags *src, int move);
   struct file_tags *tags_dup(const struct file_tags *tags);
   void tags_free(struct file_tags *tags);
-  char *build_title_with_format(const struct file_tags *tags, const char *fmt);
-  char *build_title(const struct file_tags *tags);
+  std::string build_title_with_format(const struct file_tags *tags, const char *fmt);
+  std::string build_title(const struct file_tags *tags);
   int plist_count(const struct plist *plist);
   void plist_set_title_tags(struct plist *plist, const int num,
                             const char *title);

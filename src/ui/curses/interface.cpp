@@ -290,9 +290,8 @@ private:
         if (tags_sel != 0) {
             for (int i = 0; i < p->num; i++) {
                 if (!plist_deleted(p, i) && (!p->items[i].tags || ~p->items[i].tags->filled & tags_sel)) {
-                    char *file = plist_get_file(p, i);
-                    req += send_tags_request(file, tags_sel);
-                    free(file);
+                    std::string file = plist_get_file(p, i);
+                    req += send_tags_request(file.c_str(), tags_sel);
                 }
             }
         }
@@ -348,9 +347,7 @@ private:
                 }
             }
             if (!data->tags->title.empty()) {
-                char *title = build_title(data->tags);
-                curr_file.title = title;
-                free(title);
+                curr_file.title = build_title(data->tags);
                 iface_set_played_file_title(curr_file.title.c_str());
             }
             curr_file.tags.reset(tags_dup(data->tags));
@@ -1246,13 +1243,11 @@ private:
             return;
         }
 
-        char *second_file = plist_get_file(&playlist, second);
-        swap_playlist_items(file.c_str(), second_file);
+        std::string second_file = plist_get_file(&playlist, second);
+        swap_playlist_items(file.c_str(), second_file.c_str());
 
-        if (engine_plist == &playlist) audio_plist_move(file.c_str(), second_file);
+        if (engine_plist == &playlist) audio_plist_move(file.c_str(), second_file.c_str());
         else playlist_dirty = true;
-
-        free(second_file);
     }
 
     void do_silent_seek() {

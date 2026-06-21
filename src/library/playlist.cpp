@@ -208,17 +208,17 @@ void plist_item_copy(struct plist_item *dst, const struct plist_item *src)
  * If the item number is not valid, return nullptr.
  * Returned memory is malloced.
  */
-char *plist_get_file(const struct plist *plist, int i)
+std::string plist_get_file(const struct plist *plist, int i)
 {
   assert(i >= 0);
   assert(plist != nullptr);
 
   if (i < plist->num)
   {
-    return xstrdup(plist->items[i].file.c_str());
+    return plist->items[i].file;
   }
 
-  return nullptr;
+  return {};
 }
 
 /* Get the number of the next item on the list (skipping deleted items).
@@ -568,17 +568,17 @@ static void do_title_expn(char *dest, int size, const char *fmt,
   dest[size - free] = '\0';
 }
 
-/* Build file title from struct file_tags. Returned memory is malloc()ed. */
-char *build_title_with_format(const struct file_tags *tags, const char *fmt)
+/* Build file title from struct file_tags. */
+std::string build_title_with_format(const struct file_tags *tags, const char *fmt)
 {
   char title[512];
 
   do_title_expn(title, sizeof(title), fmt, tags);
-  return xstrdup(title);
+  return title;
 }
 
-/* Build file title from struct file_tags. Returned memory is malloc()ed. */
-char *build_title(const struct file_tags *tags)
+/* Build file title from struct file_tags. */
+std::string build_title(const struct file_tags *tags)
 {
   return build_title_with_format(tags, options_get_str("FormatString"));
 }

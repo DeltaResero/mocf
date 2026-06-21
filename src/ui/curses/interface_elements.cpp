@@ -1535,7 +1535,7 @@ static int side_menu_update_item(struct side_menu *m, const struct plist *plist,
 {
   struct menu_item *mi;
   int visible = 0;
-  char *file;
+  std::string file;
 
   assert(m != nullptr);
   assert(m->visible);
@@ -1544,24 +1544,22 @@ static int side_menu_update_item(struct side_menu *m, const struct plist *plist,
   assert(LIMIT(n, plist->num));
 
   file = plist_get_file(plist, n);
-  assert(file != nullptr);
+  assert(!file.empty());
 
-  if ((mi = menu_find(m->menu.list.main, file)))
+  if ((mi = menu_find(m->menu.list.main, file.c_str())))
   {
     update_menu_item(mi, plist, n,
                      m->type == MENU_PLAYLIST &&
                          options_get_bool("PlaylistFullpaths"));
     visible = menu_is_visible(m->menu.list.main, mi);
   }
-  if (m->menu.list.copy && (mi = menu_find(m->menu.list.copy, file)))
+  if (m->menu.list.copy && (mi = menu_find(m->menu.list.copy, file.c_str())))
   {
     update_menu_item(mi, plist, n,
                      m->type == MENU_PLAYLIST &&
                          options_get_bool("PlaylistFullpaths"));
     visible = visible || menu_is_visible(m->menu.list.main, mi);
   }
-
-  free(file);
 
   m->total_time = plist_total_time(plist, &m->total_time_for_all);
 

@@ -203,7 +203,6 @@ void make_file_title(struct plist *plist, const int num,
 void make_tags_title(struct plist *plist, const int num)
 {
   bool hide_extn;
-  char *title;
 
   assert(plist != nullptr);
   assert(LIMIT(num, plist->num));
@@ -218,9 +217,7 @@ void make_tags_title(struct plist *plist, const int num)
 
   if (!plist->items[num].tags->title.empty())
   {
-    title = build_title(plist->items[num].tags.get());
-    plist_set_title_tags(plist, num, title);
-    free(title);
+    plist_set_title_tags(plist, num, build_title(plist->items[num].tags.get()).c_str());
     return;
   }
 

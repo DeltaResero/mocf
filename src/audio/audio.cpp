@@ -722,7 +722,7 @@ static void play_thread_func()
 
   while (curr_playing != -1)
   {
-    char *file;
+    std::string file;
 
     {
         std::lock_guard<std::mutex> lock(plist_mtx);
@@ -732,35 +732,29 @@ static void play_thread_func()
     play_next = false;
     play_prev = false;
 
-    if (file)
+    if (!file.empty())
     {
-      int next;
-      char *next_file;
+      std::string next_file;
 
       {
           std::lock_guard<std::mutex> lock1(curr_playing_mtx);
           std::lock_guard<std::mutex> lock2(plist_mtx);
-          logit("Playing item %d: %s", curr_playing, file);
+          logit("Playing item %d: %s", curr_playing, file.c_str());
 
           curr_playing_fname = file;
 
           out_buf_time_set(out_buf, 0.0);
 
-          next = plist_next(curr_plist, curr_playing);
-          next_file = next != -1 ? plist_get_file(curr_plist, next) : nullptr;
+          int next = plist_next(curr_plist, curr_playing);
+          next_file = next != -1 ? plist_get_file(curr_plist, next) : std::string{};
       }
 
-      player(file, next_file, out_buf);
-      if (next_file)
-      {
-        free(next_file);
-      }
+      player(file.c_str(), next_file.empty() ? nullptr : next_file.c_str(), out_buf);
 
       set_info_rate(0);
       set_info_bitrate(0);
       set_info_channels(1);
       out_buf_time_set(out_buf, 0.0);
-      free(file);
     }
 
     if (stop_playing)
