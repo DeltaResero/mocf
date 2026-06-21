@@ -16,6 +16,8 @@
 #endif
 
 #include <sys/types.h>
+#include <vector>
+#include <stdexcept>
 
 #ifdef HAVE_SAMPLERATE
 #include <samplerate.h>
@@ -23,26 +25,29 @@
 
 #include "audio/audio.h"
 
+class AudioConversionException : public std::runtime_error {
+public:
+    using std::runtime_error::runtime_error;
+};
 
-  struct audio_conversion
-  {
-    struct sound_params from;
-    struct sound_params to;
+class AudioConversion {
+public:
+    AudioConversion(const sound_params& from, const sound_params& to);
+    ~AudioConversion();
+
+    std::vector<char> process(const char *buf, size_t size);
+
+private:
+    sound_params from_params;
+    sound_params to_params;
 
 #ifdef HAVE_SAMPLERATE
-    SRC_STATE *src_state;
-    float *resample_buf;
-    size_t resample_buf_nsamples; /* in samples ( sizeof(float) ) */
+    SRC_STATE *src_state = nullptr;
+    std::vector<float> resample_buf;
+
+    std::vector<float> resample_sound(const float *buf, const size_t samples, const int nchannels);
 #endif
-  };
-
-  int audio_conv_new(struct audio_conversion *conv,
-                     const struct sound_params *from,
-                     const struct sound_params *to);
-  char *audio_conv(struct audio_conversion *conv, const char *buf,
-                   const size_t size, size_t *conv_len);
-  void audio_conv_destroy(struct audio_conversion *conv);
-
+};
 
 #endif
 

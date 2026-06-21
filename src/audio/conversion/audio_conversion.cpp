@@ -22,6 +22,8 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <vector>
+#include <stdexcept>
 
 #ifdef HAVE_SAMPLERATE
 #include <samplerate.h>
@@ -473,12 +475,10 @@ static void s32_to_float(const char *in, float *out, const size_t samples)
   }
 }
 
-/* Convert fixed point samples in format fmt (size in bytes) to float.
- * Size of converted sound is put in new_size. Returned memory is malloc()ed. */
-static float *fixed_to_float(const char *buf, const size_t size, const long fmt,
-                             size_t *new_size)
+/* Convert fixed point samples in format fmt (size in bytes) to float. */
+static std::vector<float> fixed_to_float(const char *buf, const size_t size, const long fmt)
 {
-  float *out = nullptr;
+  std::vector<float> out;
   char fmt_name[SFMT_STR_MAX];
 
   assert((fmt & SFMT_MASK_FORMAT) != SFMT_FLOAT);
@@ -486,54 +486,44 @@ static float *fixed_to_float(const char *buf, const size_t size, const long fmt,
   switch (fmt & SFMT_MASK_FORMAT)
   {
     case SFMT_U8:
-      *new_size = sizeof(float) * size;
-      out = static_cast<float *>(xmalloc(*new_size));
-      u8_to_float((unsigned char *)buf, out, size);
+      out.resize(size);
+      u8_to_float((unsigned char *)buf, out.data(), size);
       break;
     case SFMT_S8:
-      *new_size = sizeof(float) * size;
-      out = static_cast<float *>(xmalloc(*new_size));
-      s8_to_float(buf, out, size);
+      out.resize(size);
+      s8_to_float(buf, out.data(), size);
       break;
     case SFMT_U16:
-      *new_size = sizeof(float) * size / 2;
-      out = static_cast<float *>(xmalloc(*new_size));
-      u16_to_float((unsigned char *)buf, out, size / 2);
+      out.resize(size / 2);
+      u16_to_float((unsigned char *)buf, out.data(), size / 2);
       break;
     case SFMT_S16:
-      *new_size = sizeof(float) * size / 2;
-      out = static_cast<float *>(xmalloc(*new_size));
-      s16_to_float(buf, out, size / 2);
+      out.resize(size / 2);
+      s16_to_float(buf, out.data(), size / 2);
       break;
     case SFMT_U24:
-      *new_size = sizeof(float) * size / 4;
-      out = static_cast<float *>(xmalloc(*new_size));
-      u24_to_float((unsigned char *)buf, out, size / 4);
+      out.resize(size / 4);
+      u24_to_float((unsigned char *)buf, out.data(), size / 4);
       break;
     case SFMT_S24:
-      *new_size = sizeof(float) * size / 4;
-      out = static_cast<float *>(xmalloc(*new_size));
-      s24_to_float(buf, out, size / 4);
+      out.resize(size / 4);
+      s24_to_float(buf, out.data(), size / 4);
       break;
     case SFMT_S24_3:
-      *new_size = sizeof(float) * size / 3;
-      out = static_cast<float *>(xmalloc(*new_size));
-      s24_3_to_float(buf, out, size / 3);
+      out.resize(size / 3);
+      s24_3_to_float(buf, out.data(), size / 3);
       break;
     case SFMT_U24_3:
-      *new_size = sizeof(float) * size / 3;
-      out = static_cast<float *>(xmalloc(*new_size));
-      u24_3_to_float(buf, out, size / 3);
+      out.resize(size / 3);
+      u24_3_to_float(buf, out.data(), size / 3);
       break;
     case SFMT_U32:
-      *new_size = sizeof(float) * size / 4;
-      out = static_cast<float *>(xmalloc(*new_size));
-      u32_to_float((unsigned char *)buf, out, size / 4);
+      out.resize(size / 4);
+      u32_to_float((unsigned char *)buf, out.data(), size / 4);
       break;
     case SFMT_S32:
-      *new_size = sizeof(float) * size / 4;
-      out = static_cast<float *>(xmalloc(*new_size));
-      s32_to_float(buf, out, size / 4);
+      out.resize(size / 4);
+      s32_to_float(buf, out.data(), size / 4);
       break;
     default:
       error("Can't convert from %s to float!",
@@ -544,67 +534,56 @@ static float *fixed_to_float(const char *buf, const size_t size, const long fmt,
   return out;
 }
 
-/* Convert float samples to fixed point format fmt. Returned samples of size
- * new_size bytes is malloc()ed. */
-static char *float_to_fixed(const float *buf, const size_t samples,
-                            const long fmt, size_t *new_size)
+/* Convert float samples to fixed point format fmt. */
+static std::vector<char> float_to_fixed(const float *buf, const size_t samples,
+                                        const long fmt)
 {
   char fmt_name[SFMT_STR_MAX];
-  char *new_snd = nullptr;
+  std::vector<char> new_snd;
 
   assert((fmt & SFMT_MASK_FORMAT) != SFMT_FLOAT);
 
   switch (fmt & SFMT_MASK_FORMAT)
   {
     case SFMT_U8:
-      *new_size = samples;
-      new_snd = static_cast<char *>(xmalloc(samples));
-      float_to_u8(buf, reinterpret_cast<unsigned char *>(new_snd), samples);
+      new_snd.resize(samples);
+      float_to_u8(buf, reinterpret_cast<unsigned char *>(new_snd.data()), samples);
       break;
     case SFMT_S8:
-      *new_size = samples;
-      new_snd = static_cast<char *>(xmalloc(samples));
-      float_to_s8(buf, new_snd, samples);
+      new_snd.resize(samples);
+      float_to_s8(buf, new_snd.data(), samples);
       break;
     case SFMT_U16:
-      *new_size = samples * 2;
-      new_snd = static_cast<char *>(xmalloc(*new_size));
-      float_to_u16(buf, reinterpret_cast<unsigned char *>(new_snd), samples);
+      new_snd.resize(samples * 2);
+      float_to_u16(buf, reinterpret_cast<unsigned char *>(new_snd.data()), samples);
       break;
     case SFMT_S16:
-      *new_size = samples * 2;
-      new_snd = static_cast<char *>(xmalloc(*new_size));
-      float_to_s16(buf, new_snd, samples);
+      new_snd.resize(samples * 2);
+      float_to_s16(buf, new_snd.data(), samples);
       break;
     case SFMT_U24:
-      *new_size = samples * 4;
-      new_snd = static_cast<char *>(xmalloc(*new_size));
-      float_to_u24(buf, reinterpret_cast<unsigned char *>(new_snd), samples);
+      new_snd.resize(samples * 4);
+      float_to_u24(buf, reinterpret_cast<unsigned char *>(new_snd.data()), samples);
       break;
     case SFMT_S24:
-      *new_size = samples * 4;
-      new_snd = static_cast<char *>(xmalloc(*new_size));
-      float_to_s24(buf, new_snd, samples);
+      new_snd.resize(samples * 4);
+      float_to_s24(buf, new_snd.data(), samples);
       break;
     case SFMT_U24_3:
-      *new_size = samples * 3;
-      new_snd = static_cast<char *>(xmalloc(*new_size));
-      float_to_u24_3(buf, reinterpret_cast<unsigned char *>(new_snd), samples);
+      new_snd.resize(samples * 3);
+      float_to_u24_3(buf, reinterpret_cast<unsigned char *>(new_snd.data()), samples);
       break;
     case SFMT_S24_3:
-      *new_size = samples * 3;
-      new_snd = static_cast<char *>(xmalloc(*new_size));
-      float_to_s24_3(buf, new_snd, samples);
+      new_snd.resize(samples * 3);
+      float_to_s24_3(buf, new_snd.data(), samples);
       break;
     case SFMT_U32:
-      *new_size = samples * 4;
-      new_snd = static_cast<char *>(xmalloc(*new_size));
-      float_to_u32(buf, reinterpret_cast<unsigned char *>(new_snd), samples);
+      new_snd.resize(samples * 4);
+      float_to_u32(buf, reinterpret_cast<unsigned char *>(new_snd.data()), samples);
       break;
     case SFMT_S32:
-      *new_size = samples * 4;
-      new_snd = static_cast<char *>(xmalloc(*new_size));
-      float_to_s32(buf, new_snd, samples);
+      new_snd.resize(samples * 4);
+      float_to_s32(buf, new_snd.data(), samples);
       break;
     default:
       error("Can't convert from float to %s!",
@@ -783,31 +762,30 @@ static void swap_endian(char *buf, const size_t size, const long fmt)
 }
 
 /* Initialize the audio_conversion structure for conversion between parameters
- * from and to. Return 0 on error. */
-int audio_conv_new(struct audio_conversion *conv,
-                   const struct sound_params *from,
-                   const struct sound_params *to)
+ * from and to. Throws AudioConversionException on error. */
+AudioConversion::AudioConversion(const sound_params& from, const sound_params& to)
+  : from_params(from), to_params(to)
 {
-  assert(from->rate != to->rate || from->fmt != to->fmt ||
-         from->channels != to->channels);
+  assert(from_params.rate != to_params.rate || from_params.fmt != to_params.fmt ||
+         from_params.channels != to_params.channels);
 
-  if (from->channels != to->channels)
+  if (from_params.channels != to_params.channels)
   {
     /* the only conversion we can do */
-    if (!((from->channels == 1 || from->channels == 6) && to->channels == 2))
+    if (!((from_params.channels == 1 || from_params.channels == 6) && to_params.channels == 2))
     {
-      error("Can't change number of channels (%d to %d)!", from->channels,
-            to->channels);
-      return 0;
+      error("Can't change number of channels (%d to %d)!", from_params.channels,
+            to_params.channels);
+      throw AudioConversionException("Unsupported channel conversion");
     }
   }
 
-  if (from->rate != to->rate)
+  if (from_params.rate != to_params.rate)
   {
     if (options_get_int("EnableResample") == 0)
     {
       error("Resampling disabled!");
-      return 0;
+      throw AudioConversionException("Resampling disabled");
     }
 #ifdef HAVE_SAMPLERATE
     int err;
@@ -839,81 +817,66 @@ int audio_conv_new(struct audio_conversion *conv,
       fatal("Bad ResampleMethod option: %s", method);
     }
 
-    conv->src_state = src_new(resample_type, from->channels, &err);
-    if (!conv->src_state)
+    src_state = src_new(resample_type, from_params.channels, &err);
+    if (!src_state)
     {
-      error("Can't resample from %dHz to %dHz: %s", from->rate, to->rate,
+      error("Can't resample from %dHz to %dHz: %s", from_params.rate, to_params.rate,
             src_strerror(err));
-      return 0;
+      throw AudioConversionException("Failed to initialize resampler");
     }
-    logit("Resampling from %dHz to %dHz using %s", from->rate, to->rate,
+    logit("Resampling from %dHz to %dHz using %s", from_params.rate, to_params.rate,
           method);
 #else
     error("Resampling not supported!");
-    return 0;
+    throw AudioConversionException("Resampling not supported");
 #endif
   }
+}
+
+AudioConversion::~AudioConversion()
+{
 #ifdef HAVE_SAMPLERATE
-  else
+  if (src_state)
   {
-    conv->src_state = nullptr;
+    src_delete(src_state);
   }
 #endif
-
-  conv->from = *from;
-  conv->to = *to;
-
-#ifdef HAVE_SAMPLERATE
-  conv->resample_buf = nullptr;
-  conv->resample_buf_nsamples = 0;
-#endif
-
-  return 1;
 }
 
 #ifdef HAVE_SAMPLERATE
-static float *resample_sound(struct audio_conversion *conv, const float *buf,
-                             const size_t samples, const int nchannels,
-                             size_t *resampled_samples)
+std::vector<float> AudioConversion::resample_sound(const float *buf,
+                             const size_t samples, const int nchannels)
 {
   SRC_DATA resample_data;
-  float *output;
-  float *new_input_start;
-  int output_samples = 0;
+  std::vector<float> output;
 
   resample_data.end_of_input = 0;
-  resample_data.src_ratio = conv->to.rate / static_cast<double>(conv->from.rate);
+  resample_data.src_ratio = to_params.rate / static_cast<double>(from_params.rate);
 
   resample_data.input_frames =
-      samples / nchannels + conv->resample_buf_nsamples / nchannels;
+      samples / nchannels + resample_buf.size() / nchannels;
   resample_data.output_frames =
       resample_data.input_frames * resample_data.src_ratio;
 
-  assert(conv->resample_buf || conv->resample_buf_nsamples == 0);
-  conv->resample_buf = static_cast<float *>(
-      xrealloc(conv->resample_buf,
-               sizeof(float) * nchannels * resample_data.input_frames));
-  new_input_start = conv->resample_buf + conv->resample_buf_nsamples;
+  size_t old_resample_size = resample_buf.size();
+  resample_buf.resize(old_resample_size + samples);
+  memcpy(resample_buf.data() + old_resample_size, buf, samples * sizeof(float));
 
-  output =
-      static_cast<float *>(xmalloc(sizeof(float) * resample_data.output_frames * nchannels));
+  output.resize(resample_data.output_frames * nchannels);
 
-  /*debug ("Resampling %lu bytes of data by ratio %f", (unsigned long)size,
-      resample_data.src_ratio);*/
+  resample_data.data_in = resample_buf.data();
+  resample_data.data_out = output.data();
 
-  memcpy(new_input_start, buf, samples * sizeof(float));
-  resample_data.data_in = conv->resample_buf;
-  resample_data.data_out = output;
+  int output_samples = 0;
 
   do
   {
     int err;
 
-    if ((err = src_process(conv->src_state, &resample_data)))
+    if ((err = src_process(src_state, &resample_data)))
     {
       error("Can't resample: %s", src_strerror(err));
-      free(output);
-      return nullptr;
+      return {};
     }
 
     resample_data.data_in += resample_data.input_frames_used * nchannels;
@@ -924,27 +887,17 @@ static float *resample_sound(struct audio_conversion *conv, const float *buf,
   } while (resample_data.input_frames && resample_data.output_frames_gen &&
            resample_data.output_frames);
 
-  *resampled_samples = output_samples;
+  output.resize(output_samples);
 
   if (resample_data.input_frames)
   {
-    conv->resample_buf_nsamples = resample_data.input_frames * nchannels;
-    if (conv->resample_buf != resample_data.data_in)
-    {
-      float *new_input;
-
-      new_input = static_cast<float *>(xmalloc(sizeof(float) * conv->resample_buf_nsamples));
-      memcpy(new_input, resample_data.data_in,
-             sizeof(float) * conv->resample_buf_nsamples);
-      free(conv->resample_buf);
-      conv->resample_buf = new_input;
-    }
+    size_t remaining_samples = resample_data.input_frames * nchannels;
+    std::vector<float> new_resample_buf(resample_data.data_in, resample_data.data_in + remaining_samples);
+    resample_buf = std::move(new_resample_buf);
   }
   else
   {
-    free(conv->resample_buf);
-    conv->resample_buf = nullptr;
-    conv->resample_buf_nsamples = 0;
+    resample_buf.clear();
   }
 
   return output;
@@ -952,35 +905,32 @@ static float *resample_sound(struct audio_conversion *conv, const float *buf,
 #endif
 
 /* Double the channels from */
-static char *mono_to_stereo(const char *mono, const size_t size,
+static std::vector<char> mono_to_stereo(const char *mono, const size_t size,
                             const long format)
 {
   int Bps = sfmt_Bps(format);
   size_t i;
-  char *stereo;
-
-  stereo = static_cast<char *>(xmalloc(size * 2));
+  std::vector<char> stereo(size * 2);
 
   for (i = 0; i < size; i += Bps)
   {
-    memcpy(stereo + (i * 2), mono + i, Bps);
-    memcpy(stereo + (i * 2 + Bps), mono + i, Bps);
+    memcpy(stereo.data() + (i * 2), mono + i, Bps);
+    memcpy(stereo.data() + (i * 2 + Bps), mono + i, Bps);
   }
 
   return stereo;
 }
 
 /* DPL downmix: 5.1 -> stereo */
-static char *ch6_to_stereo(const char *ch6, const size_t size,
+static std::vector<char> ch6_to_stereo(const char *ch6, const size_t size,
                            const long format)
 {
   debug("Downmixing from 5.1 to 2.0");
   int Bps = sfmt_Bps(format);
   size_t i;
   int j, k;
-  char *stereo;
+  std::vector<char> stereo(size / 3);
 
-  stereo = static_cast<char *>(xmalloc(size / 3));
   float a[2][6]; // downmix matrix
   a[0][0] = 1.0;
   a[0][2] = 0.707;
@@ -1015,7 +965,7 @@ static char *ch6_to_stereo(const char *ch6, const size_t size,
           sample_out[j] += a[j][k] * sample_in[k] * normalization;
         }
       }
-      memcpy(stereo + (i / 3), sample_out, 2 * Bps);
+      memcpy(stereo.data() + (i / 3), sample_out, 2 * Bps);
     }
   }
   else if (format & SFMT_FLOAT)
@@ -1037,7 +987,7 @@ static char *ch6_to_stereo(const char *ch6, const size_t size,
           sample_out[j] += (a[j][k] * sample_in[k] * normalization);
         }
       }
-      memcpy(stereo + (i / 3), sample_out, 2 * Bps);
+      memcpy(stereo.data() + (i / 3), sample_out, 2 * Bps);
     }
   }
   else if (format & SFMT_S32)
@@ -1059,7 +1009,7 @@ static char *ch6_to_stereo(const char *ch6, const size_t size,
           sample_out[j] += (a[j][k] * sample_in[k] * normalization);
         }
       }
-      memcpy(stereo + (i / 3), sample_out, 2 * Bps);
+      memcpy(stereo.data() + (i / 3), sample_out, 2 * Bps);
     }
   }
   else
@@ -1070,115 +1020,108 @@ static char *ch6_to_stereo(const char *ch6, const size_t size,
   return stereo;
 }
 
-static int8_t *s32_to_s24_3(int32_t *in, const size_t samples)
+static std::vector<char> s32_to_s24_3(const int32_t *in, const size_t samples)
 {
   size_t i;
-  int8_t *new_buf;
-
-  new_buf = static_cast<int8_t *>(xmalloc(samples * 3));
+  std::vector<char> new_buf(samples * 3);
+  int8_t *out = reinterpret_cast<int8_t *>(new_buf.data());
 
   for (i = 0; i < samples; i++)
   {
-    new_buf[3 * i] = (in[i] & 0x0000FF00) >> 8;
-    new_buf[3 * i + 1] = (in[i] & 0x00FF0000) >> 16;
-    new_buf[3 * i + 2] = (in[i] & 0xFF000000) >> 24;
+    out[3 * i] = (in[i] & 0x0000FF00) >> 8;
+    out[3 * i + 1] = (in[i] & 0x00FF0000) >> 16;
+    out[3 * i + 2] = (in[i] & 0xFF000000) >> 24;
   }
   return new_buf;
 }
 
-static int16_t *s32_to_s16(int32_t *in, const size_t samples)
+static std::vector<char> s32_to_s16(const int32_t *in, const size_t samples)
 {
   size_t i;
-  int16_t *new_buf;
-
-  new_buf = static_cast<int16_t *>(xmalloc(samples * 2));
+  std::vector<char> new_buf(samples * 2);
+  int16_t *out = reinterpret_cast<int16_t *>(new_buf.data());
 
   for (i = 0; i < samples; i++)
   {
-    new_buf[i] = in[i] >> 16;
+    out[i] = in[i] >> 16;
   }
 
   return new_buf;
 }
 
-static uint16_t *u32_to_u16(uint32_t *in, const size_t samples)
+static std::vector<char> u32_to_u16(const uint32_t *in, const size_t samples)
 {
   size_t i;
-  uint16_t *new_buf;
-
-  new_buf = static_cast<uint16_t *>(xmalloc(samples * 2));
+  std::vector<char> new_buf(samples * 2);
+  uint16_t *out = reinterpret_cast<uint16_t *>(new_buf.data());
 
   for (i = 0; i < samples; i++)
   {
-    new_buf[i] = in[i] >> 16;
+    out[i] = in[i] >> 16;
   }
 
   return new_buf;
 }
 
-static int32_t *s32_to_s24(int32_t *in, const size_t samples)
+static std::vector<char> s32_to_s24(const int32_t *in, const size_t samples)
 {
   size_t i;
-  int32_t *new_buf;
-
-  new_buf = static_cast<int32_t *>(xmalloc(samples * 4));
+  std::vector<char> new_buf(samples * 4);
+  int32_t *out = reinterpret_cast<int32_t *>(new_buf.data());
 
   for (i = 0; i < samples; i++)
   {
-    new_buf[i] = in[i] >> 8;
+    out[i] = in[i] >> 8;
   }
 
   return new_buf;
 }
 
-static uint32_t *u32_to_u24(uint32_t *in, const size_t samples)
+static std::vector<char> u32_to_u24(const uint32_t *in, const size_t samples)
 {
   size_t i;
-  uint32_t *new_buf;
-
-  new_buf = static_cast<uint32_t *>(xmalloc(samples * 4));
+  std::vector<char> new_buf(samples * 4);
+  uint32_t *out = reinterpret_cast<uint32_t *>(new_buf.data());
 
   for (i = 0; i < samples; i++)
   {
-    new_buf[i] = in[i] >> 8;
+    out[i] = in[i] >> 8;
   }
 
   return new_buf;
 }
 
-static int16_t *s24_to_s16(int32_t *in, const size_t samples)
+static std::vector<char> s24_to_s16(const int32_t *in, const size_t samples)
 {
   size_t i;
-  int16_t *new_buf;
-
-  new_buf = static_cast<int16_t *>(xmalloc(samples * 2));
+  std::vector<char> new_buf(samples * 2);
+  int16_t *out = reinterpret_cast<int16_t *>(new_buf.data());
 
   for (i = 0; i < samples; i++)
   {
-    new_buf[i] = in[i] >> 8;
+    out[i] = in[i] >> 8;
   }
 
   return new_buf;
 }
 
-static uint16_t *u24_to_u16(uint32_t *in, const size_t samples)
+static std::vector<char> u24_to_u16(const uint32_t *in, const size_t samples)
 {
   size_t i;
-  uint16_t *new_buf;
-
-  new_buf = static_cast<uint16_t *>(xmalloc(samples * 2));
+  std::vector<char> new_buf(samples * 2);
+  uint16_t *out = reinterpret_cast<uint16_t *>(new_buf.data());
 
   for (i = 0; i < samples; i++)
   {
-    new_buf[i] = in[i] >> 8;
+    out[i] = in[i] >> 8;
   }
 
   return new_buf;
 }
 
 /* Do the sound conversion.  buf of length size is the sample buffer to
- * convert and the size of the converted sound is put into *conv_len.
- * Return the converted sound in malloc()ed memory.
+ * convert.
+ * Return the converted sound in a std::vector.
  *
  * Conversion workflow:
  *   1. Change endianness
@@ -1187,47 +1130,32 @@ static uint16_t *u24_to_u16(uint32_t *in, const size_t samples)
  *   4. Change sample format to destination SFMT
  *   5. Up/downmix channels
  */
-char *audio_conv(struct audio_conversion *conv, const char *buf,
-                 const size_t size, size_t *conv_len)
+std::vector<char> AudioConversion::process(const char *buf, const size_t size)
 {
-  char *curr_sound;
-  long curr_sfmt = conv->from.fmt;
-
-  *conv_len = size;
-
-  curr_sound = static_cast<char *>(xmalloc(size));
-  memcpy(curr_sound, buf, size);
+  std::vector<char> curr_sound(buf, buf + size);
+  long curr_sfmt = from_params.fmt;
 
   if (!(curr_sfmt & SFMT_NE))
   {
-    swap_endian(curr_sound, *conv_len, curr_sfmt);
+    swap_endian(curr_sound.data(), curr_sound.size(), curr_sfmt);
     curr_sfmt = sfmt_set_endian(curr_sfmt, SFMT_NE);
   }
 
   /* Special case (optimization): 32bit -> 24bit_3 */
   if ((curr_sfmt & (SFMT_S32 | SFMT_U32)) &&
-      (conv->to.fmt & (SFMT_S24_3 | SFMT_U24_3)) &&
-      conv->from.rate == conv->to.rate)
+      (to_params.fmt & (SFMT_S24_3 | SFMT_U24_3)) &&
+      from_params.rate == to_params.rate)
   {
-    char *new_sound;
-
     if ((curr_sfmt & SFMT_MASK_FORMAT) == SFMT_S32)
     {
-      new_sound = reinterpret_cast<char *>(s32_to_s24_3(reinterpret_cast<int32_t *>(curr_sound), *conv_len / 4));
+      curr_sound = s32_to_s24_3(reinterpret_cast<int32_t *>(curr_sound.data()), curr_sound.size() / 4);
       curr_sfmt = sfmt_set_fmt(curr_sfmt, SFMT_S24_3);
     }
     else
     {
-      new_sound = reinterpret_cast<char *>(s32_to_s24_3(reinterpret_cast<int32_t *>(curr_sound), *conv_len / 4));
+      curr_sound = s32_to_s24_3(reinterpret_cast<int32_t *>(curr_sound.data()), curr_sound.size() / 4);
       curr_sfmt = sfmt_set_fmt(curr_sfmt, SFMT_U24_3);
     }
-
-    if (curr_sound != buf)
-    {
-      free(curr_sound);
-    }
-    curr_sound = new_sound;
-    *conv_len = *conv_len * 3 / 4;
 
     logit("Fast conversion: 32bit -> 24_3bit!");
   }
@@ -1235,198 +1163,114 @@ char *audio_conv(struct audio_conversion *conv, const char *buf,
   /* Special case (optimization): if we only need to convert 32bit samples
    * to 16bit, we can do it very simply and quickly. */
   if ((curr_sfmt & (SFMT_S32 | SFMT_U32)) &&
-      (conv->to.fmt & (SFMT_S16 | SFMT_U16)) &&
-      conv->from.rate == conv->to.rate)
+      (to_params.fmt & (SFMT_S16 | SFMT_U16)) &&
+      from_params.rate == to_params.rate)
   {
-    char *new_sound;
-
     if ((curr_sfmt & SFMT_MASK_FORMAT) == SFMT_S32)
     {
-      new_sound = reinterpret_cast<char *>(s32_to_s16(reinterpret_cast<int32_t *>(curr_sound), *conv_len / 4));
+      curr_sound = s32_to_s16(reinterpret_cast<int32_t *>(curr_sound.data()), curr_sound.size() / 4);
       curr_sfmt = sfmt_set_fmt(curr_sfmt, SFMT_S16);
     }
     else
     {
-      new_sound = reinterpret_cast<char *>(u32_to_u16(reinterpret_cast<uint32_t *>(curr_sound), *conv_len / 4));
+      curr_sound = u32_to_u16(reinterpret_cast<uint32_t *>(curr_sound.data()), curr_sound.size() / 4);
       curr_sfmt = sfmt_set_fmt(curr_sfmt, SFMT_U16);
     }
-
-    if (curr_sound != buf)
-    {
-      free(curr_sound);
-    }
-    curr_sound = new_sound;
-    *conv_len /= 2;
 
     logit("Fast conversion: 32bit -> 16bit!");
   }
 
   /* Special case (optimization): 32bit to 24bit */
   if ((curr_sfmt & (SFMT_S32 | SFMT_U32)) &&
-      (conv->to.fmt & (SFMT_S24 | SFMT_U24)) &&
-      conv->from.rate == conv->to.rate)
+      (to_params.fmt & (SFMT_S24 | SFMT_U24)) &&
+      from_params.rate == to_params.rate)
   {
-    char *new_sound;
-
     if ((curr_sfmt & SFMT_MASK_FORMAT) == SFMT_S32)
     {
-      new_sound = reinterpret_cast<char *>(s32_to_s24(reinterpret_cast<int32_t *>(curr_sound), *conv_len / 4));
+      curr_sound = s32_to_s24(reinterpret_cast<int32_t *>(curr_sound.data()), curr_sound.size() / 4);
       curr_sfmt = sfmt_set_fmt(curr_sfmt, SFMT_S24);
     }
     else
     {
-      new_sound = reinterpret_cast<char *>(u32_to_u24(reinterpret_cast<uint32_t *>(curr_sound), *conv_len / 4));
+      curr_sound = u32_to_u24(reinterpret_cast<uint32_t *>(curr_sound.data()), curr_sound.size() / 4);
       curr_sfmt = sfmt_set_fmt(curr_sfmt, SFMT_U24);
     }
-
-    if (curr_sound != buf)
-    {
-      free(curr_sound);
-    }
-    curr_sound = new_sound;
-    //*conv_len /= 2;
 
     logit("Fast conversion: 32bit -> 24bit!");
   }
 
   /* Special case (optimization): 24bit to 16bit */
   if ((curr_sfmt & (SFMT_S24 | SFMT_U24)) &&
-      (conv->to.fmt & (SFMT_S16 | SFMT_U16)) &&
-      conv->from.rate == conv->to.rate)
+      (to_params.fmt & (SFMT_S16 | SFMT_U16)) &&
+      from_params.rate == to_params.rate)
   {
-    char *new_sound;
-
     if ((curr_sfmt & SFMT_MASK_FORMAT) == SFMT_S24)
     {
-      new_sound = reinterpret_cast<char *>(s24_to_s16(reinterpret_cast<int32_t *>(curr_sound), *conv_len / 4));
+      curr_sound = s24_to_s16(reinterpret_cast<int32_t *>(curr_sound.data()), curr_sound.size() / 4);
       curr_sfmt = sfmt_set_fmt(curr_sfmt, SFMT_S16);
     }
     else
     {
-      new_sound = reinterpret_cast<char *>(u24_to_u16(reinterpret_cast<uint32_t *>(curr_sound), *conv_len / 4));
+      curr_sound = u24_to_u16(reinterpret_cast<uint32_t *>(curr_sound.data()), curr_sound.size() / 4);
       curr_sfmt = sfmt_set_fmt(curr_sfmt, SFMT_U16);
     }
-
-    if (curr_sound != buf)
-    {
-      free(curr_sound);
-    }
-    curr_sound = new_sound;
-    *conv_len /= 2;
 
     logit("Fast conversion: 24bit -> 16bit!");
   }
 
   /* convert to float if necessary */
-  if ((conv->from.rate != conv->to.rate ||
-       (conv->to.fmt & SFMT_MASK_FORMAT) == SFMT_FLOAT ||
-       !sfmt_same_bps(conv->to.fmt, curr_sfmt)) &&
+  if ((from_params.rate != to_params.rate ||
+       (to_params.fmt & SFMT_MASK_FORMAT) == SFMT_FLOAT ||
+       !sfmt_same_bps(to_params.fmt, curr_sfmt)) &&
       (curr_sfmt & SFMT_MASK_FORMAT) != SFMT_FLOAT)
   {
-    char *new_sound;
-
-    new_sound =
-        reinterpret_cast<char *>(fixed_to_float(curr_sound, *conv_len, curr_sfmt, conv_len));
+    auto float_sound = fixed_to_float(curr_sound.data(), curr_sound.size(), curr_sfmt);
+    curr_sound.assign(reinterpret_cast<char*>(float_sound.data()), reinterpret_cast<char*>(float_sound.data() + float_sound.size() * sizeof(float)));
     curr_sfmt = sfmt_set_fmt(curr_sfmt, SFMT_FLOAT);
-
-    if (curr_sound != buf)
-    {
-      free(curr_sound);
-    }
-    curr_sound = new_sound;
   }
 
 #ifdef HAVE_SAMPLERATE
-  if (conv->from.rate != conv->to.rate)
+  if (from_params.rate != to_params.rate)
   {
-    char *new_sound = reinterpret_cast<char *>(resample_sound(conv, reinterpret_cast<float *>(curr_sound),
-                                             *conv_len / sizeof(float),
-                                             conv->from.channels, conv_len));
-    *conv_len *= sizeof(float);
-    if (curr_sound != buf)
-    {
-      free(curr_sound);
-    }
-    curr_sound = new_sound;
+    auto resampled = resample_sound(reinterpret_cast<float *>(curr_sound.data()),
+                                    curr_sound.size() / sizeof(float),
+                                    from_params.channels);
+    curr_sound.assign(reinterpret_cast<char*>(resampled.data()), reinterpret_cast<char*>(resampled.data() + resampled.size() * sizeof(float)));
   }
 #endif
 
-  if ((curr_sfmt & SFMT_MASK_FORMAT) != (conv->to.fmt & SFMT_MASK_FORMAT))
+  if ((curr_sfmt & SFMT_MASK_FORMAT) != (to_params.fmt & SFMT_MASK_FORMAT))
   {
-    if (sfmt_same_bps(curr_sfmt, conv->to.fmt))
+    if (sfmt_same_bps(curr_sfmt, to_params.fmt))
     {
-      change_sign(curr_sound, size, &curr_sfmt);
+      change_sign(curr_sound.data(), curr_sound.size(), &curr_sfmt);
     }
     else
     {
-      char *new_sound;
-
       assert(curr_sfmt & SFMT_FLOAT);
-
-      new_sound = float_to_fixed(reinterpret_cast<float *>(curr_sound), *conv_len / sizeof(float),
-                                 conv->to.fmt, conv_len);
-      curr_sfmt = sfmt_set_fmt(curr_sfmt, conv->to.fmt);
-
-      if (curr_sound != buf)
-      {
-        free(curr_sound);
-      }
-      curr_sound = new_sound;
+      curr_sound = float_to_fixed(reinterpret_cast<float *>(curr_sound.data()), curr_sound.size() / sizeof(float), to_params.fmt);
+      curr_sfmt = sfmt_set_fmt(curr_sfmt, to_params.fmt);
     }
   }
 
-  if (conv->from.channels == 1 && conv->to.channels == 2)
+  if (from_params.channels == 1 && to_params.channels == 2)
   {
-    char *new_sound;
-
-    new_sound = mono_to_stereo(curr_sound, *conv_len, curr_sfmt);
-    *conv_len *= 2;
-
-    if (curr_sound != buf)
-    {
-      free(curr_sound);
-    }
-    curr_sound = new_sound;
+    curr_sound = mono_to_stereo(curr_sound.data(), curr_sound.size(), curr_sfmt);
   }
 
-  if (conv->from.channels == 6 && conv->to.channels == 2)
+  if (from_params.channels == 6 && to_params.channels == 2)
   {
-    char *new_sound;
-
-    new_sound = ch6_to_stereo(curr_sound, *conv_len, conv->from.fmt);
-    *conv_len /= 3;
-
-    if (curr_sound != buf)
-    {
-      free(curr_sound);
-    }
-    curr_sound = new_sound;
+    curr_sound = ch6_to_stereo(curr_sound.data(), curr_sound.size(), from_params.fmt);
   }
 
   if ((curr_sfmt & SFMT_MASK_ENDIANNESS) !=
-      (conv->to.fmt & SFMT_MASK_ENDIANNESS))
+      (to_params.fmt & SFMT_MASK_ENDIANNESS))
   {
-    swap_endian(curr_sound, *conv_len, curr_sfmt);
-    curr_sfmt = sfmt_set_endian(curr_sfmt, conv->to.fmt & SFMT_MASK_ENDIANNESS);
+    swap_endian(curr_sound.data(), curr_sound.size(), curr_sfmt);
+    curr_sfmt = sfmt_set_endian(curr_sfmt, to_params.fmt & SFMT_MASK_ENDIANNESS);
   }
 
   return curr_sound;
-}
-
-void audio_conv_destroy(struct audio_conversion *conv ASSERT_ONLY)
-{
-  assert(conv != nullptr);
-
-#ifdef HAVE_SAMPLERATE
-  if (conv->resample_buf)
-  {
-    free(conv->resample_buf);
-  }
-  if (conv->src_state)
-  {
-    src_delete(conv->src_state);
-  }
-#endif
 }
 
 // EOF

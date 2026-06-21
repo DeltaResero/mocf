@@ -110,7 +110,7 @@ static struct sound_params driver_sound_params = {0, 0, 0};
 /* Sound parameters requested by the decoder. */
 static struct sound_params req_sound_params = {0, 0, 0};
 
-static struct audio_conversion sound_conv;
+static std::unique_ptr<AudioConversion> sound_conv;
 static bool need_audio_conversion = false;
 
 static int current_mixer = 0;
@@ -1050,13 +1050,14 @@ int audio_open(struct sound_params *sound_params)
         (req_sound_params.rate != driver_sound_params.rate))
     {
       logit("Conversion of the sound is needed.");
-      if (!audio_conv_new(&sound_conv, &req_sound_params, &driver_sound_params))
-      {
+      try {
+        sound_conv = std::make_unique<AudioConversion>(req_sound_params, driver_sound_params);
+        need_audio_conversion = true;
+      } catch (const std::exception& e) {
         hw->close();
         reset_sound_params(&req_sound_params);
         return 0;
       }
-      need_audio_conversion = true;
     }
     audio_opened = true;
 
@@ -1073,31 +1074,16 @@ int audio_open(struct sound_params *sound_params)
 
 int audio_send_buf(const char *buf, const size_t size)
 {
-  size_t out_data_len = size;
   int res;
-  char *converted = nullptr;
 
   if (need_audio_conversion)
   {
-    converted = audio_conv(&sound_conv, buf, size, &out_data_len);
-  }
-
-  if (need_audio_conversion && converted)
-  {
-    res = out_buf->put(converted, out_data_len);
-  }
-  else if (!need_audio_conversion)
-  {
-    res = out_buf->put(buf, size);
+    std::vector<char> converted = sound_conv->process(buf, size);
+    res = out_buf->put(converted.data(), converted.size());
   }
   else
   {
-    res = 0;
-  }
-
-  if (converted)
-  {
-    free(converted);
+    res = out_buf->put(buf, size);
   }
 
   return res;
@@ -1175,7 +1161,7 @@ void audio_close()
     hw->close();
     if (need_audio_conversion)
     {
-      audio_conv_destroy(&sound_conv);
+      sound_conv.reset();
       need_audio_conversion = false;
     }
     audio_opened = false;
