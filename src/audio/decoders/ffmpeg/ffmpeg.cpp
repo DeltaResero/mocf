@@ -953,7 +953,7 @@ static void free_remain_buf(struct ffmpeg_data *data)
 static int take_from_remain_buf(struct ffmpeg_data *data, char *buf,
                                 int buf_len)
 {
-  int to_copy = MIN(buf_len, (int)data->remain_buf.size());
+  int to_copy = std::min(buf_len, static_cast<int>(data->remain_buf.size()));
 
   debug("Copying %d bytes from the remain buf", to_copy);
 
@@ -1276,7 +1276,7 @@ static bool seek_in_stream(struct ffmpeg_data *data, int sec)
 
   if (data->stream->start_time != AV_NOPTS_VALUE)
   {
-    if (seek_ts > INT64_MAX - MAX(0, data->stream->start_time))
+    if (seek_ts > INT64_MAX - std::max<int64_t>(0, data->stream->start_time))
     {
       logit("Seek value too large");
       return false;
@@ -1560,7 +1560,7 @@ public:
     void *data;
     FfmpegDecoder(void *d) : data(d) {}
     ~FfmpegDecoder() override { ffmpeg_close(data); }
-    
+
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
         return ffmpeg_decode(data, buf, buf_len, sound_params);
     }
@@ -1624,8 +1624,5 @@ extern "C" class AudioPlugin *ffmpeg_plugin_init() {
     static FfmpegPlugin plugin;
     return &plugin;
 }
-
-
-
 
 // EOF

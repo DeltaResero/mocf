@@ -18,8 +18,10 @@
 #include <cstdlib>
 #include <cstdarg>
 #include <climits>
+#include <iterator>
 #include <optional>
 #include <string>
+#include <algorithm>
 
 #include "core/compat.h"
 
@@ -83,32 +85,20 @@ struct timespec;
 #endif
 
 #define CONFIG_DIR ".mocf"
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 #define ssizeof(x) ((ssize_t)sizeof(x))
 
 /* Exit status on fatal error. */
 #define EXIT_FATAL 2
 
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
+template <typename T, typename U>
+constexpr bool in_range(T val, U lim) noexcept {
+  return val >= T{0} && val < static_cast<T>(lim);
+}
 
-#ifndef MAX
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-#endif
-
-#ifndef LIMIT
-#define LIMIT(val, lim) ((val) >= 0 && (val) < (lim))
-#endif
-
-#ifndef RANGE
-#define RANGE(min, val, max) ((val) >= (min) && (val) <= (max))
-#endif
-
-#ifndef CLAMP
-#define CLAMP(min, val, max)                                                   \
-  ((val) < (min) ? (min) : (val) > (max) ? (max) : (val))
-#endif
+template <typename Lo, typename T, typename Hi>
+constexpr bool in_closed_range(Lo lo, T val, Hi hi) noexcept {
+  return val >= static_cast<T>(lo) && val <= static_cast<T>(hi);
+}
 
 #ifdef NDEBUG
 #define error(...) internal_error(nullptr, 0, nullptr, ##__VA_ARGS__)

@@ -69,6 +69,7 @@
 #define DEBUG
 
 #include <cmath>
+#include <algorithm>
 #include <pulse/pulseaudio.h>
 #include "core/common.h"
 #include "core/log.h"
@@ -472,7 +473,7 @@ static int pulse_play(const char *buff, const size_t size)
    */
   while (stream)
   {
-    size_t towrite = MIN(pa_stream_writable_size(stream), size - offset);
+    size_t towrite = std::min(pa_stream_writable_size(stream), size - offset);
     debug("writing %d bytes", (int)towrite);
 
     /* We have no working way of dealing with errors

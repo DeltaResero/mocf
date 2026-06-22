@@ -43,7 +43,7 @@ static const struct
 #include "decoders/decoder_list.h"
 };
 
-#define PLUGINS_NUM (ARRAY_SIZE(decoder_table))
+#define PLUGINS_NUM (std::size(decoder_table))
 
 static struct plugin
 {
@@ -176,7 +176,7 @@ static int find_extn_decoder(int *decoder_list, int count, const char *extn)
   int ix;
 
   assert(decoder_list);
-  assert(RANGE(0, count, plugins_num));
+  assert(in_closed_range(0, count, plugins_num));
   assert(extn && extn[0]);
 
   for (ix = 0; ix < count; ix += 1)
@@ -197,7 +197,7 @@ static int find_mime_decoder(int *decoder_list, int count, const char *mime)
   int ix;
 
   assert(decoder_list);
-  assert(RANGE(0, count, plugins_num));
+  assert(in_closed_range(0, count, plugins_num));
   assert(mime && mime[0]);
 
   for (ix = 0; ix < count; ix += 1)
@@ -540,7 +540,7 @@ static void load_decoders(decoder_t_preference *pref, const std::vector<std::str
     pref->decoder_list[asterisk_at + ix] = decoder[ix];
   }
 
-  assert(RANGE(0, pref->decoders, plugins_num));
+  assert(in_closed_range(0, pref->decoders, plugins_num));
 }
 
 /* Add a new preference for an audio format. */

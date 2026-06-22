@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 #ifdef MPC_IS_OLD_API
 #include <mpcdec/mpcdec.h>
@@ -335,7 +336,7 @@ static int musepack_decode(void *prv_data, char *buf, int buf_len,
   if (!data->remain_buf.empty())
   {
     size_t to_copy =
-        MIN((unsigned int)buf_len, data->remain_buf.size() * sizeof(MPC_SAMPLE_FORMAT));
+        std::min(static_cast<size_t>(buf_len), data->remain_buf.size() * sizeof(MPC_SAMPLE_FORMAT));
 
     debug("Copying %zu bytes from the remain buf", to_copy);
 
@@ -414,7 +415,7 @@ static int musepack_decode(void *prv_data, char *buf, int buf_len,
 
   if (bytes_from_decoder >= buf_len)
   {
-    size_t to_copy = MIN(buf_len, bytes_from_decoder);
+    size_t to_copy = std::min(buf_len, bytes_from_decoder);
 
     debug("Copying %zu bytes", to_copy);
 
@@ -485,7 +486,7 @@ public:
     void *data;
     MusepackDecoder(void *d) : data(d) {}
     ~MusepackDecoder() override { musepack_close(data); }
-    
+
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
         return musepack_decode(data, buf, buf_len, sound_params);
     }
@@ -541,8 +542,5 @@ extern "C" class AudioPlugin *musepack_plugin_init() {
     static MusepackPlugin plugin;
     return &plugin;
 }
-
-
-
 
 // EOF

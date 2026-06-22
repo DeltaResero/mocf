@@ -67,7 +67,7 @@ static void load_extn_list()
   supported_extns.clear();
   supported_extns.reserve(16);
 
-  for (size_t ix = 0; ix < ARRAY_SIZE(counts); ix += 1)
+  for (size_t ix = 0; ix < std::size(counts); ix += 1)
   {
     int limit;
     SF_FORMAT_INFO format_info;

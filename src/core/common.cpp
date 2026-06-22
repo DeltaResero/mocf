@@ -31,6 +31,7 @@
 #include <cerrno>
 #include <string>
 #include <mutex>
+#include <algorithm>
 #include "core/common.h"
 #include "core/server.h"
 #include "ui/curses/interface.h"
@@ -81,7 +82,7 @@ void *xmalloc(size_t size)
   void *p;
 
 #ifndef HAVE_MALLOC
-  size = MAX(1, size);
+  size = std::max<size_t>(1, size);
 #endif
 
   if ((p = malloc(size)) == nullptr)

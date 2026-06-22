@@ -18,6 +18,7 @@
 #include <cstring>
 #include <string>
 #include <memory>
+#include <algorithm>
 #include <FLAC/all.h>
 
 #define DEBUG
@@ -531,7 +532,7 @@ int FlacDecoder::decode(char *buf, int buf_len,
 
   debug("Decoded %d bytes", sample_buffer_fill);
 
-  to_copy = MIN((unsigned int)buf_len, sample_buffer_fill);
+  to_copy = std::min(static_cast<unsigned int>(buf_len), sample_buffer_fill);
   memcpy(buf, sample_buffer, to_copy);
   memmove(sample_buffer, sample_buffer + to_copy,
           sample_buffer_fill - to_copy);

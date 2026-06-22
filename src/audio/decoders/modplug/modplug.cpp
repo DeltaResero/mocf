@@ -25,6 +25,7 @@
 #include <cstring>
 #include <memory>
 #include <vector>
+#include <algorithm>
 #include <libmodplug/modplug.h>
 
 #define DEBUG
@@ -108,7 +109,7 @@ static struct modplug_data *make_modplug_data(const char *file)
 
   off_t size = io_file_size(s);
 
-  if (!RANGE(1, size, INT_MAX))
+  if (!in_closed_range(1, size, INT_MAX))
   {
     decoder_error(&data->error, ERROR_FATAL, 0,
                   "Module size unsuitable for loading: %s", file);
@@ -211,7 +212,7 @@ static int modplug_seek(void *void_data, int sec)
 
   int ms = sec * 1000;
 
-  ms = MIN(ms, data->length);
+  ms = std::min(ms, data->length);
 
   ModPlug_Seek(data->modplugfile, ms);
 
@@ -274,7 +275,7 @@ public:
     void *data;
     ModplugDecoder(void *d) : data(d) {}
     ~ModplugDecoder() override { modplug_close(data); }
-    
+
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
         return modplug_decode(data, buf, buf_len, sound_params);
     }

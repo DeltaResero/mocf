@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <algorithm>
 
 #ifdef HAVE_MMAP
 #include <sys/mman.h>
@@ -110,7 +111,7 @@ static ssize_t io_read_mmap(struct io_stream *s, const int dont_move, void *buf,
     return 0;
   }
 
-  to_read = MIN(count, (size_t)(s->size - s->mem_pos));
+  to_read = std::min(count, static_cast<size_t>(s->size - s->mem_pos));
   memcpy(buf, static_cast<char *>(s->mem) + s->mem_pos, to_read);
 
   if (!dont_move)
@@ -259,7 +260,7 @@ off_t io_seek(struct io_stream *s, off_t offset, int whence)
       fatal("Bad whence value: %d", whence);
   }
 
-  new_pos = CLAMP(0, new_pos, s->size);
+  new_pos = std::clamp<off_t>(new_pos, 0, s->size);
 
   if (s->buffered)
   {

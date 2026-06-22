@@ -558,8 +558,8 @@ static struct special_keys
                     {"F9", KEY_F(9)},         {"F10", KEY_F(10)},
                     {"F11", KEY_F(11)},       {"F12", KEY_F(12)}};
 
-#define COMMANDS_NUM (ARRAY_SIZE(commands))
-#define SPECIAL_KEYS_NUM (ARRAY_SIZE(special_keys))
+#define COMMANDS_NUM (std::size(commands))
+#define SPECIAL_KEYS_NUM (std::size(special_keys))
 
 /* Number of chars from the left where the help message starts
  * (skipping the key list). */
@@ -732,7 +732,7 @@ static void add_key(const int line_num, size_t cmd_ix, const char *key_symbol)
     }
   }
 
-  if (i == ARRAY_SIZE(commands[cmd_ix].keys) - 1)
+  if (i == std::size(commands[cmd_ix].keys) - 1)
   {
     keymap_parse_error(line_num, "too many keys defined");
   }

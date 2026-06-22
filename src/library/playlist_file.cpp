@@ -21,6 +21,7 @@
 #include <libgen.h>
 #include <sys/file.h>
 #include <unistd.h>
+#include <algorithm>
 
 #define DEBUG
 
@@ -135,7 +136,7 @@ static int plist_load_m3u(struct plist *plist, const char *fname,
       /* Get the time string */
       time_text[sizeof(time_text) - 1] = 0;
       strncpy(time_text, line.data() + sizeof("#EXTINF:") - 1,
-              MIN(comma - line.data() - (sizeof("#EXTINF:") - 1), sizeof(time_text)));
+              std::min<size_t>(comma - line.data() - (sizeof("#EXTINF:") - 1), sizeof(time_text)));
       if (time_text[sizeof(time_text) - 1])
       {
         error("Broken M3U file: wrong time!");
@@ -281,7 +282,7 @@ static char *read_ini_value(FILE *file, const char *section, const char *key)
         break;
       }
 
-      if (!strncasecmp(line.data(), key, MAX(t2 - line.data() + 1, key_len)))
+      if (!strncasecmp(line.data(), key, std::max<size_t>(t2 - line.data() + 1, key_len)))
       {
         value = t + 1;
 

@@ -24,6 +24,7 @@
 #include <cstdarg>
 #include <unistd.h>
 #include <vector>
+#include <algorithm>
 #include <alsa/asoundlib.h>
 #define exp10(x) (exp((x) * log(10)))
 
@@ -186,7 +187,7 @@ static inline long mask_to_format(const snd_pcm_format_mask_t *mask)
 {
   long result = 0;
 
-  for (size_t ix = 0; ix < ARRAY_SIZE(format_masks); ix += 1)
+  for (size_t ix = 0; ix < std::size(format_masks); ix += 1)
   {
     if (snd_pcm_format_mask_test(mask, format_masks[ix].mask))
     {
@@ -208,7 +209,7 @@ static inline snd_pcm_format_t format_to_mask(long format)
 {
   snd_pcm_format_t result = SND_PCM_FORMAT_UNKNOWN;
 
-  for (size_t ix = 0; ix < ARRAY_SIZE(format_masks); ix += 1)
+  for (size_t ix = 0; ix < std::size(format_masks); ix += 1)
   {
     if (format_masks[ix].format == format)
     {
@@ -589,7 +590,7 @@ static void alsa_set_current_mixer()
   {
     volume1 = scale_volume(real_volume1, &mixer1_min, &mixer1_max, &min_norm1,
                            &use_linear_volume_scale1);
-    assert(RANGE(0, volume1, 100));
+    assert(in_closed_range(0, volume1, 100));
   }
   else
   {
@@ -602,7 +603,7 @@ static void alsa_set_current_mixer()
   {
     volume2 = scale_volume(real_volume2, &mixer2_min, &mixer2_max, &min_norm2,
                            &use_linear_volume_scale2);
-    assert(RANGE(0, volume2, 100));
+    assert(in_closed_range(0, volume2, 100));
   }
   else
   {
@@ -805,7 +806,7 @@ static int alsa_open(struct sound_params *sound_params)
     goto err;
   }
 
-  buffer_time = MIN(buffer_time, BUFFER_MAX_USEC);
+  buffer_time = std::min<unsigned int>(buffer_time, BUFFER_MAX_USEC);
   period_time = buffer_time / 4;
 
   rc = snd_pcm_hw_params_set_period_time_near(handle, hw_params, &period_time,
@@ -989,7 +990,7 @@ static int alsa_play(const char *buff, const size_t size)
   {
     int to_copy;
 
-    to_copy = MIN(to_write, ssizeof(alsa_buf) - alsa_buf_fill);
+    to_copy = std::min(to_write, static_cast<int>(ssizeof(alsa_buf) - alsa_buf_fill));
     memcpy(alsa_buf + alsa_buf_fill, buff + buf_pos, to_copy);
     to_write -= to_copy;
     buf_pos += to_copy;
@@ -1137,7 +1138,7 @@ static int alsa_get_buff_fill()
     }
 
     /* delay can be negative if an underrun occurs */
-    result = MAX(delay, 0) * bytes_per_frame;
+    result = std::max<snd_pcm_sframes_t>(delay, 0) * bytes_per_frame;
   } while (false);
 
   return result;

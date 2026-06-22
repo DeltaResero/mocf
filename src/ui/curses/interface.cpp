@@ -240,7 +240,7 @@ private:
     }
 
     void update_mixer_value() {
-        iface_set_mixer_value(MAX(audio_get_mixer(), 0));
+        iface_set_mixer_value(std::max(audio_get_mixer(), 0));
     }
 
     void update_mixer_name() {
@@ -812,7 +812,7 @@ private:
     }
 
     void set_mixer(int val) {
-        audio_set_mixer(CLAMP(0, val, 100));
+        audio_set_mixer(std::clamp(val, 0, 100));
     }
 
     void adjust_mixer(const int diff) {
@@ -1219,7 +1219,7 @@ private:
             if (silent_seek_pos == -1) silent_seek_pos = curr_file.curr_time + sec;
             else silent_seek_pos += sec;
 
-            silent_seek_pos = CLAMP(0, silent_seek_pos, curr_file.total_time);
+            silent_seek_pos = std::clamp(silent_seek_pos, 0, curr_file.total_time);
             silent_seek_key_last = rounded_time();
             iface_set_curr_time(silent_seek_pos);
         }
@@ -1539,7 +1539,7 @@ public:
 
             dequeue_events();
 #ifdef HAVE_SYS_INOTIFY_H
-            ret = pselect(MAX(engine_event_queue_fd(g_engine_eq), inotify_fd) + 1, &fds, nullptr, nullptr, &timeout, nullptr);
+            ret = pselect(std::max(engine_event_queue_fd(g_engine_eq), inotify_fd) + 1, &fds, nullptr, nullptr, &timeout, nullptr);
 #else
             ret = pselect(engine_event_queue_fd(g_engine_eq) + 1, &fds, nullptr, nullptr, &timeout, nullptr);
 #endif

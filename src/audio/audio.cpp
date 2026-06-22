@@ -994,7 +994,7 @@ int audio_open(struct sound_params *sound_params)
                      ? hw_caps.max_rate
                      : max_rate;
       driver_sound_params.rate =
-          CLAMP(hw_caps.min_rate, req_sound_params.rate, max_rate);
+          std::clamp(req_sound_params.rate, hw_caps.min_rate, max_rate);
 
       /* check if it is possible to chose a sample rate which would be a
        * multiple of req sample rate */
@@ -1029,8 +1029,8 @@ int audio_open(struct sound_params *sound_params)
       sfmt_best_matching(hw_caps.formats, req_sound_params.fmt);
 
   /* number of channels */
-  driver_sound_params.channels = CLAMP(
-      hw_caps.min_channels, req_sound_params.channels, hw_caps.max_channels);
+  driver_sound_params.channels = std::clamp(
+      req_sound_params.channels, hw_caps.min_channels, hw_caps.max_channels);
 
   res = hw->open(&driver_sound_params);
 
@@ -1486,7 +1486,7 @@ int audio_get_mixer()
 
 void audio_set_mixer(const int val)
 {
-  if (!RANGE(0, val, 100))
+  if (!in_closed_range(0, val, 100))
   {
     logit("Tried to set mixer to volume out of range.");
     return;

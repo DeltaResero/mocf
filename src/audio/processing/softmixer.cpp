@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <algorithm>
 
 /* #define DEBUG */
 
@@ -70,14 +71,14 @@ void softmixer_shutdown()
 
 void softmixer_set_value(const int val)
 {
-  mixer_val = CLAMP(0, val, 100);
+  mixer_val = std::clamp(val, 0, 100);
   mixer_real = exp((mixer_val * mixer_amp) / 100 * 0.06908);
   if (mixer_val < 10)
   {
     mixer_real = static_cast<int>(mixer_real * mixer_val /
                        10.f); // linear roll-off to zero for low values
   }
-  mixer_real = CLAMP(SOFTMIXER_MIN, mixer_real, SOFTMIXER_MAX);
+  mixer_real = std::clamp(mixer_real, SOFTMIXER_MIN, SOFTMIXER_MAX);
   mixer_realf = (static_cast<float>(mixer_real)) / 1000.0f;
 
   debug("Softmixer value: %d, gain: %d", mixer_val, mixer_real);
@@ -170,7 +171,7 @@ static void softmixer_read_config()
     {
       if (sscanf(linebuffer->c_str() + sizeof(SOFTMIXER_CFG_AMP) - 1, " %i", &tmp) == 1)
       {
-        if (RANGE(SOFTMIXER_MIN, tmp, SOFTMIXER_MAX))
+        if (in_closed_range(SOFTMIXER_MIN, tmp, SOFTMIXER_MAX))
         {
           mixer_amp = tmp;
         }
@@ -185,7 +186,7 @@ static void softmixer_read_config()
     {
       if (sscanf(linebuffer->c_str() + sizeof(SOFTMIXER_CFG_VALUE) - 1, " %i", &tmp) == 1)
       {
-        if (RANGE(0, tmp, 100))
+        if (in_closed_range(0, tmp, 100))
         {
           softmixer_set_value(tmp);
         }
@@ -376,7 +377,7 @@ static void process_buffer_u8(uint8_t *buf, size_t samples)
     tmp *= mixer_real;
     tmp /= 1000;
     tmp += (UINT8_MAX >> 1);
-    tmp = CLAMP(0, tmp, UINT8_MAX);
+    tmp = std::clamp<int16_t>(tmp, 0, UINT8_MAX);
     buf[i] = static_cast<uint8_t>(tmp);
   }
 }
@@ -392,7 +393,7 @@ static void process_buffer_s8(int8_t *buf, size_t samples)
     int16_t tmp = buf[i];
     tmp *= mixer_real;
     tmp /= 1000;
-    tmp = CLAMP(INT8_MIN, tmp, INT8_MAX);
+    tmp = std::clamp<int16_t>(tmp, INT8_MIN, INT8_MAX);
     buf[i] = static_cast<int8_t>(tmp);
   }
 }
@@ -410,7 +411,7 @@ static void process_buffer_u16(uint16_t *buf, size_t samples)
     tmp *= mixer_real;
     tmp /= 1000;
     tmp += (UINT16_MAX >> 1);
-    tmp = CLAMP(0, tmp, UINT16_MAX);
+    tmp = std::clamp<int32_t>(tmp, 0, UINT16_MAX);
     buf[i] = static_cast<uint16_t>(tmp);
   }
 }
@@ -426,7 +427,7 @@ static void process_buffer_s16(int16_t *buf, size_t samples)
     int32_t tmp = buf[i];
     tmp *= mixer_real;
     tmp /= 1000;
-    tmp = CLAMP(INT16_MIN, tmp, INT16_MAX);
+    tmp = std::clamp<int32_t>(tmp, INT16_MIN, INT16_MAX);
     buf[i] = static_cast<int16_t>(tmp);
   }
 }
@@ -444,7 +445,7 @@ static void process_buffer_u24(uint32_t *buf, size_t samples)
     tmp *= mixer_real;
     tmp /= 1000;
     tmp += S24_MIN;
-    tmp = CLAMP(0, tmp, U24_MAX);
+    tmp = std::clamp<int64_t>(tmp, 0, U24_MAX);
     buf[i] = static_cast<uint32_t>(tmp);
   }
 }
@@ -460,7 +461,7 @@ static void process_buffer_s24(int32_t *buf, size_t samples)
     int64_t tmp = buf[i];
     tmp *= mixer_real;
     tmp /= 1000;
-    tmp = CLAMP(S24_MIN, tmp, S24_MAX);
+    tmp = std::clamp<int64_t>(tmp, S24_MIN, S24_MAX);
     buf[i] = static_cast<int32_t>(tmp);
   }
 }
@@ -478,7 +479,7 @@ static void process_buffer_u32(uint32_t *buf, size_t samples)
     tmp *= mixer_real;
     tmp /= 1000;
     tmp += (UINT32_MAX >> 1);
-    tmp = CLAMP(0, tmp, UINT32_MAX);
+    tmp = std::clamp<int64_t>(tmp, 0, UINT32_MAX);
     buf[i] = static_cast<uint32_t>(tmp);
   }
 }
@@ -494,7 +495,7 @@ static void process_buffer_s32(int32_t *buf, size_t samples)
     int64_t tmp = buf[i];
     tmp *= mixer_real;
     tmp /= 1000;
-    tmp = CLAMP(INT32_MIN, tmp, INT32_MAX);
+    tmp = std::clamp<int64_t>(tmp, INT32_MIN, INT32_MAX);
     buf[i] = static_cast<int32_t>(tmp);
   }
 }
@@ -509,7 +510,7 @@ static void process_buffer_float(float *buf, size_t samples)
   {
     float tmp = buf[i];
     tmp *= mixer_realf;
-    tmp = CLAMP(-1.0f, tmp, 1.0f);
+    tmp = std::clamp(tmp, -1.0f, 1.0f);
     buf[i] = tmp;
   }
 }
@@ -536,7 +537,7 @@ static void mix_mono_u8(uint8_t *buf, int channels, size_t samples)
     buf -= channels;
 
     mono /= channels;
-    mono = MIN(mono, UINT8_MAX); // can't be negative
+    mono = std::min<int16_t>(mono, UINT8_MAX); // can't be negative
 
     for (c = 0; c < channels; c++)
     {
@@ -568,7 +569,7 @@ static void mix_mono_s8(int8_t *buf, int channels, size_t samples)
     buf -= channels;
 
     mono /= channels;
-    mono = CLAMP(INT8_MIN, mono, INT8_MAX);
+    mono = std::clamp<int16_t>(mono, INT8_MIN, INT8_MAX);
 
     for (c = 0; c < channels; c++)
     {
@@ -600,7 +601,7 @@ static void mix_mono_u16(uint16_t *buf, int channels, size_t samples)
     buf -= channels;
 
     mono /= channels;
-    mono = MIN(mono, UINT16_MAX); // can't be negative
+    mono = std::min<int32_t>(mono, UINT16_MAX); // can't be negative
 
     for (c = 0; c < channels; c++)
     {
@@ -632,7 +633,7 @@ static void mix_mono_s16(int16_t *buf, int channels, size_t samples)
     buf -= channels;
 
     mono /= channels;
-    mono = CLAMP(INT16_MIN, mono, INT16_MAX);
+    mono = std::clamp<int32_t>(mono, INT16_MIN, INT16_MAX);
 
     for (c = 0; c < channels; c++)
     {
@@ -667,7 +668,7 @@ static void mix_mono_u24(uint32_t *buf, int channels, size_t samples)
     buf -= channels;
 
     mono /= channels;
-    mono = MIN(mono, U24_MAX); // can't be negative
+    mono = std::min<int64_t>(mono, U24_MAX); // can't be negative
 
     for (c = 0; c < channels; c++)
     {
@@ -702,7 +703,7 @@ static void mix_mono_s24(int32_t *buf, int channels, size_t samples)
     buf -= channels;
 
     mono /= channels;
-    mono = CLAMP(S24_MIN, mono, S24_MAX);
+    mono = std::clamp<int64_t>(mono, S24_MIN, S24_MAX);
 
     for (c = 0; c < channels; c++)
     {
@@ -734,7 +735,7 @@ static void mix_mono_u32(uint32_t *buf, int channels, size_t samples)
     buf -= channels;
 
     mono /= channels;
-    mono = MIN(mono, UINT32_MAX); // can't be negative
+    mono = std::min<int64_t>(mono, UINT32_MAX); // can't be negative
 
     for (c = 0; c < channels; c++)
     {
@@ -766,7 +767,7 @@ static void mix_mono_s32(int32_t *buf, int channels, size_t samples)
     buf -= channels;
 
     mono /= channels;
-    mono = CLAMP(INT32_MIN, mono, INT32_MAX);
+    mono = std::clamp<int64_t>(mono, INT32_MIN, INT32_MAX);
 
     for (c = 0; c < channels; c++)
     {
@@ -798,7 +799,7 @@ static void mix_mono_float(float *buf, int channels, size_t samples)
     buf -= channels;
 
     mono /= channels;
-    mono = CLAMP(-1.0f, mono, 1.0f);
+    mono = std::clamp(mono, -1.0f, 1.0f);
 
     for (c = 0; c < channels; c++)
     {

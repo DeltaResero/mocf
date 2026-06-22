@@ -21,6 +21,7 @@
 #include <cstring>
 #include <memory>
 #include <vector>
+#include <algorithm>
 #include <speex/speex.h>
 #include <speex/speex_header.h>
 #include <speex/speex_stereo.h>
@@ -591,7 +592,7 @@ static int spx_decode(void *prv_data, char *sound_buf, int nbytes,
     {
       int to_copy = nbytes / sizeof(int16_t);
 
-      to_copy = MIN(data->output_left, to_copy);
+      to_copy = std::min(data->output_left, to_copy);
 
       memcpy(out, data->output.data() + data->output_start, to_copy * sizeof(int16_t));
 
@@ -715,7 +716,7 @@ public:
     void *data;
     SpeexDecoder(void *d) : data(d) {}
     ~SpeexDecoder() override { spx_close(data); }
-    
+
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
         return spx_decode(data, buf, buf_len, sound_params);
     }
@@ -771,8 +772,5 @@ extern "C" class AudioPlugin *speex_plugin_init() {
     static SpeexPlugin plugin;
     return &plugin;
 }
-
-
-
 
 // EOF

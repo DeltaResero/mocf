@@ -36,6 +36,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <vector>
+#include <algorithm>
 
 #include "core/common.h"
 #include "audio/audio.h"
@@ -393,7 +394,7 @@ static void equalizer_read_config()
     {
       if (sscanf(linebuffer->c_str(), "%*s %f", &ftmp) > 0)
       {
-        if (RANGE(0.0f, ftmp, 1.0f))
+        if (in_closed_range(0.0f, ftmp, 1.0f))
         {
           mixin_rate = ftmp;
         }
@@ -756,7 +757,7 @@ static void equ_process_buffer_u8(uint8_t *buf, size_t samples)
   for (i = 0; i < samples; i++)
   {
     tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = CLAMP(0, tmp[i], UINT8_MAX);
+    tmp[i] = std::clamp<float>(tmp[i], 0, UINT8_MAX);
     buf[i] = static_cast<uint8_t>(tmp[i]);
   }
 
@@ -780,7 +781,7 @@ static void equ_process_buffer_s8(int8_t *buf, size_t samples)
   for (i = 0; i < samples; i++)
   {
     tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = CLAMP(INT8_MIN, tmp[i], INT8_MAX);
+    tmp[i] = std::clamp<float>(tmp[i], INT8_MIN, INT8_MAX);
     buf[i] = static_cast<int8_t>(tmp[i]);
   }
 
@@ -804,7 +805,7 @@ static void equ_process_buffer_u16(uint16_t *buf, size_t samples)
   for (i = 0; i < samples; i++)
   {
     tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = CLAMP(0, tmp[i], UINT16_MAX);
+    tmp[i] = std::clamp<float>(tmp[i], 0, UINT16_MAX);
     buf[i] = static_cast<uint16_t>(tmp[i]);
   }
 
@@ -828,7 +829,7 @@ static void equ_process_buffer_s16(int16_t *buf, size_t samples)
   for (i = 0; i < samples; i++)
   {
     tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = CLAMP(INT16_MIN, tmp[i], INT16_MAX);
+    tmp[i] = std::clamp<float>(tmp[i], INT16_MIN, INT16_MAX);
     buf[i] = static_cast<int16_t>(tmp[i]);
   }
 
@@ -852,7 +853,7 @@ static void equ_process_buffer_u24(uint32_t *buf, size_t samples)
   for (i = 0; i < samples; i++)
   {
     tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = CLAMP(0, tmp[i], U24_MAX);
+    tmp[i] = std::clamp<float>(tmp[i], 0, U24_MAX);
     buf[i] = static_cast<uint32_t>(tmp[i]);
   }
 
@@ -876,7 +877,7 @@ static void equ_process_buffer_s24(int32_t *buf, size_t samples)
   for (i = 0; i < samples; i++)
   {
     tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = CLAMP(S24_MIN, tmp[i], S24_MAX);
+    tmp[i] = std::clamp<float>(tmp[i], S24_MIN, S24_MAX);
     buf[i] = static_cast<int32_t>(tmp[i]);
   }
 
@@ -900,7 +901,7 @@ static void equ_process_buffer_u32(uint32_t *buf, size_t samples)
   for (i = 0; i < samples; i++)
   {
     tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = CLAMP(0, tmp[i], (float)UINT32_MAX);
+    tmp[i] = std::clamp(tmp[i], 0.0f, static_cast<float>(UINT32_MAX));
     buf[i] = static_cast<uint32_t>(tmp[i]);
   }
 
@@ -924,7 +925,7 @@ static void equ_process_buffer_s32(int32_t *buf, size_t samples)
   for (i = 0; i < samples; i++)
   {
     tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = CLAMP((float)INT32_MIN, tmp[i], (float)INT32_MAX);
+    tmp[i] = std::clamp(tmp[i], static_cast<float>(INT32_MIN), static_cast<float>(INT32_MAX));
     buf[i] = static_cast<int32_t>(tmp[i]);
   }
 
@@ -948,7 +949,7 @@ static void equ_process_buffer_float(float *buf, size_t samples)
   for (i = 0; i < samples; i++)
   {
     tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = CLAMP(-1.0f, tmp[i], 1.0f);
+    tmp[i] = std::clamp(tmp[i], -1.0f, 1.0f);
     buf[i] = tmp[i];
   }
 

@@ -23,6 +23,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <thread>
+#include <algorithm>
 
 #ifdef OUT_TEST
 #include <unistd.h>
@@ -192,7 +193,7 @@ void OutBuf::read_thread()
 
       audio_bpf = audio_get_bpf();
       play_buf_frames =
-          MIN(audio_get_bps() * AUDIO_MAX_PLAY, AUDIO_MAX_PLAY_BYTES) /
+          static_cast<size_t>(std::min<double>(audio_get_bps() * AUDIO_MAX_PLAY, AUDIO_MAX_PLAY_BYTES)) /
           audio_bpf;
       play_buf_fill =
           fifo->get(play_buf, play_buf_frames * audio_bpf);

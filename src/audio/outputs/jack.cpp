@@ -20,6 +20,7 @@
 #include <cstring>
 #include <cstdio>
 #include <unistd.h>
+#include <algorithm>
 #include <jack/jack.h>
 #include <jack/types.h>
 #include <jack/ringbuffer.h>
@@ -294,7 +295,7 @@ static int moc_jack_play(const char *buff, const size_t size)
       space *= 2; /* we have 2 channels */
       debug("Space in the ringbuffer: %zu bytes", space);
 
-      to_write = MIN(space, remain);
+      to_write = std::min(space, remain);
 
       to_write /= sizeof(jack_default_audio_sample_t) * 2;
       remain -= to_write * sizeof(float) * 2;

@@ -267,7 +267,7 @@ static int aac_count_time(struct aac_data *data)
 
       for (ix = 0; ix < frame_info.samples; ix += 1)
       {
-        if (sample_buf[ix] != 0 && RANGE(-16, sample_buf[ix], 16))
+        if (sample_buf[ix] != 0 && in_closed_range(-16, sample_buf[ix], 16))
         {
           zeroes += 1;
         }
@@ -611,7 +611,7 @@ static int aac_decode(void *prv_data, char *buf, int buf_len,
   {
     int len;
 
-    len = MIN(data->overflow_buf_len, buf_len);
+    len = std::min(data->overflow_buf_len, buf_len);
 
     memcpy(buf, data->overflow_buf, len);
     data->overflow_buf += len;
@@ -624,7 +624,7 @@ static int aac_decode(void *prv_data, char *buf, int buf_len,
     rc = decode_one_frame(data, buf, buf_len);
   } while (rc == -2);
 
-  return MAX(rc, 0);
+  return std::max(rc, 0);
 }
 
 static int aac_get_bitrate(void *prv_data)
@@ -679,7 +679,7 @@ public:
     void *data;
     AacDecoder(void *d) : data(d) {}
     ~AacDecoder() override { aac_close(data); }
-    
+
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
         return aac_decode(data, buf, buf_len, sound_params);
     }
@@ -735,8 +735,5 @@ extern "C" class AudioPlugin *aac_plugin_init() {
     static AacPlugin plugin;
     return &plugin;
 }
-
-
-
 
 // EOF

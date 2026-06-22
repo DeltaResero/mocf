@@ -252,7 +252,7 @@ static void show_help(poptContext ctx)
   poptPrintHelp(ctx, stdout, 0);
 
   printf("\nEnvironment variables:\n\n");
-  for (ix = 0; ix < ARRAY_SIZE(environment_variables); ix += 1)
+  for (ix = 0; ix < std::size(environment_variables); ix += 1)
   {
     printf("  %-34s%s\n", environment_variables[ix].name,
            environment_variables[ix].desc);
@@ -613,7 +613,7 @@ void free_popt_clone(struct poptOption *opts)
 struct poptOption *find_popt_option(struct poptOption *opts, int wanted)
 {
   assert(opts);
-  assert(LIMIT(wanted, popt_next_val));
+  assert(in_range(wanted, popt_next_val));
 
   for (size_t ix = 0; !is_tableend(&opts[ix]); ix += 1)
   {
@@ -927,7 +927,7 @@ static void log_environment_variables()
 #ifndef NDEBUG
   size_t ix;
 
-  for (ix = 0; ix < ARRAY_SIZE(environment_variables); ix += 1)
+  for (ix = 0; ix < std::size(environment_variables); ix += 1)
   {
     char *str;
 

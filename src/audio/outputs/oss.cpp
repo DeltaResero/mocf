@@ -22,6 +22,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <algorithm>
 
 #ifdef HAVE_SYS_SOUNDCARD_H
 #include <sys/soundcard.h>
@@ -61,7 +62,7 @@ static const struct
                       {"master", SOUND_MIXER_VOLUME},
                       {"speaker", SOUND_MIXER_SPEAKER}};
 
-#define MIXER_CHANNELS_NUM (ARRAY_SIZE(mixer_channels))
+#define MIXER_CHANNELS_NUM (std::size(mixer_channels))
 
 static int open_dev()
 {
@@ -483,7 +484,7 @@ static void oss_set_mixer(int vol)
   if (dsp_fd != -1)
 #endif
   {
-    vol = CLAMP(0, vol, 100);
+    vol = std::clamp(vol, 0, 100);
     vol |= vol << 8;
 #ifdef OSSv3_MIXER
     if (ioctl(mixer_fd, MIXER_WRITE(mixer_channel_current), &vol) == -1)

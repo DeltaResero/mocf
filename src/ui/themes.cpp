@@ -211,7 +211,7 @@ static enum color_index find_color_element_name(const char *name)
 
   assert(name != nullptr);
 
-  for (ix = 0; ix < ARRAY_SIZE(color_tab); ix += 1)
+  for (ix = 0; ix < std::size(color_tab); ix += 1)
   {
     if (!strcasecmp(color_tab[ix].name, name))
     {
@@ -236,7 +236,7 @@ static short find_color_name(const char *name)
                    {"cyan", COLOR_CYAN},       {"white", COLOR_WHITE},
                    {"default", COLOR_DEFAULT}, {"grey", COLOR_GREY}};
 
-  for (ix = 0; ix < ARRAY_SIZE(color_tab); ix += 1)
+  for (ix = 0; ix < std::size(color_tab); ix += 1)
   {
     if (!strcasecmp(color_tab[ix].name, name))
     {
@@ -547,7 +547,7 @@ static short parse_rgb_color_value(const int line_num,
     }
     return -1;
   }
-  if (!RANGE(0, color, 1000))
+  if (!in_closed_range(0, color, 1000))
   {
     if (errors_are_fatal)
     {
@@ -602,7 +602,7 @@ static int parse_theme_colordef(const int line_num, const int errors_are_fatal)
       }
       return -1;
     }
-    if (!RANGE(0, color, 0xFFFFFF))
+    if (!in_closed_range(0, color, 0xFFFFFF))
     {
       if (errors_are_fatal)
       {

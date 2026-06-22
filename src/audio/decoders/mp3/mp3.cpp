@@ -496,7 +496,7 @@ static inline int32_t round_sample(mad_fixed_t sample)
 {
   sample += 1L << (MAD_F_FRACBITS - 24);
 
-  sample = CLAMP(-MAD_F_ONE, sample, MAD_F_ONE - 1);
+  sample = std::clamp(sample, -MAD_F_ONE, MAD_F_ONE - 1);
 
   return sample >> (MAD_F_FRACBITS + 1 - 24);
 }

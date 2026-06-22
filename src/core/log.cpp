@@ -155,7 +155,7 @@ static void log_signals_raised(void)
 {
   size_t ix;
 
-  for (ix = 0; ix < ARRAY_SIZE(sig_info); ix += 1)
+  for (ix = 0; ix < std::size(sig_info); ix += 1)
   {
     while (sig_info[ix].raised > sig_info[ix].logged)
     {

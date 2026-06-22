@@ -23,6 +23,7 @@
 #include <cstring>
 #include <utility>
 #include <vector>
+#include <algorithm>
 
 #define DEBUG
 
@@ -126,7 +127,7 @@ struct file_tags *tags_dup(const struct file_tags *tags)
 /* Return 1 if an item has 'deleted' flag. */
 inline int plist_deleted(const struct plist *plist, const int num)
 {
-  assert(LIMIT(num, plist->num));
+  assert(in_range(num, plist->num));
 
   return plist->items[num].deleted;
 }
@@ -564,7 +565,7 @@ static void do_title_expn(char *dest, int size, const char *fmt,
     fmt++;
   }
 
-  free = MAX(free, 0); /* Possible integer overflow? */
+  free = std::max(free, 0); /* Possible integer overflow? */
   dest[size - free] = '\0';
 }
 
@@ -636,7 +637,7 @@ int plist_count(const struct plist *plist)
 /* Set tags title of an item. */
 void plist_set_title_tags(struct plist *plist, const int num, const char *title)
 {
-  assert(LIMIT(num, plist->num));
+  assert(in_range(num, plist->num));
 
   plist->items[num].title_tags = title ? title : "";
 }
@@ -644,7 +645,7 @@ void plist_set_title_tags(struct plist *plist, const int num, const char *title)
 /* Set file title of an item. */
 void plist_set_title_file(struct plist *plist, const int num, const char *title)
 {
-  assert(LIMIT(num, plist->num));
+  assert(in_range(num, plist->num));
 
   plist->items[num].title_file = title ? title : "";
 }
@@ -652,7 +653,7 @@ void plist_set_title_file(struct plist *plist, const int num, const char *title)
 /* Set file for an item. */
 void plist_set_file(struct plist *plist, const int num, const char *file)
 {
-  assert(LIMIT(num, plist->num));
+  assert(in_range(num, plist->num));
   assert(file != nullptr);
 
   if (!plist->items[num].file.empty())
@@ -696,7 +697,7 @@ void plist_set_item_time(struct plist *plist, const int num, const int time)
   int old_time;
 
   assert(plist != nullptr);
-  assert(LIMIT(num, plist->num));
+  assert(in_range(num, plist->num));
 
   if (!plist->items[num].tags)
   {
@@ -756,8 +757,8 @@ int plist_total_time(const struct plist *plist, int *all_files)
 static void plist_swap(struct plist *plist, const int a, const int b)
 {
   assert(plist != nullptr);
-  assert(LIMIT(a, plist->num));
-  assert(LIMIT(b, plist->num));
+  assert(in_range(a, plist->num));
+  assert(in_range(b, plist->num));
 
   if (a != b)
   {
@@ -875,7 +876,7 @@ void plist_set_tags(struct plist *plist, const int num,
   int old_time;
 
   assert(plist != nullptr);
-  assert(LIMIT(num, plist->num));
+  assert(in_range(num, plist->num));
   assert(tags != nullptr);
 
   if (plist->items[num].tags && plist->items[num].tags->time != -1)
@@ -905,7 +906,7 @@ void plist_set_tags(struct plist *plist, const int num,
 struct file_tags *plist_get_tags(const struct plist *plist, const int num)
 {
   assert(plist != nullptr);
-  assert(LIMIT(num, plist->num));
+  assert(in_range(num, plist->num));
 
   if (plist->items[num].tags)
   {
@@ -936,7 +937,7 @@ int plist_get_position(const struct plist *plist, int num)
 {
   int i, pos = 1;
 
-  assert(LIMIT(num, plist->num));
+  assert(in_range(num, plist->num));
 
   for (i = 0; i < num; i++)
   {

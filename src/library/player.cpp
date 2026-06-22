@@ -478,7 +478,7 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
 
       logit("seeking");
       md5->okay = false;
-      req_seek = MAX(0, req_seek);
+      req_seek = std::max(0, req_seek);
       if ((decoder_seek = decoder_data->seek(req_seek)) == -1)
       {
         logit("error when seeking");

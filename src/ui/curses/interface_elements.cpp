@@ -302,7 +302,7 @@ static void entry_history_replace(struct entry_history *h, int num,
                                   const char *text)
 {
   assert(h != nullptr);
-  assert(LIMIT(num, static_cast<int>(h->items.size())));
+  assert(in_range(num, static_cast<int>(h->items.size())));
   assert(text != nullptr);
 
   if (strlen(text) != strspn(text, " ") && h->items[num] != text)
@@ -328,7 +328,7 @@ static int entry_history_nitems(const struct entry_history *h)
 static char *entry_history_get(const struct entry_history *h, const int num)
 {
   assert(h != nullptr);
-  assert(LIMIT(num, static_cast<int>(h->items.size())));
+  assert(in_range(num, static_cast<int>(h->items.size())));
 
   return xstrdup(h->items[num].c_str());
 }
@@ -432,9 +432,9 @@ static void entry_set_text_ucs(struct entry *e, const wchar_t *text)
 
   assert(e != nullptr);
 
-  len = MIN(wcslen(text) + 1, ARRAY_SIZE(e->text_ucs));
+  len = std::min(wcslen(text) + 1, std::size(e->text_ucs));
   wmemcpy(e->text_ucs, text, len);
-  e->text_ucs[ARRAY_SIZE(e->text_ucs) - 1] = L'\0';
+  e->text_ucs[std::size(e->text_ucs) - 1] = L'\0';
 
   width = wcswidth(e->text_ucs, WIDTH_MAX);
   e->cur_pos = wcslen(e->text_ucs);
@@ -449,12 +449,12 @@ static void entry_set_text_ucs(struct entry *e, const wchar_t *text)
 /* Set the entry text. */
 static void entry_set_text(struct entry *e, const char *text)
 {
-  wchar_t text_ucs[ARRAY_SIZE(e->text_ucs)];
+  wchar_t text_ucs[std::size(e->text_ucs)];
 
   assert(e != nullptr);
 
-  mbstowcs(text_ucs, text, ARRAY_SIZE(e->text_ucs));
-  e->text_ucs[ARRAY_SIZE(e->text_ucs) - 1] = L'\0';
+  mbstowcs(text_ucs, text, std::size(e->text_ucs));
+  e->text_ucs[std::size(e->text_ucs) - 1] = L'\0';
 
   entry_set_text_ucs(e, text_ucs);
 }
@@ -467,7 +467,7 @@ static void entry_add_char(struct entry *e, const wchar_t c)
   assert(e != nullptr);
 
   len = wcslen(e->text_ucs);
-  if (len >= ARRAY_SIZE(e->text_ucs) - sizeof(wchar_t))
+  if (len >= std::size(e->text_ucs) - sizeof(wchar_t))
   {
     return;
   }
@@ -881,7 +881,7 @@ static bool parse_layout_coordinate(const char *fmt, int *val, const int max)
   }
   *val = v;
 
-  if (!RANGE(0, *val, max))
+  if (!in_closed_range(0, *val, max))
   {
     logit("Coordinate out of range - %d is not in (0, %d)", *val, max);
     return false;
@@ -1414,7 +1414,7 @@ static struct side_menu *find_side_menu(struct main_win *w,
 
   assert(w != nullptr);
 
-  for (ix = 0; ix < ARRAY_SIZE(w->menus); ix += 1)
+  for (ix = 0; ix < std::size(w->menus); ix += 1)
   {
     struct side_menu *m = &w->menus[ix];
 
@@ -1509,7 +1509,7 @@ static int side_menu_update_item(struct side_menu *m, const struct plist *plist,
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
   assert(plist != nullptr);
-  assert(LIMIT(n, plist->num));
+  assert(in_range(n, plist->num));
 
   file = plist_get_file(plist, n);
   assert(!file.empty());
@@ -1848,7 +1848,7 @@ static void main_win_draw(struct main_win *w)
     werase(w->win);
 
     /* Draw all visible menus.  Draw the selected menu last. */
-    for (ix = 0; ix < ARRAY_SIZE(w->menus); ix += 1)
+    for (ix = 0; ix < std::size(w->menus); ix += 1)
     {
       if (w->menus[ix].visible && ix != static_cast<size_t>(w->selected_menu))
       {
@@ -1944,7 +1944,7 @@ static void main_win_switch_to(struct main_win *w,
     side_menu_destroy(&w->menus[2]);
   }
 
-  for (ix = 0; ix < ARRAY_SIZE(w->menus); ix += 1)
+  for (ix = 0; ix < std::size(w->menus); ix += 1)
   {
     if (w->menus[ix].type == menu)
     {
@@ -1953,7 +1953,7 @@ static void main_win_switch_to(struct main_win *w,
     }
   }
 
-  assert(ix < ARRAY_SIZE(w->menus));
+  assert(ix < std::size(w->menus));
 
   main_win_draw(w);
 }
@@ -2049,7 +2049,7 @@ static void main_win_update_item(struct main_win *w,
 
   assert(w != nullptr);
   assert(plist != nullptr);
-  assert(LIMIT(n, plist->num));
+  assert(in_range(n, plist->num));
 
   m = find_side_menu(w, iface_to_side_menu(iface_menu));
 
@@ -2068,7 +2068,7 @@ static void main_win_set_played_file(struct main_win *w, const char *file)
 
   w->curr_file = file ? file : "";
 
-  for (ix = 0; ix < ARRAY_SIZE(w->menus); ix += 1)
+  for (ix = 0; ix < std::size(w->menus); ix += 1)
   {
     struct side_menu *m = &w->menus[ix];
 
@@ -2337,7 +2337,7 @@ static void main_win_update_show_time(struct main_win *w)
 
   assert(w != nullptr);
 
-  for (ix = 0; ix < ARRAY_SIZE(w->menus); ix += 1)
+  for (ix = 0; ix < std::size(w->menus); ix += 1)
   {
     struct side_menu *m = &w->menus[ix];
 
@@ -2365,7 +2365,7 @@ static void main_win_update_show_format(struct main_win *w)
 
   assert(w != nullptr);
 
-  for (ix = 0; ix < ARRAY_SIZE(w->menus); ix += 1)
+  for (ix = 0; ix < std::size(w->menus); ix += 1)
   {
     struct side_menu *m = &w->menus[ix];
 
@@ -2648,8 +2648,8 @@ static void bar_draw(const struct bar *b, WINDOW *win, const int pos_x,
 
   assert(b != nullptr);
   assert(win != nullptr);
-  assert(LIMIT(pos_x, COLS - b->width));
-  assert(LIMIT(pos_y, LINES));
+  assert(in_range(pos_x, COLS - b->width));
+  assert(in_range(pos_y, LINES));
 
   fill_chars = b->filled * b->width / 100.0;
 
@@ -2665,7 +2665,7 @@ static void bar_set_fill(struct bar *b, const double fill)
   assert(b != nullptr);
   assert(fill >= 0.0);
 
-  b->filled = MIN(fill, 100.0);
+  b->filled = std::min(fill, 100.0);
 
   if (b->show_val)
   {
@@ -3092,8 +3092,8 @@ static void info_win_set_block(struct info_win *w, const int block_start,
                                const int block_end)
 {
   assert(w != nullptr);
-  assert(block_start == -1 || RANGE(0, block_start, w->total_time));
-  assert(block_end == -1 || RANGE(0, block_end, w->total_time));
+  assert(block_start == -1 || in_closed_range(0, block_start, w->total_time));
+  assert(block_end == -1 || in_closed_range(0, block_end, w->total_time));
 
   info_win.block_start = block_start;
   info_win.block_end = block_end;
@@ -3148,7 +3148,7 @@ static void info_win_draw_bitrate(const struct info_win *w)
     wmove(w->win, 2, 29);
     if (w->bitrate != -1)
     {
-      xwprintw(w->win, "%4d", MIN(w->bitrate, 9999));
+      xwprintw(w->win, "%4d", std::min(w->bitrate, 9999));
     }
     else
     {
@@ -3963,7 +3963,7 @@ void iface_update_attrs()
   info_win.time_bar.fill_color = get_color(CLR_TIME_BAR_FILL);
   info_win.time_bar.empty_color = get_color(CLR_TIME_BAR_EMPTY);
 
-  for (ix = 0; ix < ARRAY_SIZE(main_win.menus); ix += 1)
+  for (ix = 0; ix < std::size(main_win.menus); ix += 1)
   {
     struct side_menu *m = &main_win.menus[ix];
     struct menu *menu = m->menu.list.main;
