@@ -11,6 +11,7 @@
 #ifndef EQUALIZER_H
 #define EQUALIZER_H
 
+#include <string>
 
   void equalizer_init();
   void equalizer_shutdown();
@@ -19,7 +20,7 @@
   void equalizer_refresh();
   int equalizer_is_active();
   int equalizer_set_active(int active);
-  char *equalizer_current_eqname();
+  std::string equalizer_current_eqname();
   void equalizer_next();
   void equalizer_prev();
 

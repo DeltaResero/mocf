@@ -648,20 +648,19 @@ void engine_toggle_softmixer(void)
 static void update_eq_name()
 {
   char buffer[27];
-  char *n = equalizer_current_eqname();
-  int l   = strlen(n);
+  std::string n = equalizer_current_eqname();
+  int l   = n.length();
 
   if (l > 14)
   {
-    n[14] = 0;
+    n.resize(14);
     n[13] = '.';
     n[12] = '.';
     n[11] = '.';
   }
 
-  snprintf(buffer, sizeof(buffer), "EQ set to: %s", n);
+  snprintf(buffer, sizeof(buffer), "EQ set to: %s", n.c_str());
   logit("%s", buffer);
-  free(n);
   status_msg(buffer);
 }
 

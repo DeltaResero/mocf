@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <vector>
 #include <algorithm>
+#include <string>
 
 #include "core/common.h"
 #include "audio/audio.h"
@@ -169,14 +170,14 @@ int equalizer_is_active() { return equ_active ? 1 : 0; }
 
 int equalizer_set_active(int active) { return equ_active = active ? 1 : 0; }
 
-char *equalizer_current_eqname()
+std::string equalizer_current_eqname()
 {
   if (equ_active && current_equ && current_equ->set)
   {
-    return xstrdup(current_equ->set->name);
+    return std::string(current_equ->set->name);
   }
 
-  return xstrdup("off");
+  return std::string("off");
 }
 
 void equalizer_next()
