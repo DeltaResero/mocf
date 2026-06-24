@@ -444,10 +444,9 @@ private:
     void recv_engine_queue(plist *q) {
         plist *engine_q = engine_get_queue();
         if (!engine_q) return;
-        for (int i = 0; i < engine_q->num; i++) {
+        for (int i = 0; i < static_cast<int>(engine_q->items.size()); i++) {
             if (!plist_deleted(engine_q, i)) plist_add_from_item(q, &engine_q->items[i]);
         }
-        plist_free(engine_q);
         delete engine_q;
     }
 
@@ -565,17 +564,14 @@ private:
         }
 
         plist new_dir_plist;
-        plist_init(&new_dir_plist);
         dirs.reserve(FILES_LIST_INIT_SIZE);
         playlists.reserve(FILES_LIST_INIT_SIZE);
 
         if (!read_directory(new_dir, dirs, playlists, &new_dir_plist)) {
             iface_set_status("");
-            plist_free(&new_dir_plist);
             return 0;
         }
 
-        plist_free(&dir_plist);
         dir_plist = std::move(new_dir_plist);
 
 #ifdef HAVE_SYS_INOTIFY_H
@@ -840,7 +836,6 @@ private:
 
         iface_set_status("Reading directories...");
         plist p;
-        plist_init(&p);
 
         if (type == F_DIR) {
             read_directory_recurr(file.c_str(), &p);
@@ -860,7 +855,6 @@ private:
         }
         plist_cat(&playlist, &p);
 
-        plist_free(&p);
     }
 
     void remove_file_from_playlist(const char *file) {
@@ -1486,9 +1480,6 @@ public:
         silent_seek_key_last = 0;
         last_menu_move_time = 0;
 
-        plist_init(&dir_plist);
-        plist_init(&playlist);
-        plist_init(&queue);
         keys_init();
         windows_init();
         get_engine_options();
@@ -1599,9 +1590,6 @@ public:
         windows_end();
         keys_cleanup();
 
-        plist_free(&dir_plist);
-        plist_free(&playlist);
-        plist_free(&queue);
 
         while (!events.empty()) {
             free_event_data(events.front().type, events.front().data);

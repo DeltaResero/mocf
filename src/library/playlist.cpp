@@ -80,13 +80,9 @@ inline int plist_deleted(const struct plist *plist, const int num)
   return plist->items[num].deleted;
 }
 
-/* Initialize the playlist. */
-void plist_init(struct plist *plist)
+plist::plist()
 {
-  plist->not_deleted = 0;
-  plist->items.reserve(INIT_SIZE);
-  plist->total_time = 0;
-  plist->items_with_time = 0;
+  items.reserve(INIT_SIZE);
 }
 
 /* Create a new playlist item with empty fields. */
@@ -204,16 +200,6 @@ void plist_clear(struct plist *plist)
   plist->search_tree.clear();
   plist->total_time = 0;
   plist->items_with_time = 0;
-}
-
-/* Destroy the list freeing memory; the list can't be used after that. */
-void plist_free(struct plist *plist)
-{
-  assert(plist != nullptr);
-
-  plist_clear(plist);
-  plist->items.shrink_to_fit();
-  plist->search_tree.clear();
 }
 
 /* Sort the playlist by file names. */

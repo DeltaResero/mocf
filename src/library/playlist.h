@@ -58,10 +58,10 @@
 
   struct plist
   {
-    int not_deleted; /* Number of non-deleted items */
+    int not_deleted      = 0;
     std::vector<plist_item> items;
-    int total_time;      /* Total time for files on the playlist */
-    int items_with_time; /* Number of items for which the time is set. */
+    int total_time       = 0;
+    int items_with_time  = 0;
 
     struct StrCollCompare {
       bool operator()(const std::string& a, const std::string& b) const {
@@ -69,9 +69,11 @@
       }
     };
     std::map<std::string, int, StrCollCompare> search_tree;
+
+    plist();
+    ~plist() = default;
   };
 
-  void plist_init(struct plist *plist);
   int plist_add(struct plist *plist, const char *file_name);
   int plist_add_from_item(struct plist *plist, const struct plist_item *item);
   std::string plist_get_file(const struct plist *plist, int i);
@@ -79,7 +81,6 @@
   int plist_prev(struct plist *plist, int num);
   void plist_clear(struct plist *plist);
   void plist_delete(struct plist *plist, const int num);
-  void plist_free(struct plist *plist);
   void plist_sort_fname(struct plist *plist);
   int plist_find_fname(struct plist *plist, const char *file);
   void tags_update(struct file_tags *dst, struct file_tags *src, int move);

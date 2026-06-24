@@ -1363,9 +1363,6 @@ void audio_initialize()
   softmixer_init();
   equalizer_init();
 
-  plist_init(&playlist);
-  plist_init(&shuffled_plist);
-  plist_init(&queue);
   player_init();
 }
 
@@ -1377,9 +1374,6 @@ void audio_exit()
     hw->shutdown();
   }
   out_buf.reset();
-  plist_free(&playlist);
-  plist_free(&shuffled_plist);
-  plist_free(&queue);
   player_cleanup();
 
   softmixer_shutdown();
@@ -1601,7 +1595,6 @@ void audio_plist_move(const char *file1, const char *file2)
 struct plist *audio_queue_get_contents()
 {
   struct plist *ret = new plist;
-  plist_init(ret);
 
   std::lock_guard<std::mutex> lock(plist_mtx);
   plist_cat(ret, &queue);

@@ -107,7 +107,7 @@
   void engine_queue_clear(void);
 
   /* Returns a freshly allocated copy of the server queue; caller must
-   * plist_free() + free() it. */
+   * delete it. */
   struct plist *engine_get_queue(void);
 
   /* -----------------------------------------------------------------------
