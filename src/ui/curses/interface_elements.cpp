@@ -302,7 +302,7 @@ static void entry_history_replace(struct entry_history *h, int num,
                                   const char *text)
 {
   assert(h != nullptr);
-  assert(in_range(num, static_cast<int>(h->items.size())));
+  assert(in_range(num, h->items.size()));
   assert(text != nullptr);
 
   if (strlen(text) != strspn(text, " ") && h->items[num] != text)
@@ -328,7 +328,7 @@ static int entry_history_nitems(const struct entry_history *h)
 static char *entry_history_get(const struct entry_history *h, const int num)
 {
   assert(h != nullptr);
-  assert(in_range(num, static_cast<int>(h->items.size())));
+  assert(in_range(num, h->items.size()));
 
   return xstrdup(h->items[num].c_str());
 }
@@ -1204,7 +1204,7 @@ static void side_menu_make_list_content(struct side_menu *m,
   }
 
   /* playlist items */
-  for (i = 0; i < files->num; i++)
+  for (i = 0; i < static_cast<int>(files->items.size()); i++)
   {
     if (!plist_deleted(files, i))
     {
@@ -1505,7 +1505,7 @@ static int side_menu_update_item(struct side_menu *m, const struct plist *plist,
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
   assert(plist != nullptr);
-  assert(in_range(n, plist->num));
+  assert(in_range(n, plist->items.size()));
 
   file = plist_get_file(plist, n);
   assert(!file.empty());
@@ -2045,7 +2045,7 @@ static void main_win_update_item(struct main_win *w,
 
   assert(w != nullptr);
   assert(plist != nullptr);
-  assert(in_range(n, plist->num));
+  assert(in_range(n, plist->items.size()));
 
   m = find_side_menu(w, iface_to_side_menu(iface_menu));
 
@@ -4603,7 +4603,7 @@ void iface_update_queue_positions(const struct plist *queue,
 
   assert(queue != nullptr);
 
-  for (i = 0; i < queue->num; i++)
+  for (i = 0; i < static_cast<int>(queue->items.size()); i++)
   {
     if (!plist_deleted(queue, i))
     {
@@ -4631,7 +4631,7 @@ void iface_clear_queue_positions(const struct plist *queue,
   assert(playlist != nullptr);
   assert(dir_list != nullptr);
 
-  for (i = 0; i < queue->num; i++)
+  for (i = 0; i < static_cast<int>(queue->items.size()); i++)
   {
     if (!plist_deleted(queue, i))
     {

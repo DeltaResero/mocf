@@ -173,7 +173,7 @@ void make_file_title(struct plist *plist, const int num,
                      const bool hide_extension)
 {
   assert(plist != nullptr);
-  assert(in_range(num, plist->num));
+  assert(in_range(num, plist->items.size()));
   assert(!plist_deleted(plist, num));
 
   std::string file = plist->items[num].file;
@@ -201,7 +201,7 @@ void make_tags_title(struct plist *plist, const int num)
   bool hide_extn;
 
   assert(plist != nullptr);
-  assert(in_range(num, plist->num));
+  assert(in_range(num, plist->items.size()));
   assert(!plist_deleted(plist, num));
 
   if (!plist->items[num].title_tags.empty())
@@ -229,7 +229,7 @@ void switch_titles_file(struct plist *plist)
 
   hide_extn = options_get_bool("HideFileExtension");
 
-  for (i = 0; i < plist->num; i++)
+  for (i = 0; i < static_cast<int>(plist->items.size()); i++)
   {
     if (plist_deleted(plist, i))
     {
@@ -253,7 +253,7 @@ void switch_titles_tags(struct plist *plist)
 
   hide_extn = options_get_bool("HideFileExtension");
 
-  for (i = 0; i < plist->num; i++)
+  for (i = 0; i < static_cast<int>(plist->items.size()); i++)
   {
     if (plist_deleted(plist, i))
     {

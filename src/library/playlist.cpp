@@ -75,7 +75,7 @@ void tags_update(struct file_tags *dst, struct file_tags *src, int move)
 /* Return 1 if an item has 'deleted' flag. */
 inline int plist_deleted(const struct plist *plist, const int num)
 {
-  assert(in_range(num, plist->num));
+  assert(in_range(num, plist->items.size()));
 
   return plist->items[num].deleted;
 }
@@ -83,7 +83,6 @@ inline int plist_deleted(const struct plist *plist, const int num)
 /* Initialize the playlist. */
 void plist_init(struct plist *plist)
 {
-  plist->num = 0;
   plist->not_deleted = 0;
   plist->items.reserve(INIT_SIZE);
   plist->total_time = 0;
@@ -96,7 +95,7 @@ int plist_add(struct plist *plist, const char *file_name)
 {
   assert(plist != nullptr);
 
-  int new_idx = plist->num;
+  int new_idx = static_cast<int>(plist->items.size());
 
   plist->items.emplace_back();
   plist_item &item = plist->items.back();
@@ -107,8 +106,6 @@ int plist_add(struct plist *plist, const char *file_name)
   item.tags      = nullptr;
   item.mtime     = file_name ? get_mtime(file_name) : static_cast<time_t>(-1);
   item.queue_pos = 0;
-
-  plist->num++;
 
   if (file_name)
   {
@@ -151,7 +148,7 @@ std::string plist_get_file(const struct plist *plist, int i)
   assert(i >= 0);
   assert(plist != nullptr);
 
-  if (i < plist->num)
+  if (i < static_cast<int>(plist->items.size()))
   {
     return plist->items[i].file;
   }
@@ -170,12 +167,12 @@ int plist_next(struct plist *plist, int num)
   assert(plist != nullptr);
   assert(num >= -1);
 
-  while (i < plist->num && plist->items[i].deleted)
+  while (i < static_cast<int>(plist->items.size()) && plist->items[i].deleted)
   {
     i++;
   }
 
-  return i < plist->num ? i : -1;
+  return i < static_cast<int>(plist->items.size()) ? i : -1;
 }
 
 /* Get the number of the previous item on the list (skipping deleted items).
@@ -203,7 +200,6 @@ void plist_clear(struct plist *plist)
   assert(plist != nullptr);
 
   plist->items.clear();
-  plist->num = 0;
   plist->not_deleted = 0;
   plist->search_tree.clear();
   plist->total_time = 0;
@@ -250,7 +246,6 @@ void plist_sort_fname(struct plist *plist)
   }
   plist->items.resize(n);
 
-  plist->num = n;
   plist->not_deleted = n;
 }
 
@@ -280,7 +275,7 @@ int plist_find_del_fname(const struct plist *plist, const char *file)
 
   assert(plist != nullptr);
 
-  for (i = 0; i < plist->num; i++)
+  for (i = 0; i < static_cast<int>(plist->items.size()); i++)
   {
     if (!plist->items[i].file.empty() && plist->items[i].file == file)
     {
@@ -307,7 +302,7 @@ const char *plist_get_next_dead_entry(const struct plist *plist,
   assert(last_index != nullptr);
   assert(plist != nullptr);
 
-  for (i = *last_index; i < plist->num; i++)
+  for (i = *last_index; i < static_cast<int>(plist->items.size()); i++)
   {
     if (!plist->items[i].file.empty() && !plist_deleted(plist, i) &&
         !can_read_file(plist->items[i].file.c_str()))
@@ -532,7 +527,7 @@ void plist_delete(struct plist *plist, const int num)
   assert(!plist->items[num].deleted);
   assert(plist->not_deleted > 0);
 
-  if (num < plist->num)
+  if (num < static_cast<int>(plist->items.size()))
   {
     /* Free every field except the file, it is needed in deleted items. */
     std::string file = std::move(plist->items[num].file);
@@ -562,7 +557,7 @@ int plist_count(const struct plist *plist)
 /* Set tags title of an item. */
 void plist_set_title_tags(struct plist *plist, const int num, const char *title)
 {
-  assert(in_range(num, plist->num));
+  assert(in_range(num, plist->items.size()));
 
   plist->items[num].title_tags = title ? title : "";
 }
@@ -570,7 +565,7 @@ void plist_set_title_tags(struct plist *plist, const int num, const char *title)
 /* Set file title of an item. */
 void plist_set_title_file(struct plist *plist, const int num, const char *title)
 {
-  assert(in_range(num, plist->num));
+  assert(in_range(num, plist->items.size()));
 
   plist->items[num].title_file = title ? title : "";
 }
@@ -578,7 +573,7 @@ void plist_set_title_file(struct plist *plist, const int num, const char *title)
 /* Set file for an item. */
 void plist_set_file(struct plist *plist, const int num, const char *file)
 {
-  assert(in_range(num, plist->num));
+  assert(in_range(num, plist->items.size()));
   assert(file != nullptr);
 
   if (!plist->items[num].file.empty())
@@ -622,7 +617,7 @@ void plist_set_item_time(struct plist *plist, const int num, const int time)
   int old_time;
 
   assert(plist != nullptr);
-  assert(in_range(num, plist->num));
+  assert(in_range(num, plist->items.size()));
 
   if (!plist->items[num].tags)
   {
@@ -682,8 +677,8 @@ int plist_total_time(const struct plist *plist, int *all_files)
 static void plist_swap(struct plist *plist, const int a, const int b)
 {
   assert(plist != nullptr);
-  assert(in_range(a, plist->num));
-  assert(in_range(b, plist->num));
+  assert(in_range(a, plist->items.size()));
+  assert(in_range(b, plist->items.size()));
 
   if (a != b)
   {
@@ -696,14 +691,14 @@ void plist_shuffle(struct plist *plist)
 {
   int i;
 
-  for (i = plist->num - 1; i > 0; i -= 1)
+  for (i = static_cast<int>(plist->items.size()) - 1; i > 0; i -= 1)
   {
     plist_swap(plist, i, rand() % (i + 1));
   }
 
   plist->search_tree.clear();
 
-  for (i = 0; i < plist->num; i++)
+  for (i = 0; i < static_cast<int>(plist->items.size()); i++)
   {
     plist->search_tree[plist->items[i].file] = i;
   }
@@ -735,7 +730,7 @@ int plist_last(const struct plist *plist)
 {
   int i;
 
-  i = plist->num - 1;
+  i = static_cast<int>(plist->items.size()) - 1;
 
   while (i > 0 && plist_deleted(plist, i))
   {
@@ -748,7 +743,7 @@ int plist_last(const struct plist *plist)
 enum file_type plist_file_type(const struct plist *plist, const int num)
 {
   assert(plist != nullptr);
-  assert(num < plist->num);
+  assert(num < static_cast<int>(plist->items.size()));
 
   return plist->items[num].type;
 }
@@ -783,7 +778,7 @@ void plist_discard_tags(struct plist *plist)
 
   assert(plist != nullptr);
 
-  for (i = 0; i < plist->num; i++)
+  for (i = 0; i < static_cast<int>(plist->items.size()); i++)
   {
     if (!plist_deleted(plist, i) && plist->items[i].tags)
     {
@@ -801,7 +796,7 @@ void plist_set_tags(struct plist *plist, const int num,
   int old_time;
 
   assert(plist != nullptr);
-  assert(in_range(num, plist->num));
+  assert(in_range(num, plist->items.size()));
   assert(tags != nullptr);
 
   if (plist->items[num].tags && plist->items[num].tags->time != -1)
@@ -831,7 +826,7 @@ void plist_set_tags(struct plist *plist, const int num,
 struct file_tags *plist_get_tags(const struct plist *plist, const int num)
 {
   assert(plist != nullptr);
-  assert(in_range(num, plist->num));
+  assert(in_range(num, plist->items.size()));
 
   if (plist->items[num].tags)
   {
@@ -862,7 +857,7 @@ int plist_get_position(const struct plist *plist, int num)
 {
   int i, pos = 1;
 
-  assert(in_range(num, plist->num));
+  assert(in_range(num, plist->items.size()));
 
   for (i = 0; i < num; i++)
   {

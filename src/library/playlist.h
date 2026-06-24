@@ -58,7 +58,6 @@
 
   struct plist
   {
-    int num;         /* Number of elements on the list */
     int not_deleted; /* Number of non-deleted items */
     std::vector<plist_item> items;
     int total_time;      /* Total time for files on the playlist */

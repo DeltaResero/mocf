@@ -288,7 +288,7 @@ private:
     int ask_for_tags(const plist *p, const int tags_sel) {
         int req = 0;
         if (tags_sel != 0) {
-            for (int i = 0; i < p->num; i++) {
+            for (int i = 0; i < static_cast<int>(p->items.size()); i++) {
                 if (!plist_deleted(p, i) && (!p->items[i].tags || ~p->items[i].tags->filled & tags_sel)) {
                     std::string file = plist_get_file(p, i);
                     req += send_tags_request(file.c_str(), tags_sel);
@@ -471,7 +471,7 @@ private:
         int item = plist_find_fname(&queue, file);
         if (item != -1) {
             plist_delete(&queue, item);
-            if (plist_count(&queue) == 0 && queue.num >= QUEUE_CLEAR_THRESH) plist_clear(&queue);
+            if (plist_count(&queue) == 0 && static_cast<int>(queue.items.size()) >= QUEUE_CLEAR_THRESH) plist_clear(&queue);
             iface_set_files_in_queue(plist_count(&queue));
             iface_update_queue_positions(&queue, &playlist, &dir_plist, file);
         }
@@ -768,7 +768,7 @@ private:
 
     void send_playlist(plist *p, const int clear) {
         if (clear) audio_plist_clear();
-        for (int i = 0; i < p->num; i++) {
+        for (int i = 0; i < static_cast<int>(p->items.size()); i++) {
             if (!plist_deleted(p, i)) audio_plist_add(p->items[i].file.c_str());
         }
     }
@@ -855,7 +855,7 @@ private:
         switch_titles_file(&p);
         ask_for_tags(&p, get_tags_setting());
 
-        for (int i = 0; i < p.num; i++) {
+        for (int i = 0; i < static_cast<int>(p.items.size()); i++) {
             if (!plist_deleted(&p, i)) iface_add_to_plist(&p, i);
         }
         plist_cat(&playlist, &p);
@@ -1155,7 +1155,7 @@ private:
     }
 
     void update_iface_menu(const iface_menu menu, const plist *p) {
-        for (int i = 0; i < p->num; i++) {
+        for (int i = 0; i < static_cast<int>(p->items.size()); i++) {
             if (!plist_deleted(p, i)) iface_update_item(menu, p, i);
         }
     }

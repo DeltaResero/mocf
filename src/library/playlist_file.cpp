@@ -480,7 +480,7 @@ static int plist_save_m3u(struct plist *plist, const char *fname,
     }
   }
 
-  for (i = 0; i < plist->num; i++)
+  for (i = 0; i < static_cast<int>(plist->items.size()); i++)
   {
     if (!plist_deleted(plist, i))
     {
@@ -560,7 +560,7 @@ int plist_save(struct plist *plist, const char *file, const bool save_tags)
     assert(strcmp(dir, ".") != 0); // file should already include path
 
     /* check if all elements of playlist are in dir or below */
-    for (i = 0; i < plist->num; i++)
+    for (i = 0; i < static_cast<int>(plist->items.size()); i++)
     {
       if (!plist_deleted(plist, i) &&
           (strstr(plist->items[i].file.c_str(), dir) != plist->items[i].file.c_str()))
