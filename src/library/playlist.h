@@ -47,13 +47,13 @@
   struct plist_item
   {
     std::string file;
-    enum file_type type;    /* type of the file (F_OTHER if not read yet) */
-    std::string title_file; /* title based on the file name */
-    std::string title_tags; /* title based on the tags */
+    enum file_type type    = F_OTHER; /* type of the file */
+    std::string title_file;           /* title based on the file name */
+    std::string title_tags;           /* title based on the tags */
     std::unique_ptr<struct file_tags> tags;
-    short deleted;
-    time_t mtime;  /* modification time */
-    int queue_pos; /* position in the queue */
+    short deleted          = 0;
+    time_t mtime           = static_cast<time_t>(-1); /* modification time */
+    int queue_pos          = 0;                       /* position in the queue */
   };
 
   struct plist
@@ -100,8 +100,6 @@
   int plist_total_time(const struct plist *plisti, int *all_files);
   void plist_shuffle(struct plist *plist);
   void plist_swap_first_fname(struct plist *plist, const char *fname);
-  struct plist_item *plist_new_item();
-  void plist_free_item_fields(struct plist_item *item);
   int plist_last(const struct plist *plist);
   int plist_find_del_fname(const struct plist *plist, const char *file);
   const char *plist_get_next_dead_entry(const struct plist *plist,

@@ -339,7 +339,7 @@ static void add_event_all(const int event, const void *data)
   {
     if (event == EV_QUEUE_ADD)
     {
-      data_copy = plist_new_item();
+      data_copy = new plist_item{};
       plist_item_copy(static_cast<plist_item *>(data_copy),
                       static_cast<const plist_item *>(data));
     }
@@ -570,14 +570,13 @@ void engine_queue_add(const char *file)
   logit("Adding '%s' to the queue", file);
   audio_queue_add(file);
 
-  item = plist_new_item();
+  item = new plist_item{};
   item->file  = file;
   item->type  = file_type(file);
   item->mtime = get_mtime(file);
 
   add_event_all(EV_QUEUE_ADD, item);
 
-  plist_free_item_fields(item);
   delete item;
 }
 

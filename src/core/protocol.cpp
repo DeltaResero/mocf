@@ -37,7 +37,6 @@ void free_event_data(const int type, void *data)
   if (type == EV_QUEUE_ADD)
   {
     auto *item = static_cast<struct plist_item *>(data);
-    plist_free_item_fields(item);
     delete item;
   }
   else if (type == EV_FILE_TAGS)

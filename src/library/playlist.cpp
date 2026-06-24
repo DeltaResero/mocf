@@ -91,17 +91,6 @@ void plist_init(struct plist *plist)
 }
 
 /* Create a new playlist item with empty fields. */
-struct plist_item *plist_new_item()
-{
-  auto *item     = new plist_item;
-  item->type     = F_OTHER;
-  item->deleted  = 0;
-  item->tags     = nullptr;
-  item->mtime    = static_cast<time_t>(-1);
-  item->queue_pos = 0;
-  return item;
-}
-
 /* Add a file to the list. Return the index of the item. */
 int plist_add(struct plist *plist, const char *file_name)
 {
@@ -206,17 +195,6 @@ int plist_prev(struct plist *plist, int num)
   }
 
   return i >= 0 ? i : -1;
-}
-
-void plist_free_item_fields(struct plist_item *item)
-{
-  item->file.clear();
-  item->title_tags.clear();
-  item->title_file.clear();
-  if (item->tags)
-  {
-    item->tags.reset();
-  }
 }
 
 /* Clear the list. */
@@ -565,7 +543,6 @@ void plist_delete(struct plist *plist, const int num)
       plist->items_with_time--;
     }
 
-    plist_free_item_fields(&plist->items[num]);
     plist->items[num].file = std::move(file);
 
     plist->items[num].deleted = 1;
