@@ -594,23 +594,22 @@ enum key_cmd get_key_cmd(const enum key_context context,
   return KEY_CMD_WRONG;
 }
 
-/* Return the path to the keymap file or nullptr if none was specified. */
-static char *find_keymap_file()
+/* Return the path to the keymap file or empty string if none was specified. */
+static std::string find_keymap_file()
 {
   const char *file;
-  static char path[PATH_MAX];
 
   if ((file = options_get_str("Keymap")))
   {
     if (file[0] == '/')
     {
       /* Absolute path */
-      return pathstrcpy(path, file);
+      return std::string(file);
     }
-    return pathstrcpy(path, create_file_name(file).c_str());
+    return create_file_name(file);
   }
 
-  return nullptr;
+  return {};
 }
 
 static void keymap_parse_error(const int line, const char *msg)
@@ -950,11 +949,11 @@ static void make_help()
 /* Load key map. Set default keys if necessary. */
 void keys_init()
 {
-  char *file = find_keymap_file();
+  std::string file = find_keymap_file();
 
-  if (file)
+  if (!file.empty())
   {
-    load_key_map(file);
+    load_key_map(file.c_str());
     check_keys();
   }
 

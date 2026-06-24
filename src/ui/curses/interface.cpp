@@ -127,11 +127,9 @@ static void add_themes_to_list(std::vector<std::string> &themes, const char *the
     return;
   }
   while ((entry = readdir(dir))) {
-    char file[PATH_MAX];
     if (entry->d_name[0] == '.') continue;
     if (entry->d_name[strlen(entry->d_name) - 1] == '~') continue;
-    if (snprintf(file, sizeof(file), "%s/%s", themes_dir, entry->d_name) >= ssizeof(file)) continue;
-    themes.push_back(file);
+    themes.push_back(std::string(themes_dir) + "/" + entry->d_name);
   }
   closedir(dir);
 }
@@ -187,7 +185,7 @@ private:
     plist queue;
     plist dir_plist;
     std::queue<Event> events;
-    char cwd[PATH_MAX] = "";
+    std::string cwd;
     bool playlist_dirty = false;
     plist *engine_plist = nullptr;
     file_info curr_file;
@@ -249,32 +247,38 @@ private:
     }
 
     void set_cwd(const char *path) {
-        if (path[0] == '/') strcpy(cwd, "/");
-        else if (!cwd[0]) {
-            if (!getcwd(cwd, sizeof(cwd))) fatal("Can't get CWD: %s", xstrerror(errno).c_str());
+        char buf[PATH_MAX];
+        if (path[0] == '/') {
+            buf[0] = '/'; buf[1] = '\0';
+        } else if (cwd.empty()) {
+            if (!getcwd(buf, sizeof(buf))) fatal("Can't get CWD: %s", xstrerror(errno).c_str());
+        } else {
+            strncpy(buf, cwd.c_str(), sizeof(buf) - 1);
+            buf[sizeof(buf) - 1] = '\0';
         }
-        resolve_path(cwd, sizeof(cwd), path);
+        resolve_path(buf, sizeof(buf), path);
+        cwd = buf;
     }
 
     void set_start_dir() {
-        if (!getcwd(cwd, sizeof(cwd))) {
+        char buf[PATH_MAX];
+        if (!getcwd(buf, sizeof(buf))) {
             if (errno == ERANGE) fatal("CWD is larger than PATH_MAX!");
-            const char *home = get_home();
-            if (strlen(home) >= sizeof(cwd)) fatal("Home directory path is longer than PATH_MAX!");
-            strcpy(cwd, home);
+            cwd = get_home();
+        } else {
+            cwd = buf;
         }
     }
 
     int read_last_dir() {
         FILE *dir_file = fopen(create_file_name("last_directory").c_str(), "r");
         if (!dir_file) return 0;
-        int read_bytes = fread(cwd, sizeof(char), sizeof(cwd) - 1, dir_file);
-        if (read_bytes == 0) {
-            fclose(dir_file);
-            return 0;
-        }
-        cwd[read_bytes] = 0;
+        char buf[PATH_MAX];
+        int read_bytes = fread(buf, sizeof(char), sizeof(buf) - 1, dir_file);
         fclose(dir_file);
+        if (read_bytes == 0) return 0;
+        buf[read_bytes] = '\0';
+        cwd = buf;
         return 1;
     }
 
@@ -550,16 +554,15 @@ private:
     }
 
     int go_to_dir(const char *dir, const int reload) {
-        char last_dir[PATH_MAX];
-        const char *new_dir = dir ? dir : cwd;
+        std::string last_dir;
+        const char *new_dir = dir ? dir : cwd.c_str();
         int going_up = 0;
         std::vector<std::string> dirs, playlists;
 
         iface_set_status("Reading directory...");
 
-        if (dir && is_subdir(dir, cwd)) {
-            strcpy(last_dir, strrchr(cwd, '/') + 1);
-            strcat(last_dir, "/");
+        if (dir && is_subdir(dir, cwd.c_str())) {
+            last_dir = std::string(strrchr(cwd.c_str(), '/') + 1) + "/";
             going_up = 1;
         }
 
@@ -580,7 +583,7 @@ private:
         }
 #endif
 
-        if (dir) strcpy(cwd, dir);
+        if (dir) cwd = dir;
 
         switch_titles_file(&dir_plist);
         plist_sort_fname(&dir_plist);
@@ -599,9 +602,9 @@ private:
             }
 #endif
         }
-        if (going_up) iface_set_curr_item_title(last_dir);
+        if (going_up) iface_set_curr_item_title(last_dir.c_str());
 
-        iface_set_title(IFACE_MENU_DIR, cwd);
+        iface_set_title(IFACE_MENU_DIR, cwd.c_str());
         iface_update_queue_positions(&queue, nullptr, &dir_plist, nullptr);
 
         if (iface_in_plist_menu()) iface_switch_to_dir();
@@ -616,9 +619,9 @@ private:
             if (music_dir) {
                 set_cwd(music_dir);
                 if (first_run && file_type(music_dir) == F_PLAYLIST && plist_count(&playlist) == 0 && go_to_playlist(music_dir, false)) {
-                    cwd[0] = 0;
+                    cwd.clear();
                     first_run = 0;
-                } else if (file_type(cwd) == F_DIR && go_to_dir(nullptr, 0)) {
+                } else if (file_type(cwd.c_str()) == F_DIR && go_to_dir(nullptr, 0)) {
                     first_run = 0;
                     return;
                 }
@@ -636,7 +639,7 @@ private:
 
     void toggle_menu() {
         if (iface_in_plist_menu()) {
-            if (!cwd[0]) enter_first_dir();
+            if (cwd.empty()) enter_first_dir();
             else iface_switch_to_dir();
         } else if (plist_count(&playlist)) {
             iface_switch_to_plist();
@@ -653,7 +656,7 @@ private:
 
         plist_clear(&playlist);
         iface_set_status("Loading playlist...");
-        if (plist_load(&playlist, file, cwd)) {
+        if (plist_load(&playlist, file, cwd.c_str())) {
             if (!default_playlist) toggle_menu();
             iface_set_dir_content(IFACE_MENU_PLIST, &playlist, {}, {});
             iface_update_queue_positions(&queue, &playlist, nullptr, nullptr);
@@ -696,7 +699,7 @@ private:
     void process_multiple_args(const std::vector<std::string> &args) {
         char this_cwd[PATH_MAX];
 
-        if (!getcwd(this_cwd, sizeof(cwd))) interface_fatal("Can't get CWD: %s", xstrerror(errno).c_str());
+        if (!getcwd(this_cwd, sizeof(this_cwd))) interface_fatal("Can't get CWD: %s", xstrerror(errno).c_str());
 
         for (const auto &a : args) {
             const char *arg = a.c_str();
@@ -757,7 +760,7 @@ private:
     }
 
     void go_dir_up() {
-        char *dir = dir_up(cwd);
+        char *dir = dir_up(cwd.c_str());
         go_to_dir(dir, 0);
         free(dir);
     }
@@ -841,7 +844,7 @@ private:
             read_directory_recurr(file.c_str(), &p);
             plist_sort_fname(&p);
         } else {
-            plist_load(&p, file.c_str(), cwd);
+            plist_load(&p, file.c_str(), cwd.c_str());
         }
 
         plist_remove_common_items(&p, &playlist);
@@ -1004,7 +1007,7 @@ private:
             if (!strcmp(str, "~")) add_slash = 1;
             str++;
         } else if (str[0] != '/') {
-            strcpy(dir, cwd);
+            strcpy(dir, cwd.c_str());
         } else {
             strcpy(dir, "/");
         }
@@ -1027,10 +1030,9 @@ private:
                 dir = xstrdup(complete_dir.c_str());
             }
 
-            char buf[PATH_MAX];
-            pathstrcpy(buf, dir);
+            std::string buf = dir;
             free(dir);
-            iface_entry_set_text(buf);
+            iface_entry_set_text(buf.c_str());
         } else if (k->type == IFACE_KEY_CHAR && k->key.ucs == '\n') {
             char *entry_text = iface_entry_get_text();
             if (entry_text[0]) {
@@ -1057,7 +1059,7 @@ private:
 
             if (text[0]) {
                 if (file == "..") {
-                    char *up = dir_up(cwd);
+                    char *up = dir_up(cwd.c_str());
                     file = up;
                     free(up);
                 }
@@ -1268,11 +1270,11 @@ private:
     void make_theme_menu() {
         iface_switch_to_theme_menu();
         if (add_themes_to_menu(create_file_name("themes").c_str(), SYSTEM_THEMES_DIR) == 0) {
-            if (!cwd[0]) enter_first_dir();
+            if (cwd.empty()) enter_first_dir();
             else iface_switch_to_dir();
             iface_error("No themes found.");
         } else {
-            iface_update_theme_selection(get_current_theme());
+            iface_update_theme_selection(get_current_theme().c_str());
         }
         iface_refresh();
     }
@@ -1458,7 +1460,7 @@ private:
     void save_curr_dir() {
         FILE *dir_file = fopen(create_file_name("last_directory").c_str(), "w");
         if (!dir_file) return;
-        fprintf(dir_file, "%s", cwd);
+        fprintf(dir_file, "%s", cwd.c_str());
         fclose(dir_file);
     }
 
@@ -1473,7 +1475,6 @@ public:
         if (!setlocale(LC_CTYPE, "")) logit("Could not set locale!");
 
         g_engine_eq = eq;
-        cwd[0] = '\0';
         playlist_dirty = false;
         engine_plist = nullptr;
         silent_seek_pos = -1;

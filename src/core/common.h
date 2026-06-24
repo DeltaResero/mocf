@@ -137,7 +137,6 @@ constexpr bool in_closed_range(Lo lo, T val, Hi hi) noexcept {
 std::string sec_to_min(int seconds);
   const char *get_home();
   void common_cleanup();
-  char *pathstrcpy(char *restrict dst, const char *restrict src);
 
 std::string xstrerror(int errnum);
 std::string create_file_name(const char *file);

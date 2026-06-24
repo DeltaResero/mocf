@@ -55,7 +55,7 @@
 #define COLOR_GREY 10
 #endif
 
-static char current_theme[PATH_MAX];
+static std::string current_theme;
 
 static int colors[CLR_LAST];
 
@@ -332,25 +332,21 @@ static int get_exe_dir(char *buf, size_t len)
   return 1;
 }
 
-/* Find path to the theme for the given name. Returned memory is static. */
-static char *find_theme_file(const char *name)
+/* Find path to the theme for the given name.
+ * Returns an empty string if the theme file cannot be found. */
+static std::string find_theme_file(const char *name)
 {
-  int rc;
-  static char path[PATH_MAX];
+  std::string path;
 
   if (name[0] == '/')
   {
     /* Absolute path */
-    return pathstrcpy(path, name);
+    return std::string(name);
   }
 
   /* Try the user directory */
-  rc = snprintf(path, sizeof(path), "%s/%s", create_file_name("themes").c_str(), name);
-  if (rc >= ssizeof(path))
-  {
-    interface_fatal("Theme path too long!");
-  }
-  if (file_exists(path))
+  path = std::string(create_file_name("themes").c_str()) + "/" + name;
+  if (file_exists(path.c_str()))
   {
     return path;
   }
@@ -365,8 +361,8 @@ static char *find_theme_file(const char *name)
     char exe_dir[PATH_MAX];
     if (get_exe_dir(exe_dir, sizeof(exe_dir)))
     {
-      rc = snprintf(path, sizeof(path), "%s/data/themes/%s", exe_dir, name);
-      if (rc < ssizeof(path) && file_exists(path))
+      path = std::string(exe_dir) + "/data/themes/" + name;
+      if (file_exists(path.c_str()))
       {
         return path;
       }
@@ -374,12 +370,8 @@ static char *find_theme_file(const char *name)
   }
 
   /* Try the system directory */
-  rc = snprintf(path, sizeof(path), "%s/%s", SYSTEM_THEMES_DIR, name);
-  if (rc >= ssizeof(path))
-  {
-    interface_fatal("Theme path too long!");
-  }
-  if (file_exists(path))
+  path = std::string(SYSTEM_THEMES_DIR) + "/" + name;
+  if (file_exists(path.c_str()))
   {
     return path;
   }
@@ -387,11 +379,11 @@ static char *find_theme_file(const char *name)
   /* File related to the current directory? */
   if (file_exists(name))
   {
-    return pathstrcpy(path, name);
+    return std::string(name);
   }
 
   printf("Error loading theme '%s'!", name);
-  return nullptr;
+  return {};
 }
 
 /* Parse a theme element line. strtok() should be already invoked and consumed
@@ -672,9 +664,9 @@ static int load_color_theme(const char *name, const int errors_are_fatal)
   FILE *file;
   int result = 1;
   int line_num = 0;
-  char *theme_file = find_theme_file(name);
+  std::string theme_file = find_theme_file(name);
 
-  if (!(file = fopen(theme_file, "r")))
+  if (theme_file.empty() || !(file = fopen(theme_file.c_str(), "r")))
   {
     if (errors_are_fatal)
     {
@@ -715,8 +707,6 @@ void theme_init(bool has_xterm)
   if (has_colors())
   {
     const char *theme;
-    char *file;
-
     theme = options_get_str("ForceTheme");
     if (!theme && has_xterm)
     {
@@ -732,15 +722,17 @@ void theme_init(bool has_xterm)
       theme = "nightingale_theme";
     }
 
-    if (theme && (file = find_theme_file(theme)))
     {
-      load_color_theme(file, 1);
-      pathstrcpy(current_theme, file);
-    }
-    else
-    {
-      snprintf(current_theme, PATH_MAX, "%s/nightingale_theme",
-               SYSTEM_THEMES_DIR);
+      std::string file = find_theme_file(theme);
+      if (!file.empty())
+      {
+        load_color_theme(file.c_str(), 1);
+        current_theme = file;
+      }
+      else
+      {
+        current_theme = std::string(SYSTEM_THEMES_DIR) + "/nightingale_theme";
+      }
     }
 
     set_default_colors();
@@ -765,13 +757,13 @@ void themes_switch_theme(const char *file)
     }
     else
     {
-      pathstrcpy(current_theme, file);
+      current_theme = file;
     }
 
     set_default_colors();
   }
 }
 
-const char *get_current_theme() { return current_theme; }
+std::string get_current_theme() { return current_theme; }
 
 // EOF

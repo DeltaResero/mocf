@@ -414,16 +414,6 @@ const char *get_home()
   return home;
 }
 
-char *pathstrcpy(char *restrict dst, const char *restrict src)
-{
-  size_t len = strnlen(src, PATH_MAX);
-  if (len == PATH_MAX)
-  {
-    fatal("Path too long!");
-  }
-  return static_cast<char *>(memcpy(dst, src, len + 1));
-}
-
 void common_cleanup()
 {
 }

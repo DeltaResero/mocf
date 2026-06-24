@@ -56,7 +56,7 @@
   void theme_init(bool has_xterm);
   int get_color(const enum color_index);
   void themes_switch_theme(const char *file);
-  const char *get_current_theme();
+  std::string get_current_theme();
 
 
 #endif
