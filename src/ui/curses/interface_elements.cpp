@@ -1099,10 +1099,8 @@ static int add_to_menu(struct menu *menu, const struct plist *plist,
 
   if (item->tags && item->tags->time != -1)
   {
-    char time_str[32];
-
-    sec_to_min(time_str, item->tags->time);
-    menu_item_set_time(added, time_str);
+    std::string time_str = sec_to_min(item->tags->time);
+    menu_item_set_time(added, time_str.c_str());
   }
 
   menu_item_set_attr_normal(added, get_color(CLR_MENU_ITEM_FILE));
@@ -1453,10 +1451,8 @@ static void update_menu_item(struct menu_item *mi, const struct plist *plist,
 
   if (item->tags && item->tags->time != -1)
   {
-    char time_str[32];
-
-    sec_to_min(time_str, item->tags->time);
-    menu_item_set_time(mi, time_str);
+    std::string time_str = sec_to_min(item->tags->time);
+    menu_item_set_time(mi, time_str.c_str());
   }
   else
   {
@@ -2952,24 +2948,22 @@ static void info_win_set_state(struct info_win *w, const int state)
 
 static void info_win_draw_time(const struct info_win *w)
 {
-  char time_str[32];
-
   assert(w != nullptr);
 
   if (!w->too_small)
   {
     /* current time */
-    sec_to_min(time_str, w->curr_time != -1 ? w->curr_time : 0);
+    std::string time_str = sec_to_min(w->curr_time != -1 ? w->curr_time : 0);
     wattrset(w->win, get_color(CLR_TIME_CURRENT));
-    xmvwaddstr(w->win, 2, 1, time_str);
+    xmvwaddstr(w->win, 2, 1, time_str.c_str());
 
     /* time left */
     if (w->total_time > 0 && w->curr_time >= 0 && w->total_time >= w->curr_time)
     {
-      sec_to_min(time_str, w->total_time - w->curr_time);
+      time_str = sec_to_min(w->total_time - w->curr_time);
       wmove(w->win, 2, 7);
       wattrset(w->win, get_color(CLR_TIME_LEFT));
-      xwaddstr(w->win, time_str);
+      xwaddstr(w->win, time_str.c_str());
     }
     else
     {
@@ -2977,10 +2971,10 @@ static void info_win_draw_time(const struct info_win *w)
     }
 
     /* total time */
-    sec_to_min(time_str, w->total_time != -1 ? w->total_time : 0);
+    time_str = sec_to_min(w->total_time != -1 ? w->total_time : 0);
     wmove(w->win, 2, 14);
     wattrset(w->win, get_color(CLR_TIME_TOTAL));
-    xwaddstr(w->win, time_str);
+    xwaddstr(w->win, time_str.c_str());
 
     bar_draw(&w->time_bar, w->win, 2, 3);
   }

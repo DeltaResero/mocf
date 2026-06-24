@@ -134,7 +134,7 @@ constexpr bool in_closed_range(Lo lo, T val, Hi hi) noexcept {
                       const char *format, ...) ATTR_NORETURN ATTR_PRINTF(4, 5);
   bool is_valid_symbol(const char *candidate);
   int get_realtime(struct timespec *ts);
-  void sec_to_min(char *buff, const int seconds);
+std::string sec_to_min(int seconds);
   const char *get_home();
   void common_cleanup();
   char *pathstrcpy(char *restrict dst, const char *restrict src);

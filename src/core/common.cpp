@@ -351,31 +351,32 @@ int get_realtime(struct timespec *ts)
   return result;
 }
 
-/* Convert time in second to min:sec text format.
-   'buff' must be at least 32 chars long. */
-void sec_to_min(char *buff, const int seconds)
+/* Convert time in seconds to min:sec text format. */
+std::string sec_to_min(int seconds)
 {
   assert(seconds >= 0);
+
+  char buff[32];
 
   if (seconds < 6000)
   {
     /* the time is less than 99:59 */
-    int min, sec;
+    int min = seconds / 60;
+    int sec = seconds % 60;
 
-    min = seconds / 60;
-    sec = seconds % 60;
-
-    snprintf(buff, 32, "%02d:%02d", min, sec);
+    snprintf(buff, sizeof(buff), "%02d:%02d", min, sec);
   }
   else if (seconds < 10000 * 60)
   {
     /* the time is less than 9999 minutes */
-    snprintf(buff, 32, "%4dm", seconds / 60);
+    snprintf(buff, sizeof(buff), "%4dm", seconds / 60);
   }
   else
   {
     strcpy(buff, "!!!!!");
   }
+
+  return std::string(buff);
 }
 
 /* Determine and return the path of the user's home directory. */
