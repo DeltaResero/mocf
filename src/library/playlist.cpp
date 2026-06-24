@@ -38,36 +38,6 @@
 /* Initial size of the table */
 #define INIT_SIZE 64
 
-void tags_free(struct file_tags *tags)
-{
-  assert(tags != nullptr);
-
-  delete tags;
-}
-
-void tags_clear(struct file_tags *tags)
-{
-  assert(tags != nullptr);
-
-  tags->title.clear();
-  tags->artist.clear();
-  tags->album.clear();
-  tags->track = -1;
-  tags->time = -1;
-  tags->filled = 0;
-}
-
-/* Copy the tags data from src to dst freeing old fields if necessary. */
-void tags_copy(struct file_tags *dst, const struct file_tags *src)
-{
-  dst->title = src->title;
-  dst->artist = src->artist;
-  dst->album = src->album;
-  dst->track = src->track;
-  dst->time = src->time;
-  dst->filled = src->filled;
-}
-
 /* copy or move missing tags from src to dst */
 void tags_update(struct file_tags *dst, struct file_tags *src, int move)
 {
@@ -100,28 +70,6 @@ void tags_update(struct file_tags *dst, struct file_tags *src, int move)
     dst->filled |= TAGS_TIME;
   }
 }
-
-struct file_tags *tags_new()
-{
-  auto *tags   = new file_tags;
-  tags->track  = -1;
-  tags->time   = -1;
-  tags->filled = 0;
-  return tags;
-}
-
-struct file_tags *tags_dup(const struct file_tags *tags)
-{
-  struct file_tags *dtags;
-
-  assert(tags != nullptr);
-
-  dtags = tags_new();
-  tags_copy(dtags, tags);
-
-  return dtags;
-}
-
 
 
 /* Return 1 if an item has 'deleted' flag. */
@@ -195,7 +143,7 @@ void plist_item_copy(struct plist_item *dst, const struct plist_item *src)
 
   if (src->tags)
   {
-    dst->tags.reset(tags_dup(src->tags.get()));
+    dst->tags = std::make_unique<file_tags>(*src->tags);
   }
   else
   {
@@ -701,7 +649,7 @@ void plist_set_item_time(struct plist *plist, const int num, const int time)
 
   if (!plist->items[num].tags)
   {
-    plist->items[num].tags.reset(tags_new());
+    plist->items[num].tags = std::make_unique<file_tags>();
     old_time = -1;
   }
   else if (plist->items[num].tags->time != -1)
@@ -888,7 +836,7 @@ void plist_set_tags(struct plist *plist, const int num,
     old_time = -1;
   }
 
-  plist->items[num].tags.reset(tags_dup(tags));
+  plist->items[num].tags = std::make_unique<file_tags>(*tags);
 
   if (old_time != -1)
   {
@@ -910,7 +858,7 @@ struct file_tags *plist_get_tags(const struct plist *plist, const int num)
 
   if (plist->items[num].tags)
   {
-    return tags_dup(plist->items[num].tags.get());
+    return new file_tags(*plist->items[num].tags);
   }
 
   return nullptr;

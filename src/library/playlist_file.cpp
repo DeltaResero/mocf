@@ -392,7 +392,7 @@ static int plist_load_pls(struct plist *plist, const char *fname,
 
         if (time > 0)
         {
-          plist->items[last_added].tags.reset(tags_new());
+          plist->items[last_added].tags = std::make_unique<file_tags>();
           plist->items[last_added].tags->time = time;
           plist->items[last_added].tags->filled |= TAGS_TIME;
         }

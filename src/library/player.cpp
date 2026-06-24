@@ -323,14 +323,14 @@ static void update_tags(AudioDecoder *decoder_data,
   int tags_changed = 0;
   struct file_tags *new_tags;
 
-  new_tags = tags_new();
+  new_tags = new file_tags{};
 
   std::lock_guard<std::mutex> lock(curr_tags_mtx);
   if (decoder_data->current_tags(new_tags) &&
       !new_tags->title.empty())
   {
     tags_changed = 1;
-    tags_copy(curr_tags, new_tags);
+    *curr_tags = *new_tags;
     logit("Tags change from the decoder");
     tags_source = TAGS_SOURCE_DECODER;
     show_tags(curr_tags);
@@ -341,7 +341,7 @@ static void update_tags(AudioDecoder *decoder_data,
     tags_change();
   }
 
-  tags_free(new_tags);
+  delete new_tags;
 }
 
 /* Called when some free space in the output buffer appears. */
@@ -373,7 +373,7 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
 
   {
     std::lock_guard<std::mutex> lock(curr_tags_mtx);
-    curr_tags = tags_new();
+    curr_tags = new file_tags{};
   }
 
   {
@@ -556,7 +556,7 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
     std::lock_guard<std::mutex> lock(curr_tags_mtx);
     if (curr_tags)
     {
-      tags_free(curr_tags);
+      delete curr_tags;
       curr_tags = nullptr;
     }
   }

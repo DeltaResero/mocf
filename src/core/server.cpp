@@ -360,7 +360,7 @@ static void add_event_all(const int event, const void *data)
       const auto *src = static_cast<const tag_ev_response *>(data);
       auto *n = new tag_ev_response;
       n->file = src->file;
-      n->tags = src->tags ? std::unique_ptr<file_tags>(tags_dup(src->tags.get())) : nullptr;
+      n->tags = src->tags ? std::make_unique<file_tags>(*src->tags) : nullptr;
       data_copy = n;
     }
     else
@@ -485,7 +485,7 @@ void tags_response(const char *file, const struct file_tags *tags)
 
   auto *data = new tag_ev_response;
   data->file = file;
-  data->tags = std::unique_ptr<file_tags>(tags_dup(tags));
+  data->tags = std::make_unique<file_tags>(*tags);
   eq_push(g_eq, EV_FILE_TAGS, data);
 }
 
@@ -621,12 +621,12 @@ void engine_jump_to(int sec)
     tags = tags_cache_get_immediate(tags_cache, file.c_str(), TAGS_TIME);
     if (!tags || !(tags->filled & TAGS_TIME))
     {
-      tags_free(tags);
+      delete tags;
       return;
     }
 
     sec = (tags->time * percent) / 100;
-    tags_free(tags);
+    delete tags;
   }
 
   logit("Jumping to %ds", sec);

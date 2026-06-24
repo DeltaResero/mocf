@@ -315,7 +315,7 @@ private:
         if (options_get_bool("ReadTags") && p->items[num].title_tags.empty()) {
             if (p->items[num].title_file.empty()) make_file_title(p, num, options_get_bool("HideFileExtension"));
         }
-        if (old_tags) tags_free(old_tags);
+        if (old_tags) delete old_tags;
     }
 
     void ev_file_tags(const tag_ev_response *data) {
@@ -350,7 +350,7 @@ private:
                 curr_file.title = build_title(data->tags.get());
                 iface_set_played_file_title(curr_file.title.c_str());
             }
-            curr_file.tags.reset(tags_dup(data->tags.get()));
+            curr_file.tags = std::make_unique<file_tags>(*data->tags);
         }
     }
 

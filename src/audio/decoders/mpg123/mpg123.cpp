@@ -224,7 +224,7 @@ static void mpg123_open_stream_internal(struct mpg123_data *data)
   struct mpg123_frameinfo info;
   off_t file_size, samples;
 
-  data->tags = tags_new();
+  data->tags = new file_tags{};
 
 #if MPG123_API_VERSION < 46
   mpg123_init();
@@ -391,7 +391,7 @@ static void mpg123_closeX(void *prv_data)
   decoder_error_clear(&data->error);
   if (data->tags)
   {
-    tags_free(data->tags);
+    delete data->tags;
   }
   delete data;
 }
@@ -460,8 +460,8 @@ static int mpg123_decodeX(void *prv_data, char *buf, int buf_len,
     {
       logit("Tags change");
       data->tags_change = 1;
-      tags_free(data->tags);
-      data->tags = tags_new();
+      delete data->tags;
+      data->tags = new file_tags{};
       get_tags(data->mf, data->tags);
     }
 
@@ -485,7 +485,7 @@ static int mpg123_current_tags(void *prv_data, struct file_tags *tags)
 {
   struct mpg123_data *data = static_cast<struct mpg123_data *>(prv_data);
 
-  tags_copy(tags, data->tags);
+  *tags = *data->tags;
 
   if (data->tags_change)
   {

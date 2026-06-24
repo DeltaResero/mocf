@@ -30,9 +30,9 @@
     std::string title;
     std::string artist;
     std::string album;
-    int track;
-    int time;
-    int filled; /* Which tags are filled: TAGS_COMMENTS, TAGS_TIME. */
+    int track  = -1;
+    int time   = -1;
+    int filled = 0; /* Which tags are filled: TAGS_COMMENTS, TAGS_TIME. */
   };
 
   enum file_type
@@ -83,12 +83,7 @@
   void plist_free(struct plist *plist);
   void plist_sort_fname(struct plist *plist);
   int plist_find_fname(struct plist *plist, const char *file);
-  struct file_tags *tags_new();
-  void tags_clear(struct file_tags *tags);
-  void tags_copy(struct file_tags *dst, const struct file_tags *src);
   void tags_update(struct file_tags *dst, struct file_tags *src, int move);
-  struct file_tags *tags_dup(const struct file_tags *tags);
-  void tags_free(struct file_tags *tags);
   std::string build_title_with_format(const struct file_tags *tags, const char *fmt);
   std::string build_title(const struct file_tags *tags);
   int plist_count(const struct plist *plist);

@@ -223,7 +223,7 @@ static void vorbis_open_stream_internal(struct vorbis_data *data)
   int res;
   ov_callbacks callbacks = {read_cb, seek_cb, close_cb, tell_cb};
 
-  data->tags = tags_new();
+  data->tags = new file_tags{};
 
   res = ov_open_callbacks(data->stream, &data->vf, nullptr, 0, callbacks);
   if (res < 0)
@@ -297,7 +297,7 @@ static void vorbis_close(void *prv_data)
   decoder_error_clear(&data->error);
   if (data->tags)
   {
-    tags_free(data->tags);
+    delete data->tags;
   }
   delete data;
 }
@@ -356,8 +356,8 @@ static int vorbis_decode(void *prv_data, char *buf, int buf_len,
 
       data->last_section = current_section;
       data->tags_change = 1;
-      tags_free(data->tags);
-      data->tags = tags_new();
+      delete data->tags;
+      data->tags = new file_tags{};
       get_comment_tags(&data->vf, data->tags);
     }
 
@@ -429,7 +429,7 @@ static int vorbis_current_tags(void *prv_data, struct file_tags *tags)
 {
   struct vorbis_data *data = static_cast<struct vorbis_data *>(prv_data);
 
-  tags_copy(tags, data->tags);
+  *tags = *data->tags;
 
   if (data->tags_change)
   {

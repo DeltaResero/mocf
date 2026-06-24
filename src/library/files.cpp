@@ -356,7 +356,7 @@ struct file_tags *read_file_tags(const char *file, struct file_tags *tags,
 
   if (tags == nullptr)
   {
-    tags = tags_new();
+    tags = new file_tags{};
   }
 
   needed_tags = ~tags->filled & tags_sel;

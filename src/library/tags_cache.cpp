@@ -207,7 +207,7 @@ static int cache_record_deserialize(struct cache_record *rec,
 
   if (!skip_tags)
   {
-    rec->tags = tags_new();
+    rec->tags = new file_tags{};
   }
   else
   {
@@ -268,7 +268,7 @@ static int cache_record_deserialize(struct cache_record *rec,
 
 err:
   logit("Cache record deserialization error at %tdB", p - serialized);
-  tags_free(rec->tags);
+  delete rec->tags;
   rec->tags = nullptr;
   return 0;
 }
@@ -496,7 +496,7 @@ struct file_tags *read_missing_tags(const char *file, struct file_tags *tags,
 {
   if (tags == nullptr)
   {
-    tags = tags_new();
+    tags = new file_tags{};
   }
 
   if (tags_sel & TAGS_TIME)
@@ -551,7 +551,7 @@ static void *locked_read_add(struct tags_cache *c, const char *file,
       if (rec.mod_time != curr_mtime)
       {
         debug("Tags in the cache are outdated");
-        tags_free(rec.tags); /* remove them and reread tags */
+        delete rec.tags; /* remove them and reread tags */
       }
       else if ((rec.tags->filled & tags_sel) == tags_sel && !notify)
       {
@@ -599,7 +599,7 @@ static struct file_tags *tags_cache_read_add(struct tags_cache *c DB_ONLY,
   if (notify)
   {
     tags_response(file, tags);
-    tags_free(tags);
+    delete tags;
     tags = nullptr;
   }
 
@@ -739,12 +739,12 @@ static void *locked_add_request(struct tags_cache *c, const char *file,
         (rec.tags->filled & tags_sel) == tags_sel)
     {
       tags_response(file, rec.tags);
-      tags_free(rec.tags);
+      delete rec.tags;
       debug("Tags are present in the cache");
       return (void *)1;
     }
 
-    tags_free(rec.tags);
+    delete rec.tags;
     debug("Found outdated or incomplete tags in the cache");
   }
 
