@@ -61,45 +61,67 @@
   } while (0)
 #endif
 
-static snd_pcm_t *handle = nullptr;
 
-static struct
-{
-  unsigned int channels;
-  unsigned int rate;
-  snd_pcm_format_t format;
-} params = {0, 0, SND_PCM_FORMAT_UNKNOWN};
+class AlsaOutput : public AudioOutput {
+private:
+    snd_pcm_t *handle = nullptr;
+    struct params_t {
+        unsigned int channels;
+        unsigned int rate;
+        snd_pcm_format_t format;
+    } params = {0, 0, SND_PCM_FORMAT_UNKNOWN};
+    snd_pcm_uframes_t buffer_frames;
+    snd_pcm_uframes_t chunk_frames;
+    int chunk_bytes = -1;
+    char alsa_buf[512 * 1024];
+    int alsa_buf_fill = 0;
+    int bytes_per_frame;
+    int bytes_per_sample;
+    snd_mixer_t *mixer_handle = nullptr;
+    snd_mixer_elem_t *mixer_elem1 = nullptr;
+    snd_mixer_elem_t *mixer_elem2 = nullptr;
+    snd_mixer_elem_t *mixer_elem_curr = nullptr;
+    long mixer1_min = -1, mixer1_max = -1;
+    long mixer2_min = -1, mixer2_max = -1;
+    int volume1 = -1;
+    int volume2 = -1;
+    long real_volume1 = -1;
+    long real_volume2 = -1;
+    bool use_linear_volume_scale1 = true;
+    bool use_linear_volume_scale2 = true;
+    double min_norm1 = 0, min_norm2 = 0;
 
-static snd_pcm_uframes_t buffer_frames;
-static snd_pcm_uframes_t chunk_frames;
-static int chunk_bytes = -1;
-static char alsa_buf[512 * 1024];
-static int alsa_buf_fill = 0;
-static int bytes_per_frame;
-static int bytes_per_sample;
+    int scale_volume(long real_vol, long *mixer_min, long *mixer_max, double *min_norm, bool *use_linear_volume_scale);
+    long scale_volume_inverse(int vol, long *mixer_min, long *mixer_max, double *min_norm, bool *use_linear_volume_scale);
+    snd_pcm_hw_params_t *alsa_open_device(const char *device);
+    int fill_capabilities(struct output_driver_caps *caps);
+    void handle_mixer_events(snd_mixer_t *mixer_handle);
+    int alsa_read_mixer_raw(snd_mixer_elem_t *elem, bool raw);
+    snd_mixer_elem_t *alsa_init_mixer_channel(const char *name, long *vol_min, long *vol_max, double *min_norm, bool *use_linear_volume_scale);
+    void alsa_close_mixer();
+    void alsa_open_mixer(const char *device);
+    void alsa_set_current_mixer();
+    bool is_pulseaudio_present();
+    int play_buf_chunks();
 
-static snd_mixer_t *mixer_handle = nullptr;
-static snd_mixer_elem_t *mixer_elem1 = nullptr;
-static snd_mixer_elem_t *mixer_elem2 = nullptr;
-static snd_mixer_elem_t *mixer_elem_curr = nullptr;
-static long mixer1_min = -1, mixer1_max = -1;
-static long mixer2_min = -1, mixer2_max = -1;
-
-/* Percentage volume setting for first and second mixer. */
-static int volume1 = -1;
-static int volume2 = -1;
-
-/* Real volume setting as we last read them. */
-static long real_volume1 = -1;
-static long real_volume2 = -1;
-
-static bool use_linear_volume_scale1 = true;
-static bool use_linear_volume_scale2 = true;
-double min_norm1, min_norm2;
+public:
+    int init(struct output_driver_caps *caps) override;
+    void shutdown() override;
+    int open(struct sound_params *sound_params) override;
+    void close() override;
+    int play(const char *buff, const size_t size) override;
+    int read_mixer() override;
+    void set_mixer(int vol) override;
+    int get_buff_fill() override;
+    int reset() override;
+    int get_rate() override;
+    void toggle_mixer_channel() override;
+    std::string get_mixer_channel_name() override;
+};
 
 /* Scale the mixer value to 0-100 range for first and second channel */
 // TODO: SND_CTL_TLV_DB_GAIN_MUTE check, vide: alsamixer code
-static int scale_volume(long real_vol, long *mixer_min, long *mixer_max,
+int AlsaOutput::scale_volume(long real_vol, long *mixer_min, long *mixer_max,
                         double *min_norm, bool *use_linear_volume_scale)
 {
   int res;
@@ -118,7 +140,7 @@ static int scale_volume(long real_vol, long *mixer_min, long *mixer_max,
   return res;
 }
 
-static long scale_volume_inverse(int vol, long *mixer_min, long *mixer_max,
+long AlsaOutput::scale_volume_inverse(int vol, long *mixer_min, long *mixer_max,
                                  double *min_norm,
                                  bool *use_linear_volume_scale)
 {
@@ -240,7 +262,7 @@ static void alsa_log_cb(const char *unused1 ATTR_UNUSED,
 }
 #endif
 
-static snd_pcm_hw_params_t *alsa_open_device(const char *device)
+snd_pcm_hw_params_t *AlsaOutput::alsa_open_device(const char *device)
 {
   int rc;
   snd_pcm_hw_params_t *result;
@@ -283,7 +305,7 @@ static snd_pcm_hw_params_t *alsa_open_device(const char *device)
 }
 
 /* Fill caps with the device capabilities. Return 0 on error. */
-static int fill_capabilities(struct output_driver_caps *caps)
+int AlsaOutput::fill_capabilities(struct output_driver_caps *caps)
 {
   int result = 0;
   snd_pcm_hw_params_t *hw_params;
@@ -363,7 +385,7 @@ static int fill_capabilities(struct output_driver_caps *caps)
   return result;
 }
 
-static void handle_mixer_events(snd_mixer_t *mixer_handle)
+void AlsaOutput::handle_mixer_events(snd_mixer_t *mixer_handle)
 {
   assert(mixer_handle);
 
@@ -409,7 +431,7 @@ static void handle_mixer_events(snd_mixer_t *mixer_handle)
   } while (false);
 }
 
-static int alsa_read_mixer_raw(snd_mixer_elem_t *elem, bool raw)
+int AlsaOutput::alsa_read_mixer_raw(snd_mixer_elem_t *elem, bool raw)
 {
   if (mixer_handle)
   {
@@ -470,7 +492,7 @@ static int alsa_read_mixer_raw(snd_mixer_elem_t *elem, bool raw)
   }
 }
 
-static snd_mixer_elem_t *alsa_init_mixer_channel(const char *name,
+snd_mixer_elem_t *AlsaOutput::alsa_init_mixer_channel(const char *name,
                                                  long *vol_min, long *vol_max,
                                                  double *min_norm,
                                                  bool *use_linear_volume_scale)
@@ -526,7 +548,7 @@ static snd_mixer_elem_t *alsa_init_mixer_channel(const char *name,
   return elem;
 }
 
-static void alsa_close_mixer()
+void AlsaOutput::alsa_close_mixer()
 {
   if (mixer_handle)
   {
@@ -542,7 +564,7 @@ static void alsa_close_mixer()
   }
 }
 
-static void alsa_open_mixer(const char *device)
+void AlsaOutput::alsa_open_mixer(const char *device)
 {
   int rc;
 
@@ -583,7 +605,7 @@ static void alsa_open_mixer(const char *device)
   }
 }
 
-static void alsa_set_current_mixer()
+void AlsaOutput::alsa_set_current_mixer()
 {
   if (mixer_elem1 && (real_volume1 = alsa_read_mixer_raw(
                           mixer_elem1, use_linear_volume_scale1)) != -1)
@@ -615,7 +637,7 @@ static void alsa_set_current_mixer()
 /* Check for a running PulseAudio or PipeWire-PulseAudio instance via
  * environment variables and the well-known socket path.  No libpulse
  * linkage; this is a lightweight heuristic. */
-static bool is_pulseaudio_present()
+bool AlsaOutput::is_pulseaudio_present()
 {
   if (getenv("PULSE_SERVER") || getenv("PULSE_SINK") ||
       getenv("PIPEWIRE_REMOTE"))
@@ -647,7 +669,7 @@ static bool is_pulseaudio_present()
   return false;
 }
 
-static void alsa_shutdown()
+void AlsaOutput::shutdown()
 {
   alsa_close_mixer();
 
@@ -656,7 +678,7 @@ static void alsa_shutdown()
 #endif
 }
 
-static int alsa_init(struct output_driver_caps *caps)
+int AlsaOutput::init(struct output_driver_caps *caps)
 {
   int result = 0;
   const char *device;
@@ -728,13 +750,13 @@ static int alsa_init(struct output_driver_caps *caps)
   if (false)
   {
   err:
-    alsa_shutdown();
+    shutdown();
   }
 
   return result;
 }
 
-static int alsa_open(struct sound_params *sound_params)
+int AlsaOutput::open(struct sound_params *sound_params)
 {
   int rc, result = 0;
   unsigned int period_time, buffer_time;
@@ -877,7 +899,7 @@ err:
 /* Play from alsa_buf as many chunks as possible. Move the remaining data
  * to the beginning of the buffer. Return the number of bytes written
  * or -1 on error. */
-static int play_buf_chunks()
+int AlsaOutput::play_buf_chunks()
 {
   int written = 0;
   bool zero_logged = false;
@@ -935,7 +957,7 @@ static int play_buf_chunks()
   return written;
 }
 
-static void alsa_close()
+void AlsaOutput::close()
 {
   snd_pcm_sframes_t delay;
 
@@ -977,7 +999,7 @@ static void alsa_close()
   handle = nullptr;
 }
 
-static int alsa_play(const char *buff, const size_t size)
+int AlsaOutput::play(const char *buff, const size_t size)
 {
   int to_write = size;
   int buf_pos = 0;
@@ -1010,7 +1032,7 @@ static int alsa_play(const char *buff, const size_t size)
   return size;
 }
 
-static int alsa_read_mixer()
+int AlsaOutput::read_mixer()
 {
   long curr_real_vol;
   long *real_vol;
@@ -1054,7 +1076,7 @@ static int alsa_read_mixer()
   return *vol;
 }
 
-static void alsa_set_mixer(int vol)
+void AlsaOutput::set_mixer(int vol)
 {
   if (mixer_handle && mixer_elem_curr)
   {
@@ -1116,7 +1138,7 @@ static void alsa_set_mixer(int vol)
   }
 }
 
-static int alsa_get_buff_fill()
+int AlsaOutput::get_buff_fill()
 {
   int result = 0;
 
@@ -1144,7 +1166,7 @@ static int alsa_get_buff_fill()
   return result;
 }
 
-static int alsa_reset()
+int AlsaOutput::reset()
 {
   int result = 0;
 
@@ -1179,9 +1201,9 @@ static int alsa_reset()
   return result;
 }
 
-static int alsa_get_rate() { return params.rate; }
+int AlsaOutput::get_rate() { return params.rate; }
 
-static void alsa_toggle_mixer_channel()
+void AlsaOutput::toggle_mixer_channel()
 {
   if (mixer_elem_curr == mixer_elem1 && mixer_elem2)
   {
@@ -1193,7 +1215,7 @@ static void alsa_toggle_mixer_channel()
   }
 }
 
-static std::string alsa_get_mixer_channel_name()
+std::string AlsaOutput::get_mixer_channel_name()
 {
   if (!mixer_elem_curr)
   {
@@ -1207,22 +1229,6 @@ static std::string alsa_get_mixer_channel_name()
 
   return options_get_str("ALSAMixer2");
 }
-
-class AlsaOutput : public AudioOutput {
-public:
-    int init(struct output_driver_caps *caps) override { return alsa_init(caps); }
-    void shutdown() override { alsa_shutdown(); }
-    int open(struct sound_params *sound_params) override { return alsa_open(sound_params); }
-    void close() override { alsa_close(); }
-    int play(const char *buff, const size_t size) override { return alsa_play(buff, size); }
-    int read_mixer() override { return alsa_read_mixer(); }
-    void set_mixer(int vol) override { alsa_set_mixer(vol); }
-    int get_buff_fill() override { return alsa_get_buff_fill(); }
-    int reset() override { return alsa_reset(); }
-    int get_rate() override { return alsa_get_rate(); }
-    void toggle_mixer_channel() override { alsa_toggle_mixer_channel(); }
-    std::string get_mixer_channel_name() override { return alsa_get_mixer_channel_name(); }
-};
 
 std::unique_ptr<AudioOutput> create_alsa_output() {
     return std::make_unique<AlsaOutput>();

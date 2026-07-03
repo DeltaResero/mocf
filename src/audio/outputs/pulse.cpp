@@ -76,39 +76,69 @@
 #include "audio/audio.h"
 #include "audio/outputs/pulse.h"
 
-/* The pulse mainloop and context are initialized in pulse_init and
- * destroyed in pulse_shutdown.
- */
-static pa_threaded_mainloop *mainloop = nullptr;
-static pa_context *context = nullptr;
-static uint32_t pa_default_sink_index = 0;
-
-/* The stream is initialized in pulse_open and destroyed in pulse_close. */
-static pa_stream *stream = nullptr;
-
-static int showing_sink_volume = 0;
-static int stream_volume = 100;
-
-/* File used to persist stream_volume across sessions, stored in the
- * same config directory as the softmixer state file. */
 #define PULSE_VOLUME_SAVE_FILE "pulse_volume"
 
-/* Forward declarations: defined later but called before their definitions. */
-static void sink_input_volume_cb(pa_context *c, const pa_sink_input_info *i,
-                                 int eol, void *userdata);
-static void flush_callback(pa_stream *s, int success, void *userdata);
+class PulseOutput : public AudioOutput {
+private:
+    pa_threaded_mainloop *mainloop = nullptr;
+    pa_context *context = nullptr;
+    uint32_t pa_default_sink_index = 0;
+    pa_stream *stream = nullptr;
+    int showing_sink_volume = 0;
+    int stream_volume = 100;
 
-/* Load stream_volume from disk.  Silently ignored if the file does not
- * exist yet (first run). */
-static void pulse_load_volume()
+    void pulse_load_volume();
+    void pulse_save_volume();
+
+    static void context_state_callback(pa_context *context, void *userdata);
+    static void stream_state_callback(pa_stream *stream, void *userdata);
+    static void stream_write_callback(pa_stream *stream, size_t nbytes, void *userdata);
+    static void volume_cb(const pa_cvolume *v, void *userdata);
+    static void sink_volume_cb(pa_context *c, const pa_sink_info *i, int eol, void *userdata);
+    static void sink_input_volume_cb(pa_context *c, const pa_sink_input_info *i, int eol, void *userdata);
+    static void flush_callback(pa_stream *s, int success, void *userdata);
+    static void sink_name_cb(pa_context *c, const pa_sink_info *i, int eol, void *userdata);
+    static void cork_callback(pa_stream *s, int success, void *userdata);
+
+    struct VolumeCbData {
+        PulseOutput *self;
+        int *result;
+    };
+
+    struct StringCbData {
+        PulseOutput *self;
+        std::string *result;
+    };
+
+    struct IntCbData {
+        PulseOutput *self;
+        int *result;
+    };
+
+public:
+    int init(struct output_driver_caps *caps) override;
+    void shutdown() override;
+    int open(struct sound_params *sound_params) override;
+    void close() override;
+    int play(const char *buff, const size_t size) override;
+    int read_mixer() override;
+    void set_mixer(int vol) override;
+    int get_buff_fill() override;
+    int reset() override;
+    int get_rate() override;
+    void toggle_mixer_channel() override;
+    std::string get_mixer_channel_name() override;
+    void hw_pause() override;
+    void hw_unpause() override;
+    bool can_hw_pause() const override { return true; }
+};
+
+void PulseOutput::pulse_load_volume()
 {
   std::string cfname = create_file_name(PULSE_VOLUME_SAVE_FILE);
   FILE *cf = fopen(cfname.c_str(), "r");
 
-  if (!cf)
-  {
-    return; /* first run — keep default of 100 */
-  }
+  if (!cf) return;
 
   int vol;
   if (fscanf(cf, "%d", &vol) == 1 && vol >= 0 && vol <= 100)
@@ -120,8 +150,7 @@ static void pulse_load_volume()
   fclose(cf);
 }
 
-/* Save stream_volume to disk so it survives across sessions. */
-static void pulse_save_volume()
+void PulseOutput::pulse_save_volume()
 {
   std::string cfname = create_file_name(PULSE_VOLUME_SAVE_FILE);
   FILE *cf = fopen(cfname.c_str(), "w");
@@ -137,36 +166,25 @@ static void pulse_save_volume()
   logit("Pulse: saved stream volume: %d%%", stream_volume);
 }
 
-/* Callbacks that do nothing but wake up the mainloop. */
-
-static void context_state_callback(pa_context *context ATTR_UNUSED,
-                                   void *userdata)
+void PulseOutput::context_state_callback(pa_context *context ATTR_UNUSED, void *userdata)
 {
   pa_threaded_mainloop *m = static_cast<pa_threaded_mainloop *>(userdata);
-
   pa_threaded_mainloop_signal(m, 0);
 }
 
-static void stream_state_callback(pa_stream *stream ATTR_UNUSED, void *userdata)
+void PulseOutput::stream_state_callback(pa_stream *stream ATTR_UNUSED, void *userdata)
 {
   pa_threaded_mainloop *m = static_cast<pa_threaded_mainloop *>(userdata);
-
   pa_threaded_mainloop_signal(m, 0);
 }
 
-static void stream_write_callback(pa_stream *stream ATTR_UNUSED,
-                                  size_t nbytes ATTR_UNUSED, void *userdata)
+void PulseOutput::stream_write_callback(pa_stream *stream ATTR_UNUSED, size_t nbytes ATTR_UNUSED, void *userdata)
 {
   pa_threaded_mainloop *m = static_cast<pa_threaded_mainloop *>(userdata);
-
   pa_threaded_mainloop_signal(m, 0);
 }
 
-/* Initialize pulse mainloop and context. Failure to connect to the
- * pulse daemon is nonfatal, everything else is fatal (as it
- * presumably means we ran out of resources).
- */
-static int pulse_init(struct output_driver_caps *caps)
+int PulseOutput::init(struct output_driver_caps *caps)
 {
   pa_context *c;
   pa_proplist *proplist;
@@ -175,32 +193,11 @@ static int pulse_init(struct output_driver_caps *caps)
   assert(!context);
 
   mainloop = pa_threaded_mainloop_new();
-  if (!mainloop)
-  {
-    fatal("Cannot create PulseAudio mainloop");
-  }
+  if (!mainloop) fatal("Cannot create PulseAudio mainloop");
+  if (pa_threaded_mainloop_start(mainloop) < 0) fatal("Cannot start PulseAudio mainloop");
 
-  if (pa_threaded_mainloop_start(mainloop) < 0)
-  {
-    fatal("Cannot start PulseAudio mainloop");
-  }
-
-  /* TODO: possibly add more props.
-   *
-   * There are a few we could set in proplist.h but nothing I
-   * expect to be very useful.
-   *
-   * http://pulseaudio.org/wiki/ApplicationProperties recommends
-   * setting at least application.name, icon.name and media.role.
-   *
-   * No need to set application.name here, the name passed to
-   * pa_context_new_with_proplist overrides it.
-   */
   proplist = pa_proplist_new();
-  if (!proplist)
-  {
-    fatal("Cannot allocate PulseAudio proplist");
-  }
+  if (!proplist) fatal("Cannot allocate PulseAudio proplist");
 
   pa_proplist_sets(proplist, PA_PROP_APPLICATION_VERSION, PACKAGE_VERSION);
   pa_proplist_sets(proplist, PA_PROP_MEDIA_ROLE, "music");
@@ -208,79 +205,52 @@ static int pulse_init(struct output_driver_caps *caps)
 
   pa_threaded_mainloop_lock(mainloop);
 
-  c = pa_context_new_with_proplist(pa_threaded_mainloop_get_api(mainloop),
-                                   PACKAGE_NAME, proplist);
+  c = pa_context_new_with_proplist(pa_threaded_mainloop_get_api(mainloop), PACKAGE_NAME, proplist);
   pa_proplist_free(proplist);
 
-  if (!c)
-  {
-    fatal("Cannot allocate PulseAudio context");
-  }
+  if (!c) fatal("Cannot allocate PulseAudio context");
 
   pa_context_set_state_callback(c, context_state_callback, mainloop);
 
-  /* Ignore return value, rely on state being set properly */
   pa_context_connect(c, nullptr, PA_CONTEXT_NOAUTOSPAWN, nullptr);
 
   while (true)
   {
     pa_context_state_t state = pa_context_get_state(c);
-
-    if (state == PA_CONTEXT_READY)
-    {
-      break;
-    }
-
+    if (state == PA_CONTEXT_READY) break;
     if (!PA_CONTEXT_IS_GOOD(state))
     {
-      error("PulseAudio connection failed: %s",
-            pa_strerror(pa_context_errno(c)));
-
+      error("PulseAudio connection failed: %s", pa_strerror(pa_context_errno(c)));
       goto unlock_and_fail;
     }
-
     debug("waiting for context to become ready...");
     pa_threaded_mainloop_wait(mainloop);
   }
 
-  /* Only set the global now that the context is actually ready */
   context = c;
-
   pa_threaded_mainloop_unlock(mainloop);
 
-  /* We just make up the hardware capabilities, since pulse is
-   * supposed to be abstracting these out. Assume pulse will
-   * deal with anything we want to throw at it, and that we will
-   * only want mono or stereo audio.
-   */
   caps->min_channels = 1;
   caps->max_channels = 6;
   caps->min_rate = AUDIO_RATE_MIN;
   caps->max_rate = AUDIO_RATE_MAX;
   caps->formats = (SFMT_S8 | SFMT_S16 | SFMT_S32 | SFMT_FLOAT | SFMT_NE);
 
-  /* Restore the last saved volume so the UI shows the correct value
-   * immediately, before any stream has been opened. */
   pulse_load_volume();
 
   return 1;
 
 unlock_and_fail:
-
   pa_context_unref(c);
-
   pa_threaded_mainloop_unlock(mainloop);
-
   pa_threaded_mainloop_stop(mainloop);
   pa_threaded_mainloop_free(mainloop);
   mainloop = nullptr;
-
   return 0;
 }
 
-static void pulse_shutdown()
+void PulseOutput::shutdown()
 {
-  /* Persist the current volume so it is restored on the next startup. */
   pulse_save_volume();
 
   pa_threaded_mainloop_lock(mainloop);
@@ -296,18 +266,13 @@ static void pulse_shutdown()
   mainloop = nullptr;
 }
 
-static int pulse_open(struct sound_params *sound_params)
+int PulseOutput::open(struct sound_params *sound_params)
 {
   pa_sample_spec ss;
   pa_buffer_attr ba;
   pa_stream *s;
 
   assert(!stream);
-  /* Initialize everything to -1, which in practice gets us
-   * about 2 seconds of latency (which is fine). This is not the
-   * same as passing nullptr for this struct, which gets us an
-   * unnecessarily short alsa-like latency.
-   */
   ba.fragsize = static_cast<uint32_t>(-1);
   ba.tlength = static_cast<uint32_t>(-1);
   ba.prebuf = static_cast<uint32_t>(-1);
@@ -318,59 +283,27 @@ static int pulse_open(struct sound_params *sound_params)
   ss.rate = sound_params->rate;
   switch (sound_params->fmt)
   {
-    case SFMT_U8:
-      ss.format = PA_SAMPLE_U8;
-      break;
-    case SFMT_S16 | SFMT_LE:
-      ss.format = PA_SAMPLE_S16LE;
-      break;
-    case SFMT_S16 | SFMT_BE:
-      ss.format = PA_SAMPLE_S16BE;
-      break;
+    case SFMT_U8: ss.format = PA_SAMPLE_U8; break;
+    case SFMT_S16 | SFMT_LE: ss.format = PA_SAMPLE_S16LE; break;
+    case SFMT_S16 | SFMT_BE: ss.format = PA_SAMPLE_S16BE; break;
     case SFMT_FLOAT:
-    case SFMT_FLOAT | SFMT_LE:
-      ss.format = PA_SAMPLE_FLOAT32LE;
-      break;
-    case SFMT_FLOAT | SFMT_BE:
-      ss.format = PA_SAMPLE_FLOAT32BE;
-      break;
-    case SFMT_S32 | SFMT_LE:
-      ss.format = PA_SAMPLE_S32LE;
-      break;
-    case SFMT_S32 | SFMT_BE:
-      ss.format = PA_SAMPLE_S32BE;
-      break;
-
-    default:
-      fatal("pulse: got unrequested format");
+    case SFMT_FLOAT | SFMT_LE: ss.format = PA_SAMPLE_FLOAT32LE; break;
+    case SFMT_FLOAT | SFMT_BE: ss.format = PA_SAMPLE_FLOAT32BE; break;
+    case SFMT_S32 | SFMT_LE: ss.format = PA_SAMPLE_S32LE; break;
+    case SFMT_S32 | SFMT_BE: ss.format = PA_SAMPLE_S32BE; break;
+    default: fatal("pulse: got unrequested format");
   }
 
   debug("opening stream");
 
   pa_threaded_mainloop_lock(mainloop);
 
-  /* TODO: figure out if there are useful stream properties to set.
-   *
-   * I do not really see any in proplist.h that we can set from
-   * here (there are media title/artist/etc props but we do not
-   * have that data available here).
-   */
   s = pa_stream_new(context, "music", &ss, nullptr);
-  if (!s)
-  {
-    fatal("pulse: stream allocation failed");
-  }
+  if (!s) fatal("pulse: stream allocation failed");
 
   pa_stream_set_state_callback(s, stream_state_callback, mainloop);
   pa_stream_set_write_callback(s, stream_write_callback, mainloop);
 
-  /* Do NOT pass an initial volume.  PulseAudio's module-stream-restore
-   * (present on all modern distros, and PipeWire's equivalent) persists
-   * per-application stream volumes across sessions and restores the last
-   * set value automatically when a new stream is opened.  Passing an
-   * explicit volume here would override that mechanism, resetting the
-   * volume to stream_volume (100 at startup) on every session open. */
-  /* Ignore return value, rely on failed stream state instead. */
   pa_stream_connect_playback(s, nullptr, &ba,
                              static_cast<pa_stream_flags_t>(
                                  PA_STREAM_INTERPOLATE_TIMING |
@@ -381,35 +314,18 @@ static int pulse_open(struct sound_params *sound_params)
   while (true)
   {
     pa_stream_state_t state = pa_stream_get_state(s);
-
-    if (state == PA_STREAM_READY)
-    {
-      break;
-    }
-
+    if (state == PA_STREAM_READY) break;
     if (!PA_STREAM_IS_GOOD(state))
     {
       error("PulseAudio stream connection failed");
-
       goto fail;
     }
-
     debug("waiting for stream to become ready...");
     pa_threaded_mainloop_wait(mainloop);
   }
 
-  /* Only set the global stream now that it is actually ready */
   stream = s;
 
-  /* Apply our saved stream_volume to the new stream.  PulseAudio's
-   * module-stream-restore (and PipeWire's equivalent) remembers volume
-   * per stream key, which encodes the sample spec (channels, rate,
-   * format).  This means a 5.1 AC3 stream and a stereo MP3 stream have
-   * independent remembered volumes on the server side, so the value
-   * restored on open will differ between formats.  We maintain a single
-   * authoritative volume in stream_volume and push it to every new
-   * stream so the user always gets a consistent level regardless of
-   * the audio format being decoded. */
   {
     pa_cvolume v;
     pa_operation *op;
@@ -426,12 +342,11 @@ static int pulse_open(struct sound_params *sound_params)
 
 fail:
   pa_stream_unref(s);
-
   pa_threaded_mainloop_unlock(mainloop);
   return 0;
 }
 
-static void pulse_close()
+void PulseOutput::close()
 {
   pa_operation *op;
   int result = 0;
@@ -439,8 +354,9 @@ static void pulse_close()
   debug("closing stream");
 
   pa_threaded_mainloop_lock(mainloop);
-
-  op = pa_stream_drain(stream, flush_callback, &result);
+  
+  IntCbData data = {this, &result};
+  op = pa_stream_drain(stream, flush_callback, &data);
   while (pa_operation_get_state(op) == PA_OPERATION_RUNNING)
   {
     pa_threaded_mainloop_wait(mainloop);
@@ -454,7 +370,7 @@ static void pulse_close()
   pa_threaded_mainloop_unlock(mainloop);
 }
 
-static int pulse_play(const char *buff, const size_t size)
+int PulseOutput::play(const char *buff, const size_t size)
 {
   size_t offset = 0;
 
@@ -462,22 +378,11 @@ static int pulse_play(const char *buff, const size_t size)
 
   pa_threaded_mainloop_lock(mainloop);
 
-  /* The buffer is usually writable when we get here, and there
-   * are usually few (if any) writes after the first one. So
-   * there is no point in doing further writes directly from the
-   * callback: we can just do all writes from this thread.
-   */
-
-  /* Break out of the loop if some other thread manages to close
-   * our stream underneath us.
-   */
   while (stream)
   {
     size_t towrite = std::min(pa_stream_writable_size(stream), size - offset);
     debug("writing %d bytes", (int)towrite);
 
-    /* We have no working way of dealing with errors
-     * (see below). */
     if (pa_stream_write(stream, buff + offset, towrite, nullptr, 0,
                         PA_SEEK_RELATIVE))
     {
@@ -498,61 +403,36 @@ static int pulse_play(const char *buff, const size_t size)
 
   debug("Done playing!");
 
-  /* We should always return size, calling code does not deal
-   * well with anything else. Only read the rest if you want to
-   * know why.
-   *
-   * The output buffer reader thread (out_buf.c:read_thread)
-   * repeatedly loads some 64k/0.1s of audio into a buffer on
-   * the stack, then calls audio_send_pcm repeatedly until this
-   * entire buffer has been processed (similar to the loop in
-   * this function). audio_send_pcm applies the softmixer and
-   * equalizer, then feeds the result to this function, passing
-   * through our return value.
-   *
-   * So if we return less than size the equalizer/softmixer is
-   * re-applied to the remaining data, which is silly. Also,
-   * audio_send_pcm checks for our return value being zero and
-   * calls fatal() if it is, so try to always process *some*
-   * data. Also, out_buf.c uses the return value of this
-   * function from the last run through its inner loop to update
-   * its time attribute, which means it will be interestingly
-   * off if that loop ran more than once.
-   *
-   * Oh, and alsa.c seems to think it can return -1 to indicate
-   * failure, which will cause out_buf.c to rewind its buffer
-   * (to before its start, usually).
-   */
   return size;
 }
 
-static void volume_cb(const pa_cvolume *v, void *userdata)
+void PulseOutput::volume_cb(const pa_cvolume *v, void *userdata)
 {
-  int *result = static_cast<int *>(userdata);
+  VolumeCbData *data = static_cast<VolumeCbData *>(userdata);
 
   if (v)
   {
-    *result = ceil(100.0 * pa_cvolume_avg(v) / PA_VOLUME_NORM);
+    *data->result = ceil(100.0 * pa_cvolume_avg(v) / PA_VOLUME_NORM);
   }
 
-  pa_threaded_mainloop_signal(mainloop, 0);
+  pa_threaded_mainloop_signal(data->self->mainloop, 0);
 }
 
-static void sink_volume_cb(pa_context *c ATTR_UNUSED, const pa_sink_info *i,
-                           int eol ATTR_UNUSED, void *userdata)
+void PulseOutput::sink_volume_cb(pa_context *c ATTR_UNUSED, const pa_sink_info *i,
+                                 int eol ATTR_UNUSED, void *userdata)
 {
   volume_cb(i ? &i->volume : nullptr, userdata);
 }
 
-static void sink_input_volume_cb(pa_context *c ATTR_UNUSED,
-                                 const pa_sink_input_info *i,
-                                 int eol ATTR_UNUSED,
-                                 void *userdata)
+void PulseOutput::sink_input_volume_cb(pa_context *c ATTR_UNUSED,
+                                       const pa_sink_input_info *i,
+                                       int eol ATTR_UNUSED,
+                                       void *userdata)
 {
   volume_cb(i ? &i->volume : nullptr, userdata);
 }
 
-static int pulse_read_mixer()
+int PulseOutput::read_mixer()
 {
   pa_operation *op;
   int result = 0;
@@ -561,17 +441,19 @@ static int pulse_read_mixer()
 
   pa_threaded_mainloop_lock(mainloop);
 
+  VolumeCbData data = {this, &result};
+
   if (showing_sink_volume)
   {
     op = pa_context_get_sink_info_by_index(
         context,
         stream ? pa_stream_get_device_index(stream) : pa_default_sink_index,
-        sink_volume_cb, &result);
+        sink_volume_cb, &data);
   }
   else if (stream)
   {
     op = pa_context_get_sink_input_info(context, pa_stream_get_index(stream),
-                                        sink_input_volume_cb, &result);
+                                        sink_input_volume_cb, &data);
   }
   else
   {
@@ -593,12 +475,11 @@ static int pulse_read_mixer()
   return result;
 }
 
-static void pulse_set_mixer(int vol)
+void PulseOutput::set_mixer(int vol)
 {
   pa_cvolume v;
   pa_operation *op;
 
-  /* Setting volume for one channel does the right thing. */
   pa_cvolume_set(&v, 1, vol * PA_VOLUME_NORM / 100);
 
   pa_threaded_mainloop_lock(mainloop);
@@ -625,58 +506,15 @@ static void pulse_set_mixer(int vol)
   pa_threaded_mainloop_unlock(mainloop);
 }
 
-static int pulse_get_buff_fill()
+int PulseOutput::get_buff_fill()
 {
-  /* This function is problematic. MOC uses it to for the "time
-   * remaining" in the UI, but calls it more than once per
-   * second (after each chunk of audio played, not for each
-   * playback time update). We have to be fairly accurate here
-   * for that time remaining to not jump weirdly. But PulseAudio
-   * cannot give us a 100% accurate value here, as it involves a
-   * server roundtrip. And if we call this a lot it suggests
-   * switching to a mode where the value is interpolated, making
-   * it presumably more inaccurate (see the flags we pass to
-   * pa_stream_connect_playback).
-   *
-   * MOC also contains what I believe to be a race: it calls
-   * audio_get_buff_fill "soon" (after playing the first chunk)
-   * after starting playback of the next song, at which point we
-   * still have part of the previous song buffered. This means
-   * our position into the new song is negative, which fails an
-   * assert (in out_buf.c:out_buf_time_get). There is no sane
-   * way for us to detect this condition. I believe no other
-   * backend triggers this because the assert sits after an
-   * implicit float -> int seconds conversion, which means we
-   * have to be off by at least an entire second to get a
-   * negative value, and none of the other backends have buffers
-   * that large (alsa buffers are supposedly a few 100 ms).
-   */
   pa_usec_t buffered_usecs = 0;
   int buffered_bytes = 0;
 
   pa_threaded_mainloop_lock(mainloop);
 
-  /* Using pa_stream_get_timing_info and returning the distance
-   * between write_index and read_index would be more obvious,
-   * but because of how the result is actually used I believe
-   * using the latency value is slightly more correct, and it
-   * makes the following crash-avoidance hack more obvious.
-   */
-
-  /* This function will frequently fail the first time we call
-   * it (pulse does not have the requested data yet). We ignore
-   * that and just return 0.
-   *
-   * Deal with stream being nullptr too, just in case this is
-   * called in a racy fashion similar to how reset() is.
-   */
   if (stream && pa_stream_get_latency(stream, &buffered_usecs, nullptr) >= 0)
   {
-    /* Cap latency to 1 second.  pa_stream_get_latency() normally
-     * returns more (PA's default ~2s buffer), but reporting that
-     * near the start of playback (when buf->time is still very
-     * small) would make out_buf_time_get() return a negative
-     * value.  The cap keeps the displayed time sane. */
     if (buffered_usecs > 1000000)
     {
       buffered_usecs = 1000000;
@@ -694,17 +532,17 @@ static int pulse_get_buff_fill()
   return buffered_bytes;
 }
 
-static void flush_callback(pa_stream *s ATTR_UNUSED, int success,
-                           void *userdata)
+void PulseOutput::flush_callback(pa_stream *s ATTR_UNUSED, int success,
+                                 void *userdata)
 {
-  int *result = static_cast<int *>(userdata);
+  IntCbData *data = static_cast<IntCbData *>(userdata);
 
-  *result = success;
+  *data->result = success;
 
-  pa_threaded_mainloop_signal(mainloop, 0);
+  pa_threaded_mainloop_signal(data->self->mainloop, 0);
 }
 
-static int pulse_reset()
+int PulseOutput::reset()
 {
   pa_operation *op;
   int result = 0;
@@ -713,10 +551,10 @@ static int pulse_reset()
 
   pa_threaded_mainloop_lock(mainloop);
 
-  /* We *should* have a stream here, but MOC is racy, so bulletproof */
   if (stream)
   {
-    op = pa_stream_flush(stream, flush_callback, &result);
+    IntCbData data = {this, &result};
+    op = pa_stream_flush(stream, flush_callback, &data);
 
     while (pa_operation_get_state(op) == PA_OPERATION_RUNNING)
     {
@@ -735,11 +573,8 @@ static int pulse_reset()
   return result;
 }
 
-static int pulse_get_rate()
+int PulseOutput::get_rate()
 {
-  /* This is called once right after open. Do not bother making
-   * this fast. */
-
   int result;
 
   pa_threaded_mainloop_lock(mainloop);
@@ -759,26 +594,26 @@ static int pulse_get_rate()
   return result;
 }
 
-static void pulse_toggle_mixer_channel()
+void PulseOutput::toggle_mixer_channel()
 {
   showing_sink_volume = !showing_sink_volume;
 }
 
-static void sink_name_cb(pa_context *c ATTR_UNUSED, const pa_sink_info *i,
-                         int eol ATTR_UNUSED, void *userdata)
+void PulseOutput::sink_name_cb(pa_context *c ATTR_UNUSED, const pa_sink_info *i,
+                               int eol ATTR_UNUSED, void *userdata)
 {
-  std::string *result = static_cast<std::string *>(userdata);
+  StringCbData *data = static_cast<StringCbData *>(userdata);
 
-  if (i && result->empty())
+  if (i && data->result->empty())
   {
     const char *desc = pa_proplist_gets(i->proplist, PA_PROP_DEVICE_DESCRIPTION);
-    if (desc) *result = desc;
+    if (desc) *data->result = desc;
   }
 
-  pa_threaded_mainloop_signal(mainloop, 0);
+  pa_threaded_mainloop_signal(data->self->mainloop, 0);
 }
 
-static std::string pulse_get_mixer_channel_name()
+std::string PulseOutput::get_mixer_channel_name()
 {
   std::string result;
 
@@ -787,10 +622,11 @@ static std::string pulse_get_mixer_channel_name()
   if (showing_sink_volume)
   {
     pa_operation *op;
+    StringCbData data = {this, &result};
     op = pa_context_get_sink_info_by_index(
         context,
         stream ? pa_stream_get_device_index(stream) : pa_default_sink_index,
-        sink_name_cb, &result);
+        sink_name_cb, &data);
 
     while (pa_operation_get_state(op) == PA_OPERATION_RUNNING)
     {
@@ -814,17 +650,17 @@ static std::string pulse_get_mixer_channel_name()
   return result;
 }
 
-static void cork_callback(pa_stream *s ATTR_UNUSED, int success,
-                          void *userdata)
+void PulseOutput::cork_callback(pa_stream *s ATTR_UNUSED, int success,
+                                void *userdata)
 {
-  int *result = static_cast<int *>(userdata);
+  IntCbData *data = static_cast<IntCbData *>(userdata);
 
-  *result = success;
+  *data->result = success;
 
-  pa_threaded_mainloop_signal(mainloop, 0);
+  pa_threaded_mainloop_signal(data->self->mainloop, 0);
 }
 
-static void pulse_hw_pause()
+void PulseOutput::hw_pause()
 {
   pa_operation *op;
   int result = 0;
@@ -835,7 +671,8 @@ static void pulse_hw_pause()
 
   if (stream)
   {
-    op = pa_stream_cork(stream, 1, cork_callback, &result);
+    IntCbData data = {this, &result};
+    op = pa_stream_cork(stream, 1, cork_callback, &data);
 
     while (pa_operation_get_state(op) == PA_OPERATION_RUNNING)
     {
@@ -852,7 +689,7 @@ static void pulse_hw_pause()
   pa_threaded_mainloop_unlock(mainloop);
 }
 
-static void pulse_hw_unpause()
+void PulseOutput::hw_unpause()
 {
   pa_operation *op;
   int result = 0;
@@ -863,7 +700,8 @@ static void pulse_hw_unpause()
 
   if (stream)
   {
-    op = pa_stream_cork(stream, 0, cork_callback, &result);
+    IntCbData data = {this, &result};
+    op = pa_stream_cork(stream, 0, cork_callback, &data);
 
     while (pa_operation_get_state(op) == PA_OPERATION_RUNNING)
     {
@@ -879,25 +717,6 @@ static void pulse_hw_unpause()
 
   pa_threaded_mainloop_unlock(mainloop);
 }
-
-class PulseOutput : public AudioOutput {
-public:
-    int init(struct output_driver_caps *caps) override { return pulse_init(caps); }
-    void shutdown() override { pulse_shutdown(); }
-    int open(struct sound_params *sound_params) override { return pulse_open(sound_params); }
-    void close() override { pulse_close(); }
-    int play(const char *buff, const size_t size) override { return pulse_play(buff, size); }
-    int read_mixer() override { return pulse_read_mixer(); }
-    void set_mixer(int vol) override { pulse_set_mixer(vol); }
-    int get_buff_fill() override { return pulse_get_buff_fill(); }
-    int reset() override { return pulse_reset(); }
-    int get_rate() override { return pulse_get_rate(); }
-    void toggle_mixer_channel() override { pulse_toggle_mixer_channel(); }
-    std::string get_mixer_channel_name() override { return pulse_get_mixer_channel_name(); }
-    void hw_pause() override { pulse_hw_pause(); }
-    void hw_unpause() override { pulse_hw_unpause(); }
-    bool can_hw_pause() const override { return true; }
-};
 
 std::unique_ptr<AudioOutput> create_pulse_output() {
     return std::make_unique<PulseOutput>();

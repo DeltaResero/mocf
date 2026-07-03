@@ -28,18 +28,34 @@
 #define PCT_TO_SIO(pct) ((127 * (pct) + 50) / 100)
 #define SIO_TO_PCT(vol) ((100 * (vol) + 64) / 127)
 
-static struct sio_hdl *hdl = nullptr;
-static int curvol = 100;
-static struct sound_params params = {0, 0, 0};
+class SndioOutput : public AudioOutput {
+private:
+    struct sio_hdl *hdl = nullptr;
+    int curvol = 100;
+    struct sound_params params = {0, 0, 0};
 
-static void sndio_close();
+    static void volume_cb(void *arg, unsigned int vol) {
+        if (arg) {
+            static_cast<SndioOutput*>(arg)->curvol = SIO_TO_PCT(vol);
+        }
+    }
 
-static void volume_cb(void *unused ATTR_UNUSED, unsigned int vol)
-{
-  curvol = SIO_TO_PCT(vol);
-}
+public:
+    int init(struct output_driver_caps *caps) override;
+    void shutdown() override;
+    int open(struct sound_params *sound_params) override;
+    void close() override;
+    int play(const char *buff, const size_t size) override;
+    int read_mixer() override;
+    void set_mixer(int vol) override;
+    int get_buff_fill() override;
+    int reset() override;
+    int get_rate() override;
+    void toggle_mixer_channel() override;
+    std::string get_mixer_channel_name() override;
+};
 
-static int sndio_init(struct output_driver_caps *caps)
+int SndioOutput::init(struct output_driver_caps *caps)
 {
   assert(caps != nullptr);
 
@@ -52,16 +68,16 @@ static int sndio_init(struct output_driver_caps *caps)
   return 1;
 }
 
-static void sndio_shutdown()
+void SndioOutput::shutdown()
 {
   if (hdl)
   {
-    sndio_close();
+    close();
   }
 }
 
 /* Return 0 on failure. */
-static int sndio_open(struct sound_params *sound_params)
+int SndioOutput::open(struct sound_params *sound_params)
 {
   struct sio_par par;
 
@@ -75,7 +91,7 @@ static int sndio_open(struct sound_params *sound_params)
   params = *sound_params;
   sio_initpar(&par);
   /* Add volume change callback. */
-  sio_onvol(hdl, volume_cb, nullptr);
+  sio_onvol(hdl, volume_cb, this);
   par.rate = sound_params->rate;
   par.pchan = sound_params->channels;
   par.bits =
@@ -103,7 +119,7 @@ static int sndio_open(struct sound_params *sound_params)
 }
 
 /* Return the number of bytes played, or -1 on error. */
-static int sndio_play(const char *buff, const size_t size)
+int SndioOutput::play(const char *buff, const size_t size)
 {
   int count;
 
@@ -118,7 +134,7 @@ static int sndio_play(const char *buff, const size_t size)
   return count;
 }
 
-static void sndio_close()
+void SndioOutput::close()
 {
   assert(hdl != nullptr);
 
@@ -127,9 +143,9 @@ static void sndio_close()
   hdl = nullptr;
 }
 
-static int sndio_read_mixer() { return curvol; }
+int SndioOutput::read_mixer() { return curvol; }
 
-static void sndio_set_mixer(int vol)
+void SndioOutput::set_mixer(int vol)
 {
   if (hdl != nullptr)
   {
@@ -137,7 +153,7 @@ static void sndio_set_mixer(int vol)
   }
 }
 
-static int sndio_get_buff_fill()
+int SndioOutput::get_buff_fill()
 {
   assert(hdl != nullptr);
 
@@ -147,7 +163,7 @@ static int sndio_get_buff_fill()
   return 0;
 }
 
-static int sndio_reset()
+int SndioOutput::reset()
 {
   assert(hdl != nullptr);
 
@@ -157,32 +173,16 @@ static int sndio_reset()
   return 1;
 }
 
-static int sndio_get_rate()
+int SndioOutput::get_rate()
 {
   assert(hdl != nullptr);
 
   return params.rate;
 }
 
-static void sndio_toggle_mixer_channel() { assert(hdl != nullptr); }
+void SndioOutput::toggle_mixer_channel() { assert(hdl != nullptr); }
 
-static std::string sndio_get_mixer_channel_name() { return "mocf"; }
-
-class SndioOutput : public AudioOutput {
-public:
-    int init(struct output_driver_caps *caps) override { return sndio_init(caps); }
-    void shutdown() override { sndio_shutdown(); }
-    int open(struct sound_params *sound_params) override { return sndio_open(sound_params); }
-    void close() override { sndio_close(); }
-    int play(const char *buff, const size_t size) override { return sndio_play(buff, size); }
-    int read_mixer() override { return sndio_read_mixer(); }
-    void set_mixer(int vol) override { sndio_set_mixer(vol); }
-    int get_buff_fill() override { return sndio_get_buff_fill(); }
-    int reset() override { return sndio_reset(); }
-    int get_rate() override { return sndio_get_rate(); }
-    void toggle_mixer_channel() override { sndio_toggle_mixer_channel(); }
-    std::string get_mixer_channel_name() override { return sndio_get_mixer_channel_name(); }
-};
+std::string SndioOutput::get_mixer_channel_name() { return "mocf"; }
 
 std::unique_ptr<AudioOutput> create_sndio_output() {
     return std::make_unique<SndioOutput>();

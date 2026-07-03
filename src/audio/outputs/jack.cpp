@@ -35,49 +35,54 @@
 
 #define RINGBUF_SZ 32768
 
-/* the client */
-static jack_client_t *client;
-/* an array of output ports */
-static jack_port_t **output_port;
-/* the ring buffer, used to store the sound data before jack takes it */
-static jack_ringbuffer_t *ringbuffer[2];
-/* volume */
-static jack_default_audio_sample_t volume = 1.0;
-/* volume as an integer - needed to avoid cast errors on set/read */
-static int volume_integer = 100;
-/* indicates if we should be playing or not */
-static int play;
-/* current sample rate */
-static int rate;
-/* flag set if xrun occurred that was our fault (the ringbuffer doesn't
- * contain enough data in the process callback) */
-static volatile int our_xrun = 0;
-/* set to 1 if jack client thread exits */
-static volatile int jack_shutdown = 0;
+class JackOutput : public AudioOutput {
+private:
+    jack_client_t *client = nullptr;
+    jack_port_t **output_port = nullptr;
+    jack_ringbuffer_t *ringbuffer[2] = {nullptr, nullptr};
+    jack_default_audio_sample_t volume = 1.0;
+    int volume_integer = 100;
+    int play = 0;
+    int rate = 0;
+    volatile int our_xrun = 0;
+    volatile int jack_shutdown_flag = 0;
 
-/* this is the function that jack calls to get audio samples from us */
-static int process_cb(jack_nframes_t nframes, void *unused ATTR_UNUSED)
+    static int process_cb(jack_nframes_t nframes, void *arg);
+    static int update_sample_rate_cb(jack_nframes_t new_rate, void *arg);
+    static void error_cb(const char *msg);
+    static void shutdown_cb(void *arg);
+
+public:
+    int init(struct output_driver_caps *caps) override;
+    void shutdown() override;
+    int open(struct sound_params *sound_params) override;
+    void close() override;
+    int play_audio(const char *buff, const size_t size) override;
+    int play(const char *buff, const size_t size) override { return play_audio(buff, size); }
+    int read_mixer() override;
+    void set_mixer(int vol) override;
+    int get_buff_fill() override;
+    int reset() override;
+    int get_rate() override;
+    void toggle_mixer_channel() override;
+    std::string get_mixer_channel_name() override;
+};
+
+int JackOutput::process_cb(jack_nframes_t nframes, void *arg)
 {
+  JackOutput *self = static_cast<JackOutput *>(arg);
   jack_default_audio_sample_t *out[2];
 
   if (nframes <= 0)
-  {
     return 0;
-  }
 
-  /* get the jack output ports */
-  out[0] = static_cast<jack_default_audio_sample_t *>(jack_port_get_buffer(output_port[0],
-                                                               nframes));
-  out[1] = static_cast<jack_default_audio_sample_t *>(jack_port_get_buffer(output_port[1],
-                                                               nframes));
+  out[0] = static_cast<jack_default_audio_sample_t *>(jack_port_get_buffer(self->output_port[0], nframes));
+  out[1] = static_cast<jack_default_audio_sample_t *>(jack_port_get_buffer(self->output_port[1], nframes));
 
-  if (play)
+  if (self->play)
   {
     size_t i;
-
-    /* ringbuffer[1] is filled later, so we only need to check
-     * it's space. */
-    size_t avail_data = jack_ringbuffer_read_space(ringbuffer[1]);
+    size_t avail_data = jack_ringbuffer_read_space(self->ringbuffer[1]);
     size_t avail_frames = avail_data / sizeof(jack_default_audio_sample_t);
 
     if (avail_frames > nframes)
@@ -86,15 +91,12 @@ static int process_cb(jack_nframes_t nframes, void *unused ATTR_UNUSED)
       avail_data = nframes * sizeof(jack_default_audio_sample_t);
     }
 
-    jack_ringbuffer_read(ringbuffer[0], reinterpret_cast<char *>(out[0]), avail_data);
-    jack_ringbuffer_read(ringbuffer[1], reinterpret_cast<char *>(out[1]), avail_data);
+    jack_ringbuffer_read(self->ringbuffer[0], reinterpret_cast<char *>(out[0]), avail_data);
+    jack_ringbuffer_read(self->ringbuffer[1], reinterpret_cast<char *>(out[1]), avail_data);
 
-    /* we must provide nframes data, so fill with silence
-     * the remaining space. */
     if (avail_frames < nframes)
     {
-      our_xrun = 1;
-
+      self->our_xrun = 1;
       for (i = avail_frames; i < nframes; i++)
       {
         out[0][i] = out[1][i] = 0.0;
@@ -105,11 +107,9 @@ static int process_cb(jack_nframes_t nframes, void *unused ATTR_UNUSED)
   {
     size_t i;
     size_t size;
-
-    /* consume the input */
-    size = jack_ringbuffer_read_space(ringbuffer[1]);
-    jack_ringbuffer_read_advance(ringbuffer[0], size);
-    jack_ringbuffer_read_advance(ringbuffer[1], size);
+    size = jack_ringbuffer_read_space(self->ringbuffer[1]);
+    jack_ringbuffer_read_advance(self->ringbuffer[0], size);
+    jack_ringbuffer_read_advance(self->ringbuffer[1], size);
 
     for (i = 0; i < nframes; i++)
     {
@@ -121,107 +121,76 @@ static int process_cb(jack_nframes_t nframes, void *unused ATTR_UNUSED)
   return 0;
 }
 
-/* this is called if jack changes its sample rate */
-static int update_sample_rate_cb(jack_nframes_t new_rate,
-                                 void *unused ATTR_UNUSED)
+int JackOutput::update_sample_rate_cb(jack_nframes_t new_rate, void *arg)
 {
-  rate = new_rate;
+  JackOutput *self = static_cast<JackOutput *>(arg);
+  self->rate = new_rate;
   return 0;
 }
 
-/* callback for jack's error messages */
-static void error_cb(const char *msg) { error("JACK: %s", msg); }
+void JackOutput::error_cb(const char *msg) { error("JACK: %s", msg); }
 
-static void shutdown_cb(void *unused ATTR_UNUSED) { jack_shutdown = 1; }
+void JackOutput::shutdown_cb(void *arg) {
+  JackOutput *self = static_cast<JackOutput *>(arg);
+  self->jack_shutdown_flag = 1;
+}
 
-static int moc_jack_init(struct output_driver_caps *caps)
+int JackOutput::init(struct output_driver_caps *caps)
 {
-  const char *client_name;
-
-  client_name = options_get_str("JackClientName");
-
+  const char *client_name = options_get_str("JackClientName");
   jack_set_error_function(error_cb);
 
 #ifdef HAVE_JACK_CLIENT_OPEN
-
   jack_status_t status;
-  jack_options_t options;
-
-  /* open a client connection to the JACK server */
-  options = JackNullOption;
+  jack_options_t options = JackNullOption;
   if (!options_get_bool("JackStartServer"))
-  {
-    options |= JackNoStartServer;
-  }
+    options = static_cast<jack_options_t>(options | JackNoStartServer);
   client = jack_client_open(client_name, options, &status, nullptr);
   if (client == nullptr)
   {
     error("jack_client_open() failed, status = 0x%2.0x", status);
     if (status & JackServerFailed)
-    {
       error("Unable to connect to JACK server");
-    }
     return 0;
   }
-
   if (status & JackServerStarted)
-  {
     printf("JACK server started\n");
-  }
-
 #else
-
-  /* try to become a client of the JACK server */
   client = jack_client_new(client_name);
   if (client == nullptr)
   {
     error("Cannot create client; JACK server not running?");
     return 0;
   }
-
 #endif
 
-  jack_shutdown = 0;
-  jack_on_shutdown(client, shutdown_cb, nullptr);
+  jack_shutdown_flag = 0;
+  jack_on_shutdown(client, shutdown_cb, this);
 
-  /* allocate memory for an array of 2 output ports */
   output_port = new jack_port_t *[2];
-  output_port[0] = jack_port_register(
-      client, "output0", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
-  output_port[1] = jack_port_register(
-      client, "output1", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+  output_port[0] = jack_port_register(client, "output0", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+  output_port[1] = jack_port_register(client, "output1", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
 
-  /* create the ring buffers */
   ringbuffer[0] = jack_ringbuffer_create(RINGBUF_SZ);
   ringbuffer[1] = jack_ringbuffer_create(RINGBUF_SZ);
 
-  /* set the call back functions, activate the client */
-  jack_set_process_callback(client, process_cb, nullptr);
-  jack_set_sample_rate_callback(client, update_sample_rate_cb, nullptr);
+  jack_set_process_callback(client, process_cb, this);
+  jack_set_sample_rate_callback(client, update_sample_rate_cb, this);
   if (jack_activate(client))
   {
     error("cannot activate client");
     return 0;
   }
 
-  /* connect ports
-   * a value of nullptr in JackOut* gives no connection
-   * */
   if (strcmp(options_get_str("JackOutLeft"), "nullptr"))
   {
     if (jack_connect(client, "mocf:output0", options_get_str("JackOutLeft")))
-    {
-      fprintf(stderr, "%s is not a valid Jack Client / Port",
-              options_get_str("JackOutLeft"));
-    }
+      fprintf(stderr, "%s is not a valid Jack Client / Port", options_get_str("JackOutLeft"));
   }
   if (strcmp(options_get_str("JackOutRight"), "nullptr"))
   {
     if (jack_connect(client, "mocf:output1", options_get_str("JackOutRight")))
-    {
-      fprintf(stderr, "%s is not a valid Jack Client / Port",
-              options_get_str("JackOutRight"));
-    }
+      fprintf(stderr, "%s is not a valid Jack Client / Port", options_get_str("JackOutRight"));
   }
 
   caps->formats = SFMT_FLOAT;
@@ -230,18 +199,15 @@ static int moc_jack_init(struct output_driver_caps *caps)
   caps->max_rate = caps->min_rate = rate;
 
   logit("jack init");
-
   return 1;
 }
 
-static int moc_jack_open(struct sound_params *sound_params)
+int JackOutput::open(struct sound_params *sound_params)
 {
   if (sound_params->fmt != SFMT_FLOAT)
   {
     char fmt_name[SFMT_STR_MAX];
-
-    error("Unsupported sound format: %s.",
-          sfmt_str(sound_params->fmt, fmt_name, sizeof(fmt_name)));
+    error("Unsupported sound format: %s.", sfmt_str(sound_params->fmt, fmt_name, sizeof(fmt_name)));
     return 0;
   }
   if (sound_params->channels != 2)
@@ -252,22 +218,21 @@ static int moc_jack_open(struct sound_params *sound_params)
 
   logit("jack open");
   play = 1;
-
   return 1;
 }
 
-static void moc_jack_close()
+void JackOutput::close()
 {
   logit("jack close");
   play = 0;
 }
 
-static int moc_jack_play(const char *buff, const size_t size)
+int JackOutput::play_audio(const char *buff, const size_t size)
 {
   size_t remain = size;
   size_t pos = 0;
 
-  if (jack_shutdown)
+  if (jack_shutdown_flag)
   {
     logit("Refusing to play, because there is no client thread.");
     return -1;
@@ -281,28 +246,20 @@ static int moc_jack_play(const char *buff, const size_t size)
     our_xrun = 0;
   }
 
-  while (remain && !jack_shutdown)
+  while (remain && !jack_shutdown_flag)
   {
     size_t space;
-
-    /* check if some space is available only in the second
-     * ringbuffer, because it is read later than the first. */
-    if ((space = jack_ringbuffer_write_space(ringbuffer[1])) >
-        sizeof(jack_default_audio_sample_t))
+    if ((space = jack_ringbuffer_write_space(ringbuffer[1])) > sizeof(jack_default_audio_sample_t))
     {
       size_t to_write;
-
-      space *= 2; /* we have 2 channels */
+      space *= 2;
       debug("Space in the ringbuffer: %zu bytes", space);
-
       to_write = std::min(space, remain);
-
       to_write /= sizeof(jack_default_audio_sample_t) * 2;
       remain -= to_write * sizeof(float) * 2;
       while (to_write--)
       {
         jack_default_audio_sample_t sample;
-
         sample = *(jack_default_audio_sample_t *)(buff + pos) * volume;
         pos += sizeof(jack_default_audio_sample_t);
         jack_ringbuffer_write(ringbuffer[0], reinterpret_cast<char *>(&sample), sizeof(sample));
@@ -314,46 +271,36 @@ static int moc_jack_play(const char *buff, const size_t size)
     }
     else
     {
-      debug("Sleeping for %uus",
-            (unsigned int)(RINGBUF_SZ / (float)(audio_get_bps()) * 100000.0));
+      debug("Sleeping for %uus", (unsigned int)(RINGBUF_SZ / (float)(audio_get_bps()) * 100000.0));
       xsleep(RINGBUF_SZ, audio_get_bps());
     }
   }
 
-  if (jack_shutdown)
-  {
+  if (jack_shutdown_flag)
     return -1;
-  }
 
   return size;
 }
 
-static int moc_jack_read_mixer() { return volume_integer; }
+int JackOutput::read_mixer() { return volume_integer; }
 
-static void moc_jack_set_mixer(int vol)
+void JackOutput::set_mixer(int vol)
 {
   volume_integer = vol;
-  volume =
-      static_cast<jack_default_audio_sample_t>(expm1(static_cast<double>(vol) / 100.0) / (M_E - 1));
+  volume = static_cast<jack_default_audio_sample_t>(expm1(static_cast<double>(vol) / 100.0) / (M_E - 1));
 }
 
-static int moc_jack_get_buff_fill()
+int JackOutput::get_buff_fill()
 {
-  /* FIXME: should we also use jack_port_get_latency() here? */
-  return sizeof(float) *
-         (jack_ringbuffer_read_space(ringbuffer[0]) +
-          jack_ringbuffer_read_space(ringbuffer[1])) /
-         sizeof(jack_default_audio_sample_t);
+  return sizeof(float) * (jack_ringbuffer_read_space(ringbuffer[0]) + jack_ringbuffer_read_space(ringbuffer[1])) / sizeof(jack_default_audio_sample_t);
 }
 
-static int moc_jack_reset()
+int JackOutput::reset()
 {
-  // jack_ringbuffer_reset(ringbuffer); /*this is not threadsafe!*/
   return 1;
 }
 
-/* do any cleanup that needs to be done */
-static void moc_jack_shutdown()
+void JackOutput::shutdown()
 {
   jack_port_unregister(client, output_port[0]);
   jack_port_unregister(client, output_port[1]);
@@ -363,27 +310,11 @@ static void moc_jack_shutdown()
   jack_ringbuffer_free(ringbuffer[1]);
 }
 
-static int moc_jack_get_rate() { return rate; }
+int JackOutput::get_rate() { return rate; }
 
-static std::string moc_jack_get_mixer_channel_name() { return "soft mixer"; }
+std::string JackOutput::get_mixer_channel_name() { return "soft mixer"; }
 
-static void moc_jack_toggle_mixer_channel() {}
-
-class JackOutput : public AudioOutput {
-public:
-    int init(struct output_driver_caps *caps) override { return moc_jack_init(caps); }
-    void shutdown() override { moc_jack_shutdown(); }
-    int open(struct sound_params *sound_params) override { return moc_jack_open(sound_params); }
-    void close() override { moc_jack_close(); }
-    int play(const char *buff, const size_t size) override { return moc_jack_play(buff, size); }
-    int read_mixer() override { return moc_jack_read_mixer(); }
-    void set_mixer(int vol) override { moc_jack_set_mixer(vol); }
-    int get_buff_fill() override { return moc_jack_get_buff_fill(); }
-    int reset() override { return moc_jack_reset(); }
-    int get_rate() override { return moc_jack_get_rate(); }
-    void toggle_mixer_channel() override { moc_jack_toggle_mixer_channel(); }
-    std::string get_mixer_channel_name() override { return moc_jack_get_mixer_channel_name(); }
-};
+void JackOutput::toggle_mixer_channel() {}
 
 std::unique_ptr<AudioOutput> create_jack_output() {
     return std::make_unique<JackOutput>();

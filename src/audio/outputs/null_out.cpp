@@ -1,4 +1,4 @@
-// src/audio/outputs/null_out.c
+// src/audio/outputs/null_out.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
@@ -20,61 +20,43 @@
 #include "audio/audio.h"
 #include "audio/outputs/null_out.h"
 
-static struct sound_params params = {0, 0, 0};
-
-static int null_open(struct sound_params *sound_params)
-{
-  params = *sound_params;
-  return 1;
-}
-
-static void null_close() { params.rate = 0; }
-
-static int null_play(const char *unused ATTR_UNUSED, const size_t size)
-{
-  xsleep(size, audio_get_bps());
-  return size;
-}
-
-static int null_read_mixer() { return 100; }
-
-static void null_set_mixer(int unused ATTR_UNUSED) {}
-
-static int null_get_buff_fill() { return 0; }
-
-static int null_reset() { return 1; }
-
-static int null_init(struct output_driver_caps *caps)
-{
-  caps->formats = SFMT_S8 | SFMT_S16 | SFMT_S32 | SFMT_FLOAT | SFMT_NE;
-  caps->min_channels = 1;
-  caps->max_channels = 8;
-  caps->min_rate = AUDIO_RATE_MIN;
-  caps->max_rate = AUDIO_RATE_MAX;
-
-  return 1;
-}
-
-static int null_get_rate() { return params.rate; }
-
-static void null_toggle_mixer_channel() {}
-
-static std::string null_get_mixer_channel_name() { return "FakeMixer"; }
-
 class NullOutput : public AudioOutput {
+private:
+    struct sound_params params = {0, 0, 0};
+
 public:
-    int init(struct output_driver_caps *caps) override { return null_init(caps); }
+    int init(struct output_driver_caps *caps) override {
+        caps->formats = SFMT_S8 | SFMT_S16 | SFMT_S32 | SFMT_FLOAT | SFMT_NE;
+        caps->min_channels = 1;
+        caps->max_channels = 8;
+        caps->min_rate = AUDIO_RATE_MIN;
+        caps->max_rate = AUDIO_RATE_MAX;
+        return 1;
+    }
+
     void shutdown() override {}
-    int open(struct sound_params *sound_params) override { return null_open(sound_params); }
-    void close() override { null_close(); }
-    int play(const char *buff, const size_t size) override { return null_play(buff, size); }
-    int read_mixer() override { return null_read_mixer(); }
-    void set_mixer(int vol) override { null_set_mixer(vol); }
-    int get_buff_fill() override { return null_get_buff_fill(); }
-    int reset() override { return null_reset(); }
-    int get_rate() override { return null_get_rate(); }
-    void toggle_mixer_channel() override { null_toggle_mixer_channel(); }
-    std::string get_mixer_channel_name() override { return null_get_mixer_channel_name(); }
+
+    int open(struct sound_params *sound_params) override {
+        params = *sound_params;
+        return 1;
+    }
+
+    void close() override { 
+        params.rate = 0; 
+    }
+
+    int play(const char *unused ATTR_UNUSED, const size_t size) override {
+        xsleep(size, audio_get_bps());
+        return size;
+    }
+
+    int read_mixer() override { return 100; }
+    void set_mixer(int unused ATTR_UNUSED) override {}
+    int get_buff_fill() override { return 0; }
+    int reset() override { return 1; }
+    int get_rate() override { return params.rate; }
+    void toggle_mixer_channel() override {}
+    std::string get_mixer_channel_name() override { return "FakeMixer"; }
 };
 
 std::unique_ptr<AudioOutput> create_null_output() {
