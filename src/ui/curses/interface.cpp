@@ -192,6 +192,10 @@ private:
     int silent_seek_pos = -1;
     time_t silent_seek_key_last = 0;
     time_t last_menu_move_time = 0;
+    /* Non-owning handles to the encapsulated window objects.  Valid between
+     * windows_init() and windows_end(). */
+    MainWindow *mainWindow = nullptr;
+    InfoWindow *infoWindow = nullptr;
 #ifdef HAVE_SYS_INOTIFY_H
     int inotify_fd = -1;
     int inotify_wd = -1;
@@ -1483,6 +1487,8 @@ public:
 
         keys_init();
         windows_init();
+        mainWindow = get_main_window();
+        infoWindow = get_info_window();
         get_engine_options();
         update_mixer_name();
 
@@ -1589,6 +1595,8 @@ public:
 #endif
 
         windows_end();
+        mainWindow = nullptr;
+        infoWindow = nullptr;
         keys_cleanup();
 
 

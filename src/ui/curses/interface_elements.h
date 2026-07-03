@@ -69,9 +69,49 @@
     } key;
   };
 
+  /* ---------------------------------------------------------------------------
+   * MainWindow — encapsulates the top ncurses window (file/playlist menus,
+   * help screen, etc.).  The singleton instance is created by windows_init()
+   * and destroyed by windows_end().  UserInterface holds a non-owning pointer
+   * obtained via get_main_window().
+   * --------------------------------------------------------------------------- */
+  class MainWindow
+  {
+  public:
+    /* Construction and teardown are handled by windows_init / windows_end. */
+    MainWindow() = default;
+    ~MainWindow() = default;
+
+    /* Prevent copying; the object manages ncurses WINDOW resources. */
+    MainWindow(const MainWindow &) = delete;
+    MainWindow &operator=(const MainWindow &) = delete;
+  };
+
+  /* ---------------------------------------------------------------------------
+   * InfoWindow — encapsulates the bottom ncurses info bar (status, time,
+   * mixer, entry, messages, etc.).
+   * --------------------------------------------------------------------------- */
+  class InfoWindow
+  {
+  public:
+    InfoWindow() = default;
+    ~InfoWindow() = default;
+
+    InfoWindow(const InfoWindow &) = delete;
+    InfoWindow &operator=(const InfoWindow &) = delete;
+  };
+
+  /* Lifecycle: windows_init() constructs both windows; windows_end() tears them
+   * down.  windows_reset() is a lower-level endwin() wrapper. */
   void windows_init();
   void windows_reset();
   void windows_end();
+
+  /* Accessors used by UserInterface to hold non-owning pointers to the window
+   * objects.  Valid only between windows_init() and windows_end(). */
+  MainWindow *get_main_window();
+  InfoWindow *get_info_window();
+
   void iface_set_option_state(const char *name, const bool value);
   void iface_set_mixer_name(const char *name);
   void iface_set_status(const char *msg);

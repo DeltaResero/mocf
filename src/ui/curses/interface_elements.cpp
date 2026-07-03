@@ -260,6 +260,19 @@ static int iface_initialized = 0;
 /* Was initscr() called? */
 static int screen_initialized = 0;
 
+/* ---------------------------------------------------------------------------
+ * MainWindow and InfoWindow — C++ class wrappers around the static C-struct
+ * globals above.  These objects give UserInterface something concrete to hold
+ * as std::unique_ptr members without touching any of the internal
+ * implementation.  Construction and destruction follow the existing
+ * windows_init() / windows_end() lifetime.
+ * --------------------------------------------------------------------------- */
+static MainWindow g_main_window;
+static InfoWindow g_info_window;
+
+MainWindow *get_main_window() { return &g_main_window; }
+InfoWindow *get_info_window()  { return &g_info_window; }
+
 /* Chars used to make lines (for borders etc.). */
 static struct
 {
