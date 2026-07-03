@@ -581,7 +581,7 @@ void plist_cat(struct plist *a, struct plist *b)
   assert(a != nullptr);
   assert(b != nullptr);
 
-  for (i = 0; i < b->num; i++)
+  for (i = 0; i < static_cast<int>(b->items.size()); i++)
   {
     if (plist_deleted(b, i))
     {
@@ -742,7 +742,7 @@ void plist_remove_common_items(struct plist *a, struct plist *b)
   assert(a != nullptr);
   assert(b != nullptr);
 
-  for (i = 0; i < a->num; i += 1)
+  for (i = 0; i < static_cast<int>(a->items.size()); i += 1)
   {
     if (plist_deleted(a, i))
     {

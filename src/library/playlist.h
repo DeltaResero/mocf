@@ -54,6 +54,34 @@
     short deleted          = 0;
     time_t mtime           = static_cast<time_t>(-1); /* modification time */
     int queue_pos          = 0;                       /* position in the queue */
+
+    plist_item() = default;
+    plist_item(plist_item &&) noexcept = default;
+    plist_item &operator=(plist_item &&) noexcept = default;
+
+    plist_item(const plist_item &src)
+      : file(src.file), type(src.type), title_file(src.title_file),
+        title_tags(src.title_tags),
+        tags(src.tags ? std::make_unique<file_tags>(*src.tags) : nullptr),
+        deleted(src.deleted), mtime(src.mtime), queue_pos(src.queue_pos)
+    {
+    }
+
+    plist_item &operator=(const plist_item &src)
+    {
+      if (this != &src)
+      {
+        file = src.file;
+        type = src.type;
+        title_file = src.title_file;
+        title_tags = src.title_tags;
+        tags = src.tags ? std::make_unique<file_tags>(*src.tags) : nullptr;
+        deleted = src.deleted;
+        mtime = src.mtime;
+        queue_pos = src.queue_pos;
+      }
+      return *this;
+    }
   };
 
   struct plist
