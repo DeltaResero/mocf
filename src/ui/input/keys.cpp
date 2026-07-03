@@ -565,7 +565,7 @@ static struct special_keys
  * (skipping the key list). */
 #define HELP_INDENT 15
 
-static char *help[COMMANDS_NUM];
+static std::vector<std::string> help;
 
 enum key_cmd get_key_cmd(const enum key_context context,
                          const struct iface_key *key)
@@ -927,21 +927,15 @@ static void make_help()
   size_t i;
   const char unassigned[] = " [unassigned]";
 
+  help.resize(COMMANDS_NUM);
   for (i = 0; i < COMMANDS_NUM; i += 1)
   {
-    size_t len;
-
-    len = HELP_INDENT + strlen(commands[i].help) + 1;
+    std::string keys = get_command_keys(i);
+    std::string padding(std::max(0, HELP_INDENT - static_cast<int>(keys.length())), ' ');
+    help[i] = keys + padding + commands[i].help;
     if (commands[i].keys[0] == -1)
     {
-      len += strlen(unassigned);
-    }
-    help[i] = new char[len]();
-    snprintf(help[i], len, "%-*s%s", HELP_INDENT, get_command_keys(i),
-            commands[i].help);
-    if (commands[i].keys[0] == -1)
-    {
-      strcat(help[i], unassigned);
+      help[i] += unassigned;
     }
   }
 }
@@ -963,20 +957,21 @@ void keys_init()
 /* Free the help message. */
 void keys_cleanup()
 {
-  size_t i;
-
-  for (i = 0; i < COMMANDS_NUM; i += 1)
-  {
-    delete[] help[i];
-  }
+  help.clear();
 }
 
 /* Return an array of strings with the keys help. The number of lines is put
  * in num. */
 char **get_keys_help(int *num)
 {
-  *num = static_cast<int>COMMANDS_NUM;
-  return help;
+  static std::vector<const char*> help_ptrs;
+  help_ptrs.clear();
+  for (const auto& s : help) {
+    help_ptrs.push_back(s.c_str());
+  }
+
+  *num = static_cast<int>(COMMANDS_NUM);
+  return const_cast<char**>(help_ptrs.data());
 }
 
 /* Find command entry by key command; return COMMANDS_NUM if not found. */

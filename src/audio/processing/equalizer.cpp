@@ -76,23 +76,23 @@ typedef struct t_eq_setup t_eq_setup;
 
 struct t_eq_setup
 {
-  char *name;
+  std::string name;
   float preamp;
   int bcount;
-  float *cf;
-  float *bw;
-  float *dg;
+  std::vector<float> cf;
+  std::vector<float> bw;
+  std::vector<float> dg;
 };
 
 typedef struct t_eq_set t_eq_set;
 
 struct t_eq_set
 {
-  char *name;
+  std::string name;
   int channels;
   float preamp;
   int bcount;
-  t_biquad *b;
+  std::vector<t_biquad> b;
 };
 
 typedef struct t_eq_set_list t_eq_set_list;
@@ -174,7 +174,7 @@ std::string equalizer_current_eqname()
 {
   if (equ_active && current_equ && current_equ->set)
   {
-    return std::string(current_equ->set->name);
+    return current_equ->set->name;
   }
 
   return std::string("off");
@@ -446,7 +446,7 @@ static void equalizer_write_config()
   fprintf(cf, "%s %i\n", EQUALIZER_CFG_ACTIVE, equ_active);
   if (current_equ && current_equ->set)
   {
-    fprintf(cf, "%s %s\n", EQUALIZER_CFG_PRESET, current_equ->set->name);
+    fprintf(cf, "%s %s\n", EQUALIZER_CFG_PRESET, current_equ->set->name.c_str());
   }
   fprintf(cf, "%s %f\n", EQUALIZER_CFG_MIXIN, mixin_rate);
 
@@ -513,7 +513,7 @@ void equalizer_refresh()
 
   if (current_equ && current_equ->set)
   {
-    current_set_name = xstrdup(current_equ->set->name);
+    current_set_name = xstrdup(current_equ->set->name.c_str());
   }
   else
   {
@@ -578,9 +578,9 @@ void equalizer_refresh()
         {
           int i, channel;
           t_eq_set *eqset = new t_eq_set;
-          eqset->b = new t_biquad[eqs->bcount * equ_channels];
+          eqset->b.resize(eqs->bcount * equ_channels);
 
-          eqset->name = xstrdup(eqs->name);
+          eqset->name = eqs->name;
           eqset->preamp = eqs->preamp;
           eqset->bcount = eqs->bcount;
           eqset->channels = equ_channels;
@@ -597,11 +597,6 @@ void equalizer_refresh()
           }
 
           last_elem = append_eq_set(eqset, last_elem);
-
-          free(eqs->name);
-          free(eqs->cf);
-          free(eqs->bw);
-          free(eqs->dg);
         }
         else
         {
@@ -651,7 +646,7 @@ void equalizer_refresh()
     {
       if (current_equ->set)
       {
-        if (strcmp(current_set_name, current_equ->set->name) == 0)
+        if (current_set_name == current_equ->set->name)
         {
           break;
         }
@@ -693,7 +688,7 @@ void equalizer_process_buffer(char *buf, size_t size,
     return;
   }
 
-  if (sound_params->rate != current_equ->set->b->israte ||
+  if (sound_params->rate != current_equ->set->b[0].israte ||
       sound_params->channels != equ_channels)
   {
     logit("Recreating filters due to sound parameter changes...");
@@ -752,7 +747,7 @@ static void equ_process_buffer_u8(uint8_t *buf, size_t samples)
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b,
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
                 current_equ->set->bcount);
 
   for (i = 0; i < samples; i++)
@@ -776,7 +771,7 @@ static void equ_process_buffer_s8(int8_t *buf, size_t samples)
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b,
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
                 current_equ->set->bcount);
 
   for (i = 0; i < samples; i++)
@@ -800,7 +795,7 @@ static void equ_process_buffer_u16(uint16_t *buf, size_t samples)
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b,
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
                 current_equ->set->bcount);
 
   for (i = 0; i < samples; i++)
@@ -824,7 +819,7 @@ static void equ_process_buffer_s16(int16_t *buf, size_t samples)
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b,
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
                 current_equ->set->bcount);
 
   for (i = 0; i < samples; i++)
@@ -848,7 +843,7 @@ static void equ_process_buffer_u24(uint32_t *buf, size_t samples)
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b,
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
                 current_equ->set->bcount);
 
   for (i = 0; i < samples; i++)
@@ -872,7 +867,7 @@ static void equ_process_buffer_s24(int32_t *buf, size_t samples)
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b,
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
                 current_equ->set->bcount);
 
   for (i = 0; i < samples; i++)
@@ -896,7 +891,7 @@ static void equ_process_buffer_u32(uint32_t *buf, size_t samples)
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b,
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
                 current_equ->set->bcount);
 
   for (i = 0; i < samples; i++)
@@ -920,7 +915,7 @@ static void equ_process_buffer_s32(int32_t *buf, size_t samples)
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b,
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
                 current_equ->set->bcount);
 
   for (i = 0; i < samples; i++)
@@ -944,7 +939,7 @@ static void equ_process_buffer_float(float *buf, size_t samples)
     tmp[i] = preampf * buf[i];
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b,
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
                 current_equ->set->bcount);
 
   for (i = 0; i < samples; i++)
@@ -986,8 +981,6 @@ static void clear_eq_set(t_eq_set_list *l)
 {
   if (l->set)
   {
-    free(l->set->name);
-    delete[] l->set->b;
     delete l->set;
     l->set = nullptr;
   }
@@ -1037,11 +1030,13 @@ static int read_setup(char *name, char *desc, t_eq_setup **sp)
     *sp = s;
   }
 
-  s->name = xstrdup(name);
+  s->name = name;
   s->bcount = 0;
   s->preamp = 0.0f;
   int max_values = 16;
-  std::vector<float> cf(max_values), bw(max_values), dg(max_values);
+  s->cf.resize(max_values);
+  s->bw.resize(max_values);
+  s->dg.resize(max_values);
 
   int r;
 
@@ -1055,7 +1050,6 @@ static int read_setup(char *name, char *desc, t_eq_setup **sp)
 
     if (r != 0)
     {
-      free(s->name);
       if (curloc)
       {
         free(curloc);
@@ -1071,7 +1065,6 @@ static int read_setup(char *name, char *desc, t_eq_setup **sp)
 
     if (r != 0)
     {
-      free(s->name);
       if (curloc)
       {
         free(curloc);
@@ -1090,7 +1083,6 @@ static int read_setup(char *name, char *desc, t_eq_setup **sp)
 
       if (r != 0)
       {
-        free(s->name);
         if (curloc)
         {
           free(curloc);
@@ -1103,14 +1095,14 @@ static int read_setup(char *name, char *desc, t_eq_setup **sp)
       if (s->bcount >= (max_values - 1))
       {
         max_values *= 2;
-        cf.resize(max_values);
-        bw.resize(max_values);
-        dg.resize(max_values);
+        s->cf.resize(max_values);
+        s->bw.resize(max_values);
+        s->dg.resize(max_values);
       }
 
-      cf[s->bcount] = cf_val;
-      bw[s->bcount] = bw_val;
-      dg[s->bcount] = dg_val;
+      s->cf[s->bcount] = cf_val;
+      s->bw[s->bcount] = bw_val;
+      s->dg[s->bcount] = dg_val;
 
       s->bcount++;
     }
@@ -1119,13 +1111,6 @@ static int read_setup(char *name, char *desc, t_eq_setup **sp)
       s->preamp = bw_val;
     }
   }
-
-  s->cf = static_cast<float *>(xmalloc(s->bcount * sizeof(float)));
-  s->bw = static_cast<float *>(xmalloc(s->bcount * sizeof(float)));
-  s->dg = static_cast<float *>(xmalloc(s->bcount * sizeof(float)));
-  memcpy(s->cf, cf.data(), s->bcount * sizeof(float));
-  memcpy(s->bw, bw.data(), s->bcount * sizeof(float));
-  memcpy(s->dg, dg.data(), s->bcount * sizeof(float));
 
   if (curloc)
   {
