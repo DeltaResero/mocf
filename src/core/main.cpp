@@ -978,6 +978,7 @@ static void log_popt_command_line()
 
 int main(int argc, const char *argv[])
 {
+  try {
   std::vector<std::string> deferred_overrides, args;
 
   assert(argc >= 0);
@@ -1068,6 +1069,9 @@ int main(int argc, const char *argv[])
   common_cleanup();
 
   return EXIT_SUCCESS;
+  } catch (const FatalException& e) {
+    return EXIT_FATAL;
+  }
 }
 
 // EOF

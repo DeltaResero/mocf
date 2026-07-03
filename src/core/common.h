@@ -22,6 +22,13 @@
 #include <optional>
 #include <string>
 #include <algorithm>
+#include <stdexcept>
+
+class FatalException : public std::runtime_error {
+public:
+    explicit FatalException(const std::string& msg) : std::runtime_error(msg) {}
+    explicit FatalException(const char* msg) : std::runtime_error(msg) {}
+};
 
 #include "core/compat.h"
 
@@ -131,7 +138,7 @@ constexpr bool in_closed_range(Lo lo, T val, Hi hi) noexcept {
   void internal_error(const char *file, int line, const char *function,
                       const char *format, ...) ATTR_PRINTF(4, 5);
   void internal_fatal(const char *file, int line, const char *function,
-                      const char *format, ...) ATTR_NORETURN ATTR_PRINTF(4, 5);
+                      const char *format, ...) ATTR_PRINTF(4, 5);
   bool is_valid_symbol(const char *candidate);
   int get_realtime(struct timespec *ts);
 std::string sec_to_min(int seconds);

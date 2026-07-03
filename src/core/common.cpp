@@ -74,7 +74,7 @@ void internal_fatal(const char *file LOGIT_ONLY, int line LOGIT_ONLY,
 
   log_close();
 
-  exit(EXIT_FATAL);
+  throw FatalException(msg);
 }
 
 void *xmalloc(size_t size)
