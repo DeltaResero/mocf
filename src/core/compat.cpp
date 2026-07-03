@@ -16,37 +16,23 @@
 /* Various functions which some systems lack. */
 
 #ifndef HAVE_STRCASESTR
-#include <cstring>
+#include <algorithm>
 #include <cctype>
+#include <string>
 
 /* Case insensitive version of strstr(). */
 char *strcasestr(const char *haystack, const char *needle)
 {
-  char *haystack_i, *needle_i;
-  char *c;
-  char *res;
+  auto lower = [](unsigned char c) { return std::tolower(c); };
 
-  haystack_i = xstrdup(haystack);
-  needle_i = xstrdup(needle);
+  std::string haystack_l(haystack);
+  std::string needle_l(needle);
 
-  c = haystack_i;
-  while (*c)
-  {
-    *c = tolower(*c);
-    c++;
-  }
+  std::transform(haystack_l.begin(), haystack_l.end(), haystack_l.begin(), lower);
+  std::transform(needle_l.begin(), needle_l.end(), needle_l.begin(), lower);
 
-  c = needle_i;
-  while (*c)
-  {
-    *c = tolower(*c);
-    c++;
-  }
-
-  res = strstr(haystack_i, needle_i);
-  free(haystack_i);
-  free(needle_i);
-  return res ? res - haystack_i + (char *)haystack : nullptr;
+  size_t pos = haystack_l.find(needle_l);
+  return pos == std::string::npos ? nullptr : const_cast<char *>(haystack) + pos;
 }
 #endif
 
