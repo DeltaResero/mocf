@@ -49,7 +49,7 @@
 #include "core/options.h"
 #include "utils/utf8.h"
 
-static char *terminal_charset = nullptr;
+static std::string terminal_charset;
 static int using_utf8 = 0;
 
 static iconv_t iconv_desc = (iconv_t)(-1);
@@ -350,32 +350,35 @@ void utf8_init()
 {
 #ifdef HAVE_NL_LANGINFO_CODESET
 #ifdef HAVE_NL_LANGINFO
-  terminal_charset = xstrdup(nl_langinfo(CODESET));
-  assert(terminal_charset != nullptr);
+  {
+    const char *codeset = nl_langinfo(CODESET);
+    assert(codeset != nullptr);
+    terminal_charset = codeset;
+  }
 
-  if (!strcmp(terminal_charset, "UTF-8"))
+  if (terminal_charset == "UTF-8")
   {
 #ifdef HAVE_NCURSESW
     logit("Using UTF8 output");
     using_utf8 = 1;
 #else  /* HAVE_NCURSESW */
-    terminal_charset = xstrdup("US-ASCII");
+    terminal_charset = "US-ASCII";
     logit("Using US-ASCII conversion - compiled without libncursesw");
 #endif /* HAVE_NCURSESW */
   }
   else
   {
-    logit("Terminal character set: %s", terminal_charset);
+    logit("Terminal character set: %s", terminal_charset.c_str());
   }
 #else  /* HAVE_NL_LANGINFO */
-  terminal_charset = xstrdup("US-ASCII");
+  terminal_charset = "US-ASCII";
   logit("Assuming US-ASCII terminal character set");
 #endif /* HAVE_NL_LANGINFO */
 #endif /* HAVE_NL_LANGINFO_CODESET */
 
-  if (!using_utf8 && terminal_charset)
+  if (!using_utf8 && !terminal_charset.empty())
   {
-    iconv_desc = iconv_open(terminal_charset, "UTF-8");
+    iconv_desc = iconv_open(terminal_charset.c_str(), "UTF-8");
     if (iconv_desc == (iconv_t)(-1))
     {
       log_errno("iconv_open() failed", errno);
@@ -395,10 +398,7 @@ void utf8_init()
 
 void utf8_cleanup()
 {
-  if (terminal_charset)
-  {
-    free(terminal_charset);
-  }
+  terminal_charset.clear();
   iconv_cleanup();
 }
 
