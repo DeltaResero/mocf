@@ -204,7 +204,8 @@ std::string xstrerror(int errnum)
   {
     logit("Error %d occurred obtaining error description for %d", errno,
           errnum);
-    strcpy(err_buf, "Error occurred obtaining error description");
+    snprintf(err_buf, sizeof(err_buf),
+             "Error occurred obtaining error description");
   }
   err_str = err_buf;
 #endif
@@ -373,7 +374,7 @@ std::string sec_to_min(int seconds)
   }
   else
   {
-    strcpy(buff, "!!!!!");
+    snprintf(buff, sizeof(buff), "!!!!!");
   }
 
   return std::string(buff);
