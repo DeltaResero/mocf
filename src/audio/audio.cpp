@@ -123,75 +123,41 @@ char *sfmt_str(const long format, char *msg, const size_t buf_size)
   assert(sound_format_ok(format));
 
   assert(buf_size > 0);
-  msg[0] = 0;
+  std::string s;
 
-  if (format & SFMT_S8)
-  {
-    strncat(msg, ", 8-bit signed", buf_size - strlen(msg) - 1);
-  }
-  if (format & SFMT_U8)
-  {
-    strncat(msg, ", 8-bit unsigned", buf_size - strlen(msg) - 1);
-  }
-  if (format & SFMT_S16)
-  {
-    strncat(msg, ", 16-bit signed", buf_size - strlen(msg) - 1);
-  }
-  if (format & SFMT_U16)
-  {
-    strncat(msg, ", 16-bit unsigned", buf_size - strlen(msg) - 1);
-  }
-  if (format & SFMT_S24)
-  {
-    strncat(msg, ", 24-bit signed (as 32-bit samples)",
-            buf_size - strlen(msg) - 1);
-  }
-  if (format & SFMT_U24)
-  {
-    strncat(msg, ", 24-bit unsigned (as 32-bit samples)",
-            buf_size - strlen(msg) - 1);
-  }
-  if (format & SFMT_S24_3)
-  {
-    strncat(msg, ", 24-bit signed (in 3bytes format)",
-            buf_size - strlen(msg) - 1);
-  }
-  if (format & SFMT_U24_3)
-  {
-    strncat(msg, ", 24-bit unsigned (in 3bytes format)",
-            buf_size - strlen(msg) - 1);
-  }
-  if (format & SFMT_S32)
-  {
-    strncat(msg, ", 32-bit signed", buf_size - strlen(msg) - 1);
-  }
-  if (format & SFMT_U32)
-  {
-    strncat(msg, ", 32-bit unsigned", buf_size - strlen(msg) - 1);
-  }
-  if (format & SFMT_FLOAT)
-  {
-    strncat(msg, ", float", buf_size - strlen(msg) - 1);
-  }
+  if (format & SFMT_S8) s += ", 8-bit signed";
+  if (format & SFMT_U8) s += ", 8-bit unsigned";
+  if (format & SFMT_S16) s += ", 16-bit signed";
+  if (format & SFMT_U16) s += ", 16-bit unsigned";
+  if (format & SFMT_S24) s += ", 24-bit signed (as 32-bit samples)";
+  if (format & SFMT_U24) s += ", 24-bit unsigned (as 32-bit samples)";
+  if (format & SFMT_S24_3) s += ", 24-bit signed (in 3bytes format)";
+  if (format & SFMT_U24_3) s += ", 24-bit unsigned (in 3bytes format)";
+  if (format & SFMT_S32) s += ", 32-bit signed";
+  if (format & SFMT_U32) s += ", 32-bit unsigned";
+  if (format & SFMT_FLOAT) s += ", float";
 
   if (format & SFMT_LE)
   {
-    strncat(msg, " little-endian", buf_size - strlen(msg) - 1);
+    s += " little-endian";
   }
   else if (format & SFMT_BE)
   {
-    strncat(msg, " big-endian", buf_size - strlen(msg) - 1);
+    s += " big-endian";
   }
   if (format & SFMT_NE)
   {
-    strncat(msg, " (native)", buf_size - strlen(msg) - 1);
+    s += " (native)";
   }
 
   /* skip first ", " */
-  if (msg[0])
+  const char* out = s.c_str();
+  if (s.length() >= 2 && s[0] == ',' && s[1] == ' ')
   {
-    memmove(msg, msg + 2, strlen(msg) + 1);
+    out += 2;
   }
+
+  snprintf(msg, buf_size, "%s", out);
 
   return msg;
 }
