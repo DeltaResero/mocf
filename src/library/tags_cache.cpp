@@ -26,6 +26,7 @@
 #include <thread>
 #include <string>
 #include <deque>
+#include <vector>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -128,24 +129,24 @@ static inline std::string bdb_strerror(int errnum)
 
 
 #ifdef HAVE_DB_H
-static char *cache_record_serialize(const struct cache_record *rec, int *len)
+static std::vector<char> cache_record_serialize(const struct cache_record *rec)
 {
-  char *buf;
-  char *p;
   size_t artist_len;
   size_t album_len;
   size_t title_len;
+  size_t len;
 
   artist_len = rec->tags->artist.size();
   album_len  = rec->tags->album.size();
   title_len  = rec->tags->title.size();
 
-  *len = sizeof(rec->mod_time) + sizeof(rec->atime) +
-         sizeof(size_t) * 3 /* lengths of title, artist, time. */
-         + artist_len + album_len + title_len + sizeof(rec->tags->track)
-         + sizeof(rec->tags->time);
+  len = sizeof(rec->mod_time) + sizeof(rec->atime) +
+        sizeof(size_t) * 3 /* lengths of title, artist, time. */
+        + artist_len + album_len + title_len + sizeof(rec->tags->track)
+        + sizeof(rec->tags->time);
 
-  buf = p = static_cast<char *>(xmalloc(*len));
+  std::vector<char> buf(len);
+  char *p = buf.data();
 
   memcpy(p, &rec->mod_time, sizeof(rec->mod_time));
   p += sizeof(rec->mod_time);
@@ -446,8 +447,6 @@ static void tags_cache_sync(struct tags_cache *c)
 static void tags_cache_add(struct tags_cache *c, const char *file, DBT *key,
                            struct file_tags *tags)
 {
-  char *serialized_cache_rec;
-  int serial_len;
   struct cache_record rec;
   DBT data;
   int ret;
@@ -460,15 +459,11 @@ static void tags_cache_add(struct tags_cache *c, const char *file, DBT *key,
   rec.atime = time(nullptr);
   rec.tags = tags;
 
-  serialized_cache_rec = cache_record_serialize(&rec, &serial_len);
-  if (!serialized_cache_rec)
-  {
-    return;
-  }
+  std::vector<char> serialized_cache_rec = cache_record_serialize(&rec);
 
   memset(&data, 0, sizeof(data));
-  data.data = serialized_cache_rec;
-  data.size = serial_len;
+  data.data = serialized_cache_rec.data();
+  data.size = serialized_cache_rec.size();
 
   tags_cache_gc(c);
 
@@ -479,8 +474,6 @@ static void tags_cache_add(struct tags_cache *c, const char *file, DBT *key,
   }
 
   tags_cache_sync(c);
-
-  free(serialized_cache_rec);
 }
 #endif
 

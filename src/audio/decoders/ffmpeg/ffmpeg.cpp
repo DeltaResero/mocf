@@ -26,6 +26,7 @@
 #include <cstring>
 #include <memory>
 #include <pthread.h>
+#include <string>
 #include <vector>
 
 #ifdef __cplusplus
@@ -93,7 +94,7 @@ struct ffmpeg_data
   bool eos;   /* end of sound seen */
   bool okay;  /* was this stream successfully opened? */
 
-  char *filename;
+  std::string filename;
   struct io_stream *iostream;
   struct decoder_error error;
   long fmt;
@@ -693,7 +694,6 @@ static struct ffmpeg_data *ffmpeg_make_data()
   data->eof = false;
   data->eos = false;
   data->okay = false;
-  data->filename = nullptr;
   data->iostream = nullptr;
   decoder_error_init(&data->error);
   data->fmt = 0;
@@ -746,9 +746,9 @@ static void *ffmpeg_open_internal(struct ffmpeg_data *data)
 
   /* When FFmpeg and LibAV misidentify a file's codec (and they do)
    * then hopefully this will save MOC from wanton destruction. */
-  if (data->filename)
+  if (!data->filename.empty())
   {
-    extn = ext_pos(data->filename);
+    extn = ext_pos(data->filename.c_str());
     if (extn && !strcasecmp(extn, "wav") &&
         strcmp(data->ic->iformat->name, "wav"))
     {
@@ -813,12 +813,12 @@ static void *ffmpeg_open_internal(struct ffmpeg_data *data)
     goto end;
   }
 
-  if (data->filename)
+  if (!data->filename.empty())
   {
     const char *fn;
 
-    fn = strrchr(data->filename, '/');
-    fn = fn ? fn + 1 : data->filename;
+    fn = strrchr(data->filename.c_str(), '/');
+    fn = fn ? fn + 1 : data->filename.c_str();
     debug("FFmpeg thinks '%s' is format(codec) '%s(%s)'", fn,
           data->ic->iformat->name, data->codec->name);
   }
@@ -913,7 +913,7 @@ static void *ffmpeg_open(const char *file)
 
   data = ffmpeg_make_data();
 
-  data->filename = xstrdup(file);
+  data->filename = file;
   data->iostream = io_open(file, 1);
   if (!io_ok(data->iostream))
   {
@@ -1465,7 +1465,6 @@ static void ffmpeg_close(void *prv_data)
   }
 
   decoder_error_clear(&data->error);
-  free(data->filename);
   delete data;
 }
 
