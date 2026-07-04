@@ -49,6 +49,36 @@
 
 #define TWOPI (2.0 * M_PI)
 
+/* RAII helper: switches a locale category to "C" for the scope's
+ * duration (needed so '.' is always the decimal point when reading/
+ * writing EQ config files), restoring the previous locale on exit
+ * regardless of how the scope is left. */
+class ScopedCLocale
+{
+public:
+  explicit ScopedCLocale(int category) : category_(category)
+  {
+    const char *cur = setlocale(category_, nullptr);
+    saved_ = cur ? cur : "";
+    setlocale(category_, "C");
+  }
+
+  ~ScopedCLocale()
+  {
+    if (!saved_.empty())
+    {
+      setlocale(category_, saved_.c_str());
+    }
+  }
+
+  ScopedCLocale(const ScopedCLocale &) = delete;
+  ScopedCLocale &operator=(const ScopedCLocale &) = delete;
+
+private:
+  int category_;
+  std::string saved_;
+};
+
 #define NEWLINE 0x0A
 #define CRETURN 0x0D
 #define SPACE 0x20
@@ -350,8 +380,7 @@ static void equalizer_adjust_preamp()
 
 static void equalizer_read_config()
 {
-  char *curloc = xstrdup(setlocale(LC_NUMERIC, nullptr));
-  setlocale(LC_NUMERIC, "C"); // posix decimal point
+  ScopedCLocale locale_guard(LC_NUMERIC);
 
   std::string sfile = create_file_name("equalizer");
 
@@ -360,10 +389,6 @@ static void equalizer_read_config()
   if (cf == nullptr)
   {
     logit("Unable to read equalizer configuration");
-    if (curloc)
-    {
-      free(curloc);
-    }
     return;
   }
 
@@ -416,18 +441,11 @@ static void equalizer_read_config()
   }
 
   fclose(cf);
-
-  if (curloc)
-  {
-    setlocale(LC_NUMERIC, curloc);
-    free(curloc);
-  }
 }
 
 static void equalizer_write_config()
 {
-  char *curloc = xstrdup(setlocale(LC_NUMERIC, nullptr));
-  setlocale(LC_NUMERIC, "C"); /* posix decimal point */
+  ScopedCLocale locale_guard(LC_NUMERIC);
 
   std::string cfname = create_file_name(EQUALIZER_SAVE_FILE);
 
@@ -436,10 +454,6 @@ static void equalizer_write_config()
   if (cf == nullptr)
   {
     logit("Unable to write equalizer configuration");
-    if (curloc)
-    {
-      free(curloc);
-    }
     return;
   }
 
@@ -451,12 +465,6 @@ static void equalizer_write_config()
   fprintf(cf, "%s %f\n", EQUALIZER_CFG_MIXIN, mixin_rate);
 
   fclose(cf);
-
-  if (curloc)
-  {
-    setlocale(LC_NUMERIC, curloc);
-    free(curloc);
-  }
 
   logit("Equalizer configuration written");
 }
@@ -509,17 +517,17 @@ void equalizer_refresh()
   t_eq_setup *eqs = nullptr;
   char buf[1024];
 
-  char *current_set_name = nullptr;
+  std::string current_set_name;
 
   if (current_equ && current_equ->set)
   {
-    current_set_name = xstrdup(current_equ->set->name.c_str());
+    current_set_name = current_equ->set->name;
   }
   else
   {
     if (!config_preset_name.empty())
     {
-      current_set_name = xstrdup(config_preset_name.c_str());
+      current_set_name = config_preset_name;
     }
   }
 
@@ -638,7 +646,7 @@ void equalizer_refresh()
 
   current_equ = &equ_list;
 
-  if (current_set_name)
+  if (!current_set_name.empty())
   {
     current_equ = &equ_list;
 
@@ -653,21 +661,13 @@ void equalizer_refresh()
       }
       current_equ = current_equ->next;
     }
-
-    if (current_equ)
-    {
-      // only free name when EQ was found to allow logging
-      free(current_set_name);
-    }
   }
 
-  if (!current_equ && current_set_name)
+  if (!current_equ && !current_set_name.empty())
   {
-    logit("EQ %s not found.", current_set_name);
+    logit("EQ %s not found.", current_set_name.c_str());
     /* equalizer not found, pick next equalizer */
     current_equ = &equ_list;
-    // free name now
-    free(current_set_name);
   }
   if (current_equ && !current_equ->set)
   {
@@ -995,8 +995,7 @@ static void clear_eq_set(t_eq_set_list *l)
 /* parsing stuff */
 static int read_setup(char *name, char *desc, t_eq_setup **sp)
 {
-  char *curloc = xstrdup(setlocale(LC_NUMERIC, nullptr));
-  setlocale(LC_NUMERIC, "C"); // posix decimal point
+  ScopedCLocale locale_guard(LC_NUMERIC);
 
   t_eq_setup *s = *sp;
 
@@ -1004,19 +1003,11 @@ static int read_setup(char *name, char *desc, t_eq_setup **sp)
 
   if (!*desc)
   {
-    if (curloc)
-    {
-      free(curloc);
-    }
     return -1;
   }
 
   if (strncasecmp(desc, EQSET_HEADER, sizeof(EQSET_HEADER) - 1))
   {
-    if (curloc)
-    {
-      free(curloc);
-    }
     return -2;
   }
 
@@ -1050,10 +1041,6 @@ static int read_setup(char *name, char *desc, t_eq_setup **sp)
 
     if (r != 0)
     {
-      if (curloc)
-      {
-        free(curloc);
-      }
       return -3;
     }
 
@@ -1065,10 +1052,6 @@ static int read_setup(char *name, char *desc, t_eq_setup **sp)
 
     if (r != 0)
     {
-      if (curloc)
-      {
-        free(curloc);
-      }
       return -3;
     }
 
@@ -1083,10 +1066,6 @@ static int read_setup(char *name, char *desc, t_eq_setup **sp)
 
       if (r != 0)
       {
-        if (curloc)
-        {
-          free(curloc);
-        }
         return -3;
       }
 
@@ -1110,12 +1089,6 @@ static int read_setup(char *name, char *desc, t_eq_setup **sp)
     {
       s->preamp = bw_val;
     }
-  }
-
-  if (curloc)
-  {
-    setlocale(LC_NUMERIC, curloc); // posix decimal point
-    free(curloc);
   }
 
   return 0;
