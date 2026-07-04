@@ -839,6 +839,12 @@ static void sanity_check()
   }
 }
 
+/* Maximum lengths for option names/values read from the config file.
+ * These are defensive limits against malformed/corrupt config files,
+ * not a reflection of real option name/value sizes. */
+static constexpr size_t kMaxOptNameLen = 30;
+static constexpr size_t kMaxOptValueLen = 512;
+
 /* Parse the configuration file. */
 void options_parse(const char *config_file)
 {
@@ -850,11 +856,9 @@ void options_parse(const char *config_file)
   bool plus = false;   /* plus character appeared? */
   bool append = false; /* += (list append) appeared */
   bool sp = false;     /* first post-name space detected */
-  char opt_name[30];
-  char opt_value[512];
+  std::string opt_name;
+  std::string opt_value;
   int line = 1;
-  int name_pos = 0;
-  int value_pos = 0;
   FILE *file;
 
   if (!is_secure(config_file))
@@ -887,25 +891,22 @@ void options_parse(const char *config_file)
     {
       comm = 0;
 
-      opt_name[name_pos] = 0;
-      opt_value[value_pos] = 0;
-
-      if (name_pos)
+      if (!opt_name.empty())
       {
-        if (value_pos == 0 && strncasecmp(opt_name, "Layout", 6))
+        if (opt_value.empty() && strncasecmp(opt_name.c_str(), "Layout", 6))
         {
           fatal("Error in config file: "
                 "missing option value on line %d!",
                 line);
         }
-        if (!set_option(opt_name, opt_value, append))
+        if (!set_option(opt_name.c_str(), opt_value.c_str(), append))
         {
           fatal("Error in config file on line %d!", line);
         }
       }
 
-      name_pos = 0;
-      value_pos = 0;
+      opt_name.clear();
+      opt_value.clear();
       eq = 0;
       quote = 0;
       esc = 0;
@@ -944,7 +945,7 @@ void options_parse(const char *config_file)
       {
         fatal("Error in config file: stray '=' on line %d!", line);
       }
-      if (name_pos == 0)
+      if (opt_name.empty())
       {
         fatal("Error in config file: "
               "missing option name on line %d!",
@@ -962,7 +963,7 @@ void options_parse(const char *config_file)
     }
 
     /* Embedded blank detection */
-    else if (!eq && name_pos && isblank(ch))
+    else if (!eq && !opt_name.empty() && isblank(ch))
     {
       sp = true;
     }
@@ -978,40 +979,40 @@ void options_parse(const char *config_file)
     {
       if (esc && ch != '"')
       {
-        if (sizeof(opt_value) == value_pos)
+        if (opt_value.size() == kMaxOptValueLen)
         {
           fatal("Error in config file: "
                 "option value on line %d is too long!",
                 line);
         }
-        opt_value[value_pos++] = '\\';
+        opt_value.push_back('\\');
       }
 
-      if (sizeof(opt_value) == value_pos)
+      if (opt_value.size() == kMaxOptValueLen)
       {
         fatal("Error in config file: "
               "option value on line %d is too long!",
               line);
       }
-      opt_value[value_pos++] = ch;
+      opt_value.push_back(static_cast<char>(ch));
       esc = 0;
     }
 
     /* Add char to parameter name */
     else if (!isblank(ch) || quote)
     {
-      if (sizeof(opt_name) == name_pos)
+      if (opt_name.size() == kMaxOptNameLen)
       {
         fatal("Error in config file: "
               "option name on line %d is too long!",
               line);
       }
-      opt_name[name_pos++] = ch;
+      opt_name.push_back(static_cast<char>(ch));
       esc = 0;
     }
   }
 
-  if (name_pos || value_pos)
+  if (!opt_name.empty() || !opt_value.empty())
   {
     fatal("Parse error at the end of the config file (need end of "
           "line?)!");
