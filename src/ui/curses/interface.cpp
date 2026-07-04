@@ -31,6 +31,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #ifdef HAVE_SYS_INOTIFY_H
@@ -86,7 +87,9 @@ int user_wants_interrupt() { return wants_interrupt_flag; }
 static void clear_interrupt() { wants_interrupt_flag = false; }
 
 static bool is_subdir(const char *dir1, const char *dir2) {
-  return !strncmp(dir1, dir2, strlen(dir1));
+  std::string_view d1(dir1);
+  std::string_view d2(dir2);
+  return d2.starts_with(d1);
 }
 
 static bool sort_strcmp_func(const std::string &a, const std::string &b) {
@@ -129,7 +132,8 @@ static void add_themes_to_list(std::vector<std::string> &themes, const char *the
   }
   while ((entry = readdir(dir))) {
     if (entry->d_name[0] == '.') continue;
-    if (entry->d_name[strlen(entry->d_name) - 1] == '~') continue;
+    std::string_view name(entry->d_name);
+    if (!name.empty() && name.back() == '~') continue;
     themes.push_back(std::string(themes_dir) + "/" + entry->d_name);
   }
   closedir(dir);
@@ -188,6 +192,7 @@ private:
     std::queue<Event> events;
     std::string cwd;
     bool playlist_dirty = false;
+    bool first_run = true;
     plist *engine_plist = nullptr;
     file_info curr_file;
     int silent_seek_pos = -1;
@@ -258,8 +263,7 @@ private:
         } else if (cwd.empty()) {
             if (!getcwd(buf, sizeof(buf))) fatal("Can't get CWD: %s", xstrerror(errno).c_str());
         } else {
-            strncpy(buf, cwd.c_str(), sizeof(buf) - 1);
-            buf[sizeof(buf) - 1] = '\0';
+            snprintf(buf, sizeof(buf), "%s", cwd.c_str());
         }
         resolve_path(buf, sizeof(buf), path);
         cwd = buf;
@@ -562,7 +566,8 @@ private:
         std::string last_dir;
         const char *new_dir = dir ? dir : cwd.c_str();
         int going_up = 0;
-        std::vector<std::string> dirs, playlists;
+        std::vector<std::string> dirs;
+        std::vector<std::string> playlists;
 
         iface_set_status("Reading directory...");
 
@@ -618,16 +623,15 @@ private:
     }
 
     void enter_first_dir() {
-        static int first_run = 1;
         if (options_get_bool("StartInMusicDir")) {
             const char *music_dir = options_get_str("MusicDir");
             if (music_dir) {
                 set_cwd(music_dir);
                 if (first_run && file_type(music_dir) == F_PLAYLIST && plist_count(&playlist) == 0 && go_to_playlist(music_dir, false)) {
                     cwd.clear();
-                    first_run = 0;
+                    first_run = false;
                 } else if (file_type(cwd.c_str()) == F_DIR && go_to_dir(nullptr, 0)) {
-                    first_run = 0;
+                    first_run = false;
                     return;
                 }
             } else {
@@ -639,7 +643,7 @@ private:
             set_start_dir();
             if (!go_to_dir(nullptr, 0)) interface_fatal("Can't enter any directory!");
         }
-        first_run = 0;
+        first_run = false;
     }
 
     void toggle_menu() {
@@ -689,7 +693,10 @@ private:
 
     void process_plist_arg(const char *file) {
         char path[PATH_MAX + 1];
-        if (file[0] == '/') strcpy(path, "/");
+        if (file[0] == '/') {
+            path[0] = '/';
+            path[1] = '\0';
+        }
         else if (!getcwd(path, sizeof(path))) interface_fatal("Can't get CWD: %s", xstrerror(errno).c_str());
 
         resolve_path(path, sizeof(path), file);
@@ -711,8 +718,11 @@ private:
             int dir = is_dir(arg);
             char path[2 * PATH_MAX];
 
-            if (arg[0] == '/') strcpy(path, "/");
-            else strcpy(path, this_cwd);
+            if (arg[0] == '/') {
+                path[0] = '/';
+                path[1] = '\0';
+            }
+            else snprintf(path, sizeof(path), "%s", this_cwd);
             resolve_path(path, sizeof(path), arg);
 
             if (dir == 1) {
@@ -998,27 +1008,33 @@ private:
     /* Returns std::nullopt if str starts with "~" but $HOME is too long to
      * resolve safely within PATH_MAX. */
     std::optional<std::string> make_dir(const char *str) {
+        std::string_view s(str);
+        bool add_slash = (s.length() > 1 && s.back() == '/');
         char dir[PATH_MAX];
-        dir[0] = 0;
-        int add_slash = (strlen(str) > 1 && str[strlen(str) - 1] == '/');
 
-        if (str[0] == '~') {
+        if (s.front() == '~') {
             const char *home = get_home();
             if (strnlen(home, PATH_MAX) == PATH_MAX) {
                 return std::nullopt;
             }
-            strcpy(dir, home);
-            if (!strcmp(str, "~")) add_slash = 1;
-            str++;
-        } else if (str[0] != '/') {
-            strcpy(dir, cwd.c_str());
+            snprintf(dir, sizeof(dir), "%s", home);
+            if (s == "~") add_slash = true;
+            s.remove_prefix(1);
+        } else if (s.front() != '/') {
+            snprintf(dir, sizeof(dir), "%s", cwd.c_str());
         } else {
-            strcpy(dir, "/");
+            dir[0] = '/';
+            dir[1] = '\0';
         }
 
-        resolve_path(dir, PATH_MAX, str);
-        if (add_slash && strlen(dir) < PATH_MAX) strcat(dir, "/");
-        return std::string(dir);
+        std::string s_str(s);
+        resolve_path(dir, sizeof(dir), s_str.c_str());
+
+        std::string result(dir);
+        if (add_slash && result.length() + 1 < PATH_MAX) {
+            if (result.back() != '/') result += '/';
+        }
+        return result;
     }
 
     void entry_key_go_dir(const iface_key *k) {
@@ -1349,16 +1365,16 @@ private:
                 case KEY_CMD_MIXER_INC_1: adjust_mixer(+1); break;
                 case KEY_CMD_SEEK_BACKWARD: seek(-options_get_int("SeekTime")); break;
                 case KEY_CMD_SEEK_FORWARD: seek(options_get_int("SeekTime")); break;
-                case KEY_CMD_SEEK_0: seek_to_percent(0 * 10); break;
-                case KEY_CMD_SEEK_1: seek_to_percent(1 * 10); break;
-                case KEY_CMD_SEEK_2: seek_to_percent(2 * 10); break;
-                case KEY_CMD_SEEK_3: seek_to_percent(3 * 10); break;
-                case KEY_CMD_SEEK_4: seek_to_percent(4 * 10); break;
-                case KEY_CMD_SEEK_5: seek_to_percent(5 * 10); break;
-                case KEY_CMD_SEEK_6: seek_to_percent(6 * 10); break;
-                case KEY_CMD_SEEK_7: seek_to_percent(7 * 10); break;
-                case KEY_CMD_SEEK_8: seek_to_percent(8 * 10); break;
-                case KEY_CMD_SEEK_9: seek_to_percent(9 * 10); break;
+                case KEY_CMD_SEEK_0: seek_to_percent(0); break;
+                case KEY_CMD_SEEK_1: seek_to_percent(10); break;
+                case KEY_CMD_SEEK_2: seek_to_percent(20); break;
+                case KEY_CMD_SEEK_3: seek_to_percent(30); break;
+                case KEY_CMD_SEEK_4: seek_to_percent(40); break;
+                case KEY_CMD_SEEK_5: seek_to_percent(50); break;
+                case KEY_CMD_SEEK_6: seek_to_percent(60); break;
+                case KEY_CMD_SEEK_7: seek_to_percent(70); break;
+                case KEY_CMD_SEEK_8: seek_to_percent(80); break;
+                case KEY_CMD_SEEK_9: seek_to_percent(90); break;
                 case KEY_CMD_HELP: iface_switch_to_help(); break;
                 case KEY_CMD_HIDE_MESSAGE: iface_disable_message(); break;
                 case KEY_CMD_REFRESH: iface_refresh(); break;
@@ -1546,7 +1562,9 @@ public:
 #ifdef HAVE_SYS_INOTIFY_H
                     if (FD_ISSET(inotify_fd, &fds)) {
                         char dummy[4096];
-                        ret = read(inotify_fd, dummy, sizeof(dummy));
+                        if (read(inotify_fd, dummy, sizeof(dummy)) < 0) {
+                            logit("inotify read failed: %s", xstrerror(errno).c_str());
+                        }
                         reread_dir();
                     }
 #endif
