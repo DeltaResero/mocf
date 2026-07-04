@@ -3046,7 +3046,6 @@ static void info_win_set_block_title(struct info_win *w)
   else
   {
     int start_pos, end_pos;
-    char *new_title;
     const char *decorators;
 
     start_pos = w->block_start * w->time_bar.width / w->total_time;
@@ -3059,8 +3058,7 @@ static void info_win_set_block_title(struct info_win *w)
       end_pos = w->time_bar.width - 1;
     }
 
-    new_title = static_cast<char *>(xmalloc(w->time_bar.width + 1));
-    memset(new_title, ' ', w->time_bar.width);
+    std::string new_title(w->time_bar.width, ' ');
     decorators = options_get_str("BlockDecorators");
     if (start_pos == end_pos)
     {
@@ -3071,9 +3069,8 @@ static void info_win_set_block_title(struct info_win *w)
       new_title[start_pos] = decorators[0];
       new_title[end_pos] = decorators[2];
     }
-    new_title[w->time_bar.width] = 0x00;
 
-    bar_set_title(&w->time_bar, new_title);
+    bar_set_title(&w->time_bar, new_title.c_str());
   }
 }
 
