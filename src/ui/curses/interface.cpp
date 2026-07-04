@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -154,11 +155,11 @@ static int add_themes_to_menu(const char *user_themes, const char *system_themes
   return ix;
 }
 
-static char *dir_up(const char *path) {
-  char *dir = xstrdup(path);
-  char *slash = strrchr(dir, '/');
-  if (slash == dir) *(slash + 1) = 0;
-  else *slash = 0;
+static std::string dir_up(const std::string &path) {
+  std::string dir = path;
+  size_t slash = dir.rfind('/');
+  if (slash == std::string::npos) return dir;
+  dir.erase(slash == 0 ? 1 : slash);
   return dir;
 }
 
@@ -719,11 +720,10 @@ private:
             } else if (!dir && is_sound_file(path)) {
                 if (plist_find_fname(&playlist, path) == -1) plist_add(&playlist, path);
             } else if (is_plist_file(path)) {
-                char *plist_dir = xstrdup(path);
-                char *slash = strrchr(plist_dir, '/');
-                if (slash) *slash = 0;
-                plist_load(&playlist, path, plist_dir);
-                free(plist_dir);
+                std::string plist_dir = path;
+                size_t slash = plist_dir.rfind('/');
+                if (slash != std::string::npos) plist_dir.erase(slash);
+                plist_load(&playlist, path, plist_dir.c_str());
             }
         }
     }
@@ -764,9 +764,8 @@ private:
     }
 
     void go_dir_up() {
-        char *dir = dir_up(cwd.c_str());
-        go_to_dir(dir, 0);
-        free(dir);
+        std::string dir = dir_up(cwd);
+        go_to_dir(dir.c_str(), 0);
     }
 
     void send_playlist(plist *p, const int clear) {
@@ -996,16 +995,17 @@ private:
         }
     }
 
-    char *make_dir(const char *str) {
-        char *dir = static_cast<char *>(xmalloc(sizeof(char) * PATH_MAX));
+    /* Returns std::nullopt if str starts with "~" but $HOME is too long to
+     * resolve safely within PATH_MAX. */
+    std::optional<std::string> make_dir(const char *str) {
+        char dir[PATH_MAX];
         dir[0] = 0;
         int add_slash = (strlen(str) > 1 && str[strlen(str) - 1] == '/');
 
         if (str[0] == '~') {
             const char *home = get_home();
             if (strnlen(home, PATH_MAX) == PATH_MAX) {
-                free(dir);
-                return nullptr;
+                return std::nullopt;
             }
             strcpy(dir, home);
             if (!strcmp(str, "~")) add_slash = 1;
@@ -1018,38 +1018,30 @@ private:
 
         resolve_path(dir, PATH_MAX, str);
         if (add_slash && strlen(dir) < PATH_MAX) strcat(dir, "/");
-        return dir;
+        return std::string(dir);
     }
 
     void entry_key_go_dir(const iface_key *k) {
         if (k->type == IFACE_KEY_CHAR && k->key.ucs == '\t') {
-            char *entry_text = iface_entry_get_text();
-            char *dir = make_dir(entry_text);
-            free(entry_text);
+            std::string entry_text = iface_entry_get_text();
+            std::optional<std::string> dir = make_dir(entry_text.c_str());
             if (!dir) return;
 
-            std::string complete_dir = find_match_dir(dir);
-            if (!complete_dir.empty()) {
-                free(dir);
-                dir = xstrdup(complete_dir.c_str());
-            }
+            std::string complete_dir = find_match_dir(*dir);
+            if (!complete_dir.empty()) dir = complete_dir;
 
-            std::string buf = dir;
-            free(dir);
-            iface_entry_set_text(buf.c_str());
+            iface_entry_set_text(dir->c_str());
         } else if (k->type == IFACE_KEY_CHAR && k->key.ucs == '\n') {
-            char *entry_text = iface_entry_get_text();
-            if (entry_text[0]) {
-                char *dir = make_dir(entry_text);
+            std::string entry_text = iface_entry_get_text();
+            if (!entry_text.empty()) {
+                std::optional<std::string> dir = make_dir(entry_text.c_str());
                 iface_entry_history_add();
                 if (dir) {
-                    if (dir[strlen(dir) - 1] == '/' && strcmp(dir, "/")) dir[strlen(dir) - 1] = 0;
-                    go_to_dir(dir, 0);
-                    free(dir);
+                    if (dir->back() == '/' && *dir != "/") dir->pop_back();
+                    go_to_dir(dir->c_str(), 0);
                 }
             }
             iface_entry_disable();
-            free(entry_text);
         } else {
             iface_entry_handle_key(k);
         }
@@ -1058,20 +1050,17 @@ private:
     void entry_key_search(const iface_key *k) {
         if (k->type == IFACE_KEY_CHAR && k->key.ucs == '\n') {
             std::string file = iface_get_curr_file();
-            char *text = iface_entry_get_text();
+            std::string text = iface_entry_get_text();
             iface_entry_disable();
 
-            if (text[0]) {
+            if (!text.empty()) {
                 if (file == "..") {
-                    char *up = dir_up(cwd.c_str());
-                    file = up;
-                    free(up);
+                    file = dir_up(cwd);
                 }
                 if (file_type(file.c_str()) == F_DIR) go_to_dir(file.c_str(), 0);
                 else if (file_type(file.c_str()) == F_PLAYLIST) go_to_playlist(file.c_str(), false);
                 else play_it(file.c_str());
             }
-            free(text);
         } else {
             iface_entry_handle_key(k);
         }
@@ -1092,29 +1081,22 @@ private:
 
     void entry_key_plist_save(const iface_key *k) {
         if (k->type == IFACE_KEY_CHAR && k->key.ucs == '\n') {
-            char *text = iface_entry_get_text();
+            std::string text = iface_entry_get_text();
             iface_entry_disable();
 
-            if (text[0]) {
-                char *ext = ext_pos(text);
-                if (!ext || strcmp(ext, "m3u")) {
-                    char *tmp = static_cast<char *>(xmalloc((strlen(text) + 5) * sizeof(char)));
-                    snprintf(tmp, strlen(text) + 5, "%s.m3u", text);
-                    free(text);
-                    text = tmp;
-                }
+            if (!text.empty()) {
+                char *ext = ext_pos(text.c_str());
+                if (!ext || strcmp(ext, "m3u")) text += ".m3u";
 
-                char *file = make_dir(text);
-                if (file_exists(file)) {
+                std::optional<std::string> file = make_dir(text.c_str());
+                if (file && file_exists(file->c_str())) {
                     iface_make_entry(ENTRY_PLIST_OVERWRITE);
-                    iface_entry_set_file(file);
-                } else {
-                    save_playlist(file);
+                    iface_entry_set_file(file->c_str());
+                } else if (file) {
+                    save_playlist(file->c_str());
                     if (iface_in_dir_menu()) reread_dir();
                 }
-                free(file);
             }
-            free(text);
         } else {
             iface_entry_handle_key(k);
         }
@@ -1122,11 +1104,10 @@ private:
 
     void entry_key_plist_overwrite(const iface_key *k) {
         if (k->type == IFACE_KEY_CHAR && toupper(k->key.ucs) == 'Y') {
-            char *file = iface_entry_get_file();
+            std::string file = iface_entry_get_file();
             iface_entry_disable();
-            save_playlist(file);
+            save_playlist(file.c_str());
             if (iface_in_dir_menu()) reread_dir();
-            free(file);
         } else if (k->type == IFACE_KEY_CHAR && toupper(k->key.ucs) == 'N') {
             iface_entry_disable();
             interface_message("Not overwriting.");
@@ -1135,10 +1116,9 @@ private:
 
     void entry_key_user_query(const iface_key *k) {
         if (k->type == IFACE_KEY_CHAR && k->key.ucs == '\n') {
-            char *entry_text = iface_entry_get_text();
+            std::string entry_text = iface_entry_get_text();
             iface_entry_disable();
-            iface_user_reply(entry_text);
-            free(entry_text);
+            iface_user_reply(entry_text.c_str());
         } else {
             iface_entry_handle_key(k);
         }
@@ -1199,15 +1179,14 @@ private:
                 if (plist_find_fname(&dir_plist, curr_file.file.c_str()) != -1) {
                     iface_select_file(curr_file.file.c_str());
                 } else {
-                    char *file = xstrdup(curr_file.file.c_str());
-                    char *slash = strrchr(file, '/');
-                    if (slash) *slash = 0;
+                    std::string file = curr_file.file;
+                    size_t slash = file.rfind('/');
+                    if (slash != std::string::npos) file.erase(slash);
 
-                    if (file[0]) go_to_dir(file, 0);
+                    if (!file.empty()) go_to_dir(file.c_str(), 0);
                     else go_to_dir("/", 0);
 
                     iface_switch_to_dir();
-                    free(file);
                     iface_select_file(curr_file.file.c_str());
                 }
             }

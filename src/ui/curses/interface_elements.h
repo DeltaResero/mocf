@@ -161,11 +161,11 @@
   void iface_make_entry(const enum entry_type type);
   void iface_entry_handle_key(const struct iface_key *k);
   void iface_entry_set_text(const char *text);
-  char *iface_entry_get_text();
+  std::string iface_entry_get_text();
   void iface_entry_history_add();
   void iface_entry_disable();
   void iface_entry_set_file(const char *file);
-  char *iface_entry_get_file();
+  std::string iface_entry_get_file();
   void iface_message(const char *msg);
   void iface_disable_message();
   void iface_user_query(const char *msg, const char *prompt,

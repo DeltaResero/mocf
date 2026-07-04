@@ -338,12 +338,12 @@ static int entry_history_nitems(const struct entry_history *h)
   return static_cast<int>(h->items.size());
 }
 
-static char *entry_history_get(const struct entry_history *h, const int num)
+static std::string entry_history_get(const struct entry_history *h, const int num)
 {
   assert(h != nullptr);
   assert(in_range(num, h->items.size()));
 
-  return xstrdup(h->items[num].c_str());
+  return h->items[num];
 }
 
 /* Draw the entry.  Use this function at the end of screen drawing
@@ -660,19 +660,16 @@ static void entry_resize(struct entry *e, const int width)
   entry_end(e);
 }
 
-static char *entry_get_text(const struct entry *e)
+static std::string entry_get_text(const struct entry *e)
 {
-  char *text;
-  int len;
-
   assert(e != nullptr);
 
-  len = wcstombs(nullptr, e->text_ucs, 0) + 1;
+  int len = wcstombs(nullptr, e->text_ucs, 0) + 1;
   assert(len >= 1);
-  text = static_cast<char *>(xmalloc(sizeof(char) * len));
-  wcstombs(text, e->text_ucs, len);
+  std::vector<char> buf(len);
+  wcstombs(buf.data(), e->text_ucs, len);
 
-  return text;
+  return std::string(buf.data());
 }
 
 /* Copy the previous history item to the entry if available, move the entry
@@ -684,25 +681,19 @@ static void entry_set_history_up(struct entry *e)
 
   if (e->history_pos > 0)
   {
-    char *t;
-
     if (e->history_pos == entry_history_nitems(e->history))
     {
       wmemcpy(e->saved_ucs, e->text_ucs, wcslen(e->text_ucs) + 1);
     }
     else
     {
-      t = entry_get_text(e);
-      entry_history_replace(e->history, e->history_pos, t);
-      free(t);
-      t = nullptr;
+      std::string t = entry_get_text(e);
+      entry_history_replace(e->history, e->history_pos, t.c_str());
     }
     e->history_pos--;
 
-    t = entry_history_get(e->history, e->history_pos);
-    entry_set_text(e, t);
-    free(t);
-    t = nullptr;
+    std::string t = entry_history_get(e->history, e->history_pos);
+    entry_set_text(e, t.c_str());
   }
 }
 
@@ -715,12 +706,8 @@ static void entry_set_history_down(struct entry *e)
 
   if (e->history_pos < entry_history_nitems(e->history))
   {
-    char *t;
-
-    t = entry_get_text(e);
-    entry_history_replace(e->history, e->history_pos, t);
-    free(t);
-    t = nullptr;
+    std::string t = entry_get_text(e);
+    entry_history_replace(e->history, e->history_pos, t.c_str());
 
     e->history_pos++;
     if (e->history_pos == entry_history_nitems(e->history))
@@ -730,9 +717,7 @@ static void entry_set_history_down(struct entry *e)
     else
     {
       t = entry_history_get(e->history, e->history_pos);
-      entry_set_text(e, t);
-      free(t);
-      t = nullptr;
+      entry_set_text(e, t.c_str());
     }
   }
 }
@@ -745,7 +730,7 @@ static void entry_set_file(struct entry *e, const char *file)
   e->file = file;
 }
 
-static char *entry_get_file(const struct entry *e) { return xstrdup(e->file.c_str()); }
+static std::string entry_get_file(const struct entry *e) { return e->file; }
 
 static void entry_destroy(struct entry *e)
 {
@@ -754,14 +739,11 @@ static void entry_destroy(struct entry *e)
 
 static void entry_add_text_to_history(struct entry *e)
 {
-  char *text;
-
   assert(e != nullptr);
   assert(e->history);
 
-  text = entry_get_text(e);
-  entry_history_add(e->history, text);
-  free(text);
+  std::string text = entry_get_text(e);
+  entry_history_add(e->history, text.c_str());
 }
 
 /* Return the list menu height inside the side menu. */
@@ -3620,27 +3602,23 @@ static void info_win_entry_handle_key(struct info_win *iw, struct main_win *mw,
 
   if (type == ENTRY_SEARCH)
   {
-    char *text;
-
     if (k->type == IFACE_KEY_CHAR)
     {
       if (iswprint(k->key.ucs))
       {
         entry_add_char(&iw->entry, k->key.ucs);
-        text = entry_get_text(&iw->entry);
-        if (!main_win_menu_filter(mw, text))
+        std::string text = entry_get_text(&iw->entry);
+        if (!main_win_menu_filter(mw, text.c_str()))
         {
           entry_back_space(&iw->entry);
         }
-        free(text);
       }
     }
     else if (k->key.func == KEY_BACKSPACE)
     {
       entry_back_space(&iw->entry);
-      text = entry_get_text(&iw->entry);
-      main_win_menu_filter(mw, text);
-      free(text);
+      std::string text = entry_get_text(&iw->entry);
+      main_win_menu_filter(mw, text.c_str());
     }
     else if (cmd == KEY_CMD_CANCEL)
     {
@@ -3738,7 +3716,7 @@ static void info_win_entry_set_text(struct info_win *w, const char *text)
   entry_draw(&w->entry, w->win, 1, 0);
 }
 
-static char *info_win_entry_get_text(const struct info_win *w)
+static std::string info_win_entry_get_text(const struct info_win *w)
 {
   assert(w != nullptr);
   assert(w->in_entry);
@@ -3763,7 +3741,7 @@ static void info_win_entry_set_file(struct info_win *w, const char *file)
   entry_set_file(&w->entry, file);
 }
 
-static char *info_win_entry_get_file(const struct info_win *w)
+static std::string info_win_entry_get_file(const struct info_win *w)
 {
   assert(w != nullptr);
   assert(w->in_entry);
@@ -4411,8 +4389,8 @@ void iface_entry_set_text(const char *text)
   iface_refresh_screen();
 }
 
-/* Get text from the entry. Returned memory is malloc()ed. */
-char *iface_entry_get_text() { return info_win_entry_get_text(&info_win); }
+/* Get text from the entry. */
+std::string iface_entry_get_text() { return info_win_entry_get_text(&info_win); }
 
 void iface_entry_history_add() { info_win_entry_history_add(&info_win); }
 
@@ -4433,8 +4411,7 @@ void iface_entry_set_file(const char *file)
   info_win_entry_set_file(&info_win, file);
 }
 
-/* Returned memory is malloc()ed. */
-char *iface_entry_get_file() { return info_win_entry_get_file(&info_win); }
+std::string iface_entry_get_file() { return info_win_entry_get_file(&info_win); }
 
 void iface_message(const char *msg)
 {
