@@ -115,20 +115,14 @@ struct cache_record
 
 /* BerkleyDB-provided error code to description function wrapper. */
 #ifdef HAVE_DB_H
-static inline char *bdb_strerror(int errnum)
+static inline std::string bdb_strerror(int errnum)
 {
-  char *result;
-
   if (errnum > 0)
   {
-    result = xstrdup(xstrerror(errnum).c_str());
-  }
-  else
-  {
-    result = xstrdup(db_strerror(errnum));
+    return xstrerror(errnum);
   }
 
-  return result;
+  return db_strerror(errnum);
 }
 #endif
 

@@ -50,7 +50,7 @@
     long v = val;                                                              \
     ssize_t ssz = snd_pcm_##fn(handle, 1);                                     \
     if (ssz < 0)                                                               \
-      debug("CHECK: snd_pcm_%s() failed: %s", #fn, alsa_strerror(ssz));        \
+      debug("CHECK: snd_pcm_%s() failed: %s", #fn, alsa_strerror(ssz).c_str());  \
     else if (v != ssz)                                                         \
       debug("CHECK: snd_pcm_%s() = %zd (vs %ld)", #fn, ssz, v);                \
   } while (0)
@@ -161,10 +161,8 @@ long AlsaOutput::scale_volume_inverse(int vol, long *mixer_min, long *mixer_max,
 }
 
 /* ALSA-provided error code to description function wrapper. */
-static inline char *alsa_strerror(int errnum)
+static inline std::string alsa_strerror(int errnum)
 {
-  char *result;
-
   if (errnum < 0)
   {
     errnum = -errnum;
@@ -172,14 +170,10 @@ static inline char *alsa_strerror(int errnum)
 
   if (errnum < SND_ERROR_BEGIN)
   {
-    result = xstrdup(xstrerror(errnum).c_str());
-  }
-  else
-  {
-    result = xstrdup(snd_strerror(errnum));
+    return xstrerror(errnum);
   }
 
-  return result;
+  return snd_strerror(errnum);
 }
 
 /* Map ALSA's mask to MOC's format (and visa versa). */

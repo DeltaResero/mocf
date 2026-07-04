@@ -217,14 +217,13 @@ static void ffmpeg_log_cb(void *unused ATTR_UNUSED, int level ATTR_UNUSED,
 #endif
 
 /* FFmpeg-provided error code to description function wrapper. */
-static inline char *ffmpeg_strerror(int errnum)
+static inline std::string ffmpeg_strerror(int errnum)
 {
-  char *result;
+  char result[256];
 
   ffmpeg_log_repeats(nullptr);
-  result = static_cast<char *>(xmalloc(256));
-  av_strerror(errnum, result, 256);
-  result[255] = 0;
+  av_strerror(errnum, result, sizeof(result));
+  result[sizeof(result) - 1] = 0;
 
   return result;
 }
@@ -740,9 +739,8 @@ static void *ffmpeg_open_internal(struct ffmpeg_data *data)
   err = avformat_open_input(&data->ic, nullptr, nullptr, nullptr);
   if (err < 0)
   {
-    char *buf = ffmpeg_strerror(err);
-    decoder_error(&data->error, ERROR_FATAL, 0, "Can't open audio: %s", buf);
-    free(buf);
+    std::string buf = ffmpeg_strerror(err);
+    decoder_error(&data->error, ERROR_FATAL, 0, "Can't open audio: %s", buf.c_str());
     return data;
   }
 
@@ -768,10 +766,9 @@ static void *ffmpeg_open_internal(struct ffmpeg_data *data)
     /* Depending on the particular FFmpeg/LibAV version in use, this
      * may misreport experimental codecs.  Given we don't know the
      * codec at this time, we will have to live with it. */
-    char *buf = ffmpeg_strerror(err);
+    std::string buf = ffmpeg_strerror(err);
     decoder_error(&data->error, ERROR_FATAL, 0,
-                  "Could not find codec parameters: %s", buf);
-    free(buf);
+                  "Could not find codec parameters: %s", buf.c_str());
     goto end;
   }
 
@@ -1072,9 +1069,8 @@ static AVPacket *get_packet(struct ffmpeg_data *data)
 
   if (!data->eof && rc < 0)
   {
-    char *buf = ffmpeg_strerror(rc);
-    decoder_error(&data->error, ERROR_FATAL, 0, "Error in the stream: %s", buf);
-    free(buf);
+    std::string buf = ffmpeg_strerror(rc);
+    decoder_error(&data->error, ERROR_FATAL, 0, "Error in the stream: %s", buf.c_str());
     return nullptr;
   }
 
