@@ -45,7 +45,7 @@
 static int mocf_argc;
 static const char **mocf_argv;
 static int popt_next_val = 1;
-static char *render_popt_command_line();
+static std::string render_popt_command_line();
 
 /* List of MOC-specific environment variables. */
 static struct
@@ -279,9 +279,8 @@ static void show_args()
       printf("MOCF_OPTS='%s' ", str);
     }
 
-    str = render_popt_command_line();
-    printf("%s\n", str);
-    free(str);
+    std::string cmdline_str = render_popt_command_line();
+    printf("%s\n", cmdline_str.c_str());
   }
 }
 
@@ -651,11 +650,11 @@ struct poptOption *find_popt_option(struct poptOption *opts, int wanted)
   return nullptr;
 }
 
-static char *render_popt_command_line()
+static std::string render_popt_command_line()
 {
   int rc;
   std::vector<std::string> cmdline;
-  char *result;
+  std::string result;
   const char **rest;
   poptContext ctx;
   struct poptOption *null_opts;
@@ -692,7 +691,7 @@ static char *render_popt_command_line()
     opt = find_popt_option(null_opts, rc);
     if (!opt)
     {
-      result = xstrdup("Couldn't find option in copied option table!");
+      result = "Couldn't find option in copied option table!";
       goto err;
     }
 
@@ -731,7 +730,7 @@ static char *render_popt_command_line()
       joined += s;
       joined += ' ';
     }
-    result = xstrdup(joined.c_str());
+    result = std::move(joined);
   }
 
 err:
@@ -967,11 +966,8 @@ static void log_popt_command_line()
 #ifndef NDEBUG
   if (mocf_argc > 0)
   {
-    char *str;
-
-    str = render_popt_command_line();
-    logit("%s", str);
-    free(str);
+    std::string str = render_popt_command_line();
+    logit("%s", str.c_str());
   }
 #endif
 }

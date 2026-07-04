@@ -285,33 +285,26 @@ static void log_pthread_stack_size()
 
 static void run_extern_cmd(const char *event)
 {
-  char *command;
-
-  command = xstrdup(options_get_str(event));
+  const char *command = options_get_str(event);
 
   if (command)
   {
-    char *args[2];
-
-    args[0] = xstrdup(command);
-    args[1] = nullptr;
+    std::string command_str = command;
+    char *args[2] = {command_str.data(), nullptr};
 
     switch (fork())
     {
       case 0:
-        execve(command, args, environ);
-        fatal("Error when running %s command '%s': %s", event, command,
+        execve(command_str.c_str(), args, environ);
+        fatal("Error when running %s command '%s': %s", event, command_str.c_str(),
               xstrerror(errno).c_str());
       case -1:
       {
         std::string err = xstrerror(errno);
-        logit("Error when running %s command '%s': %s", event, command, err.c_str());
+        logit("Error when running %s command '%s': %s", event, command_str.c_str(), err.c_str());
         break;
       }
     }
-
-    free(command);
-    free(args[0]);
   }
 }
 
