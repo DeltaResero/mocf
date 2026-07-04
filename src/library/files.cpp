@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <optional>
+#include <algorithm>
 #include <dirent.h>
 #include <string>
 #include <vector>
@@ -47,8 +48,8 @@
 
 #ifdef HAVE_LIBMAGIC
 static magic_t cookie = nullptr;
-static char *cached_file = nullptr;
-static char *cached_result = nullptr;
+static std::optional<std::string> cached_file;
+static std::string cached_result;
 #endif
 
 void files_init()
@@ -76,10 +77,8 @@ void files_init()
 void files_cleanup()
 {
 #ifdef HAVE_LIBMAGIC
-  free(cached_file);
-  cached_file = nullptr;
-  free(cached_result);
-  cached_result = nullptr;
+  cached_file.reset();
+  cached_result.clear();
   magic_close(cookie);
   cookie = nullptr;
 #endif
@@ -140,15 +139,14 @@ std::string file_mime_type(const char *file ASSERT_ONLY)
   if (cookie != nullptr)
   {
     std::lock_guard<std::mutex> lock(magic_mtx);
-    if (cached_file && !strcmp(cached_file, file))
+    if (cached_file && *cached_file == file)
     {
       result = cached_result;
     }
     else
     {
-      free(cached_file);
-      free(cached_result);
-      cached_file = cached_result = nullptr;
+      cached_file.reset();
+      cached_result.clear();
       const char *magic_res = magic_file(cookie, file);
       if (magic_res == nullptr)
       {
@@ -157,8 +155,8 @@ std::string file_mime_type(const char *file ASSERT_ONLY)
       else
       {
         result = magic_res;
-        cached_file = xstrdup(file);
-        cached_result = xstrdup(result.c_str());
+        cached_file = file;
+        cached_result = result;
       }
     }
   }
@@ -464,27 +462,18 @@ int read_directory(const char *directory, std::vector<std::string> &dirs,
   return 1;
 }
 
-static int dir_symlink_loop(const ino_t inode_no, const ino_t *dir_stack,
-                            const int depth)
+static bool dir_symlink_loop(const ino_t inode_no,
+                             const std::vector<ino_t> &dir_stack)
 {
-  int i;
-
-  for (i = 0; i < depth; i++)
-  {
-    if (dir_stack[i] == inode_no)
-    {
-      return 1;
-    }
-  }
-
-  return 0;
+  return std::find(dir_stack.begin(), dir_stack.end(), inode_no) !=
+         dir_stack.end();
 }
 
 /* Recursively add files from the directory to the playlist.
  * Return 1 if OK (and even some errors), 0 if the user interrupted. */
 static int read_directory_recurr_internal(const char *directory,
                                           struct plist *plist,
-                                          ino_t **dir_stack, int *depth)
+                                          std::vector<ino_t> &dir_stack)
 {
   DIR *dir;
   struct dirent *entry;
@@ -500,7 +489,7 @@ static int read_directory_recurr_internal(const char *directory,
   assert(plist != nullptr);
   assert(directory != nullptr);
 
-  if (*dir_stack && dir_symlink_loop(st.st_ino, *dir_stack, *depth))
+  if (dir_symlink_loop(st.st_ino, dir_stack))
   {
     logit("Detected symlink loop on %s", directory);
     return 1;
@@ -512,9 +501,7 @@ static int read_directory_recurr_internal(const char *directory,
     return 1;
   }
 
-  (*depth)++;
-  *dir_stack = static_cast<ino_t *>(xrealloc(*dir_stack, sizeof(ino_t) * (*depth)));
-  (*dir_stack)[*depth - 1] = st.st_ino;
+  dir_stack.push_back(st.st_ino);
 
   while ((entry = readdir(dir)))
   {
@@ -541,7 +528,7 @@ static int read_directory_recurr_internal(const char *directory,
     type = file_type(file);
     if (type == F_DIR)
     {
-      read_directory_recurr_internal(file, plist, dir_stack, depth);
+      read_directory_recurr_internal(file, plist, dir_stack);
     }
     else if (type == F_SOUND && plist_find_fname(plist, file) == -1)
     {
@@ -549,8 +536,7 @@ static int read_directory_recurr_internal(const char *directory,
     }
   }
 
-  (*depth)--;
-  *dir_stack = static_cast<ino_t *>(xrealloc(*dir_stack, sizeof(ino_t) * (*depth)));
+  dir_stack.pop_back();
 
   closedir(dir);
   return 1;
@@ -558,18 +544,9 @@ static int read_directory_recurr_internal(const char *directory,
 
 int read_directory_recurr(const char *directory, struct plist *plist)
 {
-  int ret;
-  int depth = 0;
-  ino_t *dir_stack = nullptr;
+  std::vector<ino_t> dir_stack;
 
-  ret = read_directory_recurr_internal(directory, plist, &dir_stack, &depth);
-
-  if (dir_stack)
-  {
-    free(dir_stack);
-  }
-
-  return ret;
+  return read_directory_recurr_internal(directory, plist, dir_stack);
 }
 
 /* Return the file extension position or nullptr if the file has no extension. */

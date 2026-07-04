@@ -46,15 +46,15 @@ int is_plist_file(const char *name)
   return 0;
 }
 
-static void make_path(char *buf, size_t buf_size, const char *cwd, char *path)
+static void make_path(char *buf, size_t buf_size, const char *cwd, const char *path)
 {
   if (path[0] != '/')
   {
-    strcpy(buf, cwd);
+    snprintf(buf, buf_size, "%s", cwd);
   }
   else
   {
-    strcpy(buf, "/");
+    snprintf(buf, buf_size, "/");
   }
 
   resolve_path(buf, buf_size, path);
@@ -216,18 +216,17 @@ static int is_blank_line(const char *l)
 }
 
 /* Read a value from the given section from .INI file.  File should be opened
- * and seeking will be performed on it.  Return the malloc()ed value or nullptr
+ * and seeking will be performed on it.  Return the value or std::nullopt
  * if not present or error occurred. */
-static char *read_ini_value(FILE *file, const char *section, const char *key)
+static std::optional<std::string> read_ini_value(FILE *file, const char *section, const char *key)
 {
   int in_section = 0;
-  char *value = nullptr;
   int key_len;
 
   if (fseek(file, 0, SEEK_SET))
   {
     error_errno("File fseek() error", errno);
-    return nullptr;
+    return std::nullopt;
   }
 
   key_len = strlen(key);
@@ -284,7 +283,7 @@ static char *read_ini_value(FILE *file, const char *section, const char *key)
 
       if (!strncasecmp(line.data(), key, std::max<size_t>(t2 - line.data() + 1, key_len)))
       {
-        value = t + 1;
+        char *value = t + 1;
 
         while (isblank(value[0]))
         {
@@ -304,14 +303,13 @@ static char *read_ini_value(FILE *file, const char *section, const char *key)
           *q = 0;
         }
 
-        value = xstrdup(value);
-        break;
+        return std::string(value);
       }
     }
 
   }
 
-  return value;
+  return std::nullopt;
 }
 
 /* Load PLS file into plist. Return the number of items read. */
@@ -319,7 +317,7 @@ static int plist_load_pls(struct plist *plist, const char *fname,
                           const char *cwd)
 {
   FILE *file;
-  char *e, *line = nullptr;
+  char *e;
   long i, nitems, added = 0;
 
   file = fopen(fname, "r");
@@ -329,8 +327,8 @@ static int plist_load_pls(struct plist *plist, const char *fname,
     return 0;
   }
 
-  line = read_ini_value(file, "playlist", "NumberOfEntries");
-  if (!line)
+  auto number_entries = read_ini_value(file, "playlist", "NumberOfEntries");
+  if (!number_entries)
   {
     /* Assume that it is a pls file version 1 - plist_load_m3u()
      * should handle it like an m3u file without the m3u extensions. */
@@ -338,81 +336,70 @@ static int plist_load_pls(struct plist *plist, const char *fname,
     return plist_load_m3u(plist, fname, cwd);
   }
 
-  nitems = strtol(line, &e, 10);
+  nitems = strtol(number_entries->c_str(), &e, 10);
   if (*e)
   {
     error("Broken PLS file");
-    goto err;
   }
-
-  for (i = 1; i <= nitems; i++)
+  else
   {
-    int time, last_added;
-    char *pls_file, *pls_title, *pls_length;
-    char key[32], path[2 * PATH_MAX];
-
-    snprintf(key, sizeof(key), "File%ld", i);
-    pls_file = read_ini_value(file, "playlist", key);
-    if (!pls_file)
+    for (i = 1; i <= nitems; i++)
     {
-      error("Broken PLS file");
-      goto err;
-    }
+      int time, last_added;
+      char key[32], path[2 * PATH_MAX];
 
-    snprintf(key, sizeof(key), "Title%ld", i);
-    pls_title = read_ini_value(file, "playlist", key);
+      snprintf(key, sizeof(key), "File%ld", i);
+      auto pls_file = read_ini_value(file, "playlist", key);
+      if (!pls_file)
+      {
+        error("Broken PLS file");
+        break;
+      }
 
-    snprintf(key, sizeof(key), "Length%ld", i);
-    pls_length = read_ini_value(file, "playlist", key);
+      snprintf(key, sizeof(key), "Title%ld", i);
+      auto pls_title = read_ini_value(file, "playlist", key);
 
-    if (pls_length)
-    {
-      time = strtol(pls_length, &e, 10);
-      if (*e)
+      snprintf(key, sizeof(key), "Length%ld", i);
+      auto pls_length = read_ini_value(file, "playlist", key);
+
+      if (pls_length)
+      {
+        time = strtol(pls_length->c_str(), &e, 10);
+        if (*e)
+        {
+          time = -1;
+        }
+      }
+      else
       {
         time = -1;
       }
-    }
-    else
-    {
-      time = -1;
-    }
 
-    if (strlen(pls_file) <= PATH_MAX)
-    {
-      make_path(path, sizeof(path), cwd, pls_file);
-      if (plist_find_fname(plist, path) == -1)
+      if (pls_file->size() <= PATH_MAX)
       {
-        last_added = plist_add(plist, path);
-
-        if (pls_title && pls_title[0])
+        make_path(path, sizeof(path), cwd, pls_file->c_str());
+        if (plist_find_fname(plist, path) == -1)
         {
-          plist_set_title_tags(plist, last_added, pls_title);
-        }
+          last_added = plist_add(plist, path);
 
-        if (time > 0)
-        {
-          plist->items[last_added].tags = std::make_unique<file_tags>();
-          plist->items[last_added].tags->time = time;
-          plist->items[last_added].tags->filled |= TAGS_TIME;
+          if (pls_title && !pls_title->empty())
+          {
+            plist_set_title_tags(plist, last_added, pls_title->c_str());
+          }
+
+          if (time > 0)
+          {
+            plist->items[last_added].tags = std::make_unique<file_tags>();
+            plist->items[last_added].tags->time = time;
+            plist->items[last_added].tags->filled |= TAGS_TIME;
+          }
         }
       }
-    }
 
-    free(pls_file);
-    if (pls_title)
-    {
-      free(pls_title);
+      added += 1;
     }
-    if (pls_length)
-    {
-      free(pls_length);
-    }
-    added += 1;
   }
 
-err:
-  free(line);
   fclose(file);
   return added;
 }
@@ -545,25 +532,22 @@ err:
 int plist_save(struct plist *plist, const char *file, const bool save_tags)
 {
   int offset = 0;
-  char *dir, *file_copy;
 
   debug("TG: saving playlist %s", file);
 
   if (options_get_bool("SaveRelativePlaylists"))
   {
-    int i;
+    std::string file_copy(file);
+    std::string dir(dirname(file_copy.data()));
+    offset = static_cast<int>(dir.size()) + 1;
 
-    file_copy = xstrdup(file);
-    dir = xstrdup(dirname(file_copy));
-    offset = strlen(dir) + 1;
-
-    assert(strcmp(dir, ".") != 0); // file should already include path
+    assert(dir != "."); // file should already include path
 
     /* check if all elements of playlist are in dir or below */
-    for (i = 0; i < static_cast<int>(plist->items.size()); i++)
+    for (int i = 0; i < static_cast<int>(plist->items.size()); i++)
     {
       if (!plist_deleted(plist, i) &&
-          (strstr(plist->items[i].file.c_str(), dir) != plist->items[i].file.c_str()))
+          plist->items[i].file.compare(0, dir.size(), dir) != 0)
       {
         debug("TG: relative paths in playlist disabled due to entry %d, file = "
               "%s",
@@ -572,8 +556,6 @@ int plist_save(struct plist *plist, const char *file, const bool save_tags)
         break;
       }
     }
-    free(dir);
-    free(file_copy);
   }
 
   return plist_save_m3u(plist, file, offset, save_tags);
