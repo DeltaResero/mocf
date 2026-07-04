@@ -276,6 +276,28 @@ typedef void *t_locked_fn(struct tags_cache *, const char *, int, int, DBT *,
                           DBT *);
 #endif
 
+/* Berkeley DB's DB_DBT_MALLOC flag tells the library to allocate the DBT's
+ * data buffer with malloc(); the caller owns it and must free() it. This
+ * guard does that on scope exit (including exceptions from fatal(), which
+ * throws), instead of relying on an explicit free() at the end of the
+ * function reliably being reached. */
+#ifdef HAVE_DB_H
+class DbtGuard
+{
+public:
+  explicit DbtGuard(DBT &dbt) : dbt_(dbt) {}
+  ~DbtGuard()
+  {
+    if (dbt_.data) free(dbt_.data);
+  }
+  DbtGuard(const DbtGuard &) = delete;
+  DbtGuard &operator=(const DbtGuard &) = delete;
+
+private:
+  DBT &dbt_;
+};
+#endif
+
 /* This function ensures that a DB function takes place while holding a
  * database record lock.  It also provides an initialised database thang
  * for the key and record. */
@@ -296,6 +318,7 @@ static void *with_db_lock(t_locked_fn fn, struct tags_cache *c,
 
   memset(&record, 0, sizeof(record));
   record.flags = DB_DBT_MALLOC;
+  DbtGuard record_guard(record);
 
   rc = c->db_env->lock_get(c->db_env, c->locker, 0, &key, DB_LOCK_WRITE, &lock);
   if (rc)
@@ -309,11 +332,6 @@ static void *with_db_lock(t_locked_fn fn, struct tags_cache *c,
   if (rc)
   {
     fatal("Can't release DB lock: %s", db_strerror(rc));
-  }
-
-  if (record.data)
-  {
-    free(record.data);
   }
 
   return result;
@@ -378,6 +396,9 @@ static void tags_cache_gc(struct tags_cache *c)
       break;
     }
 
+    DbtGuard key_guard(key);
+    DbtGuard rec_guard(serialized_cache_rec);
+
     if (cache_record_deserialize(&rec, static_cast<const char *>(serialized_cache_rec.data),
                                  serialized_cache_rec.size, 1) &&
         rec.atime < last_referenced_atime)
@@ -390,9 +411,6 @@ static void tags_cache_gc(struct tags_cache *c)
     // TODO: remove objects with serialization error.
 
     nitems++;
-
-    free(key.data);
-    free(serialized_cache_rec.data);
   }
 
   if (ret != DB_NOTFOUND)
