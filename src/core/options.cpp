@@ -621,65 +621,67 @@ int options_was_defaulted(const char *name)
  * substituted first from the environment then, if not found, from
  * the configuration options.  Strings of the form '$${' are reduced to
  * '${' and not substituted.  The result is returned as a new string. */
-static char *substitute_variable(const char *name_in, const char *value_in)
+static std::string substitute_variable(const char *name_in, const std::string &value_in)
 {
-  size_t len;
-  char *dollar, *result, *ptr, *name, *value, *dflt, *end;
   static const char accept[] = "abcdefghijklmnopqrstuvwxyz"
                                "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                                "0123456789_";
-  std::vector<std::string> strs;
 
-  result = xstrdup(value_in);
-  ptr = result;
-  dollar = strstr(result, "${");
-  while (dollar)
+  std::string result = value_in;
+  size_t pos = 0;
+
+  for (;;)
   {
-    /* Escape "$${". */
-    if (dollar > ptr && dollar[-1] == '$')
+    size_t dollar = result.find("${", pos);
+    if (dollar == std::string::npos)
     {
-      dollar[-1] = 0x00;
-      strs.push_back(ptr);
-      ptr = dollar;
-      dollar = strstr(&dollar[2], "${");
+      break;
+    }
+
+    /* Escape "$${". */
+    if (dollar > 0 && result[dollar - 1] == '$')
+    {
+      result.erase(dollar - 1, 1);
+      pos = dollar + 1;
       continue;
     }
 
-    /* Copy up to this point verbatim. */
-    dollar[0] = 0x00;
-    strs.push_back(ptr);
-
     /* Find where the substitution variable name ends. */
-    name = &dollar[2];
-    len = strspn(name, accept);
+    size_t name_start = dollar + 2;
+    size_t len = strspn(result.c_str() + name_start, accept);
     if (len == 0)
     {
       fatal("Error in config file option '%s':\n"
             "             substitution variable name is missing!",
             name_in);
     }
+    std::string name = result.substr(name_start, len);
 
     /* Find default substitution or closing brace. */
-    dflt = nullptr;
-    if (name[len] == '}')
+    size_t after_name = name_start + len;
+    std::string dflt;
+    bool has_dflt = false;
+    size_t end_pos;
+
+    if (after_name < result.size() && result[after_name] == '}')
     {
-      end = &name[len];
-      end[0] = 0x00;
+      end_pos = after_name;
     }
-    else if (strncmp(&name[len], ":-", 2) == 0)
+    else if (result.compare(after_name, 2, ":-") == 0)
     {
-      name[len] = 0x00;
-      dflt = &name[len + 2];
-      end = strchr(dflt, '}');
-      if (end == nullptr)
+      size_t dflt_start = after_name + 2;
+      size_t brace = result.find('}', dflt_start);
+      if (brace == std::string::npos)
       {
         fatal("Error in config file option '%s': "
               "unterminated '${%s:-'!",
-              name_in, name);
+              name_in, name.c_str());
       }
-      end[0] = 0x00;
+      dflt = result.substr(dflt_start, brace - dflt_start);
+      has_dflt = true;
+      end_pos = brace;
     }
-    else if (name[len] == 0x00)
+    else if (after_name >= result.size())
     {
       fatal("Error in config file option '%s': "
             "unterminated '${'!",
@@ -689,44 +691,66 @@ static char *substitute_variable(const char *name_in, const char *value_in)
     {
       fatal("Error in config file option '%s':\n"
             "             expecting  ':-' or '}' found '%c'!",
-            name_in, name[len]);
+            name_in, result[after_name]);
     }
 
     /* Fetch environment variable or configuration option value. */
-    value = xstrdup(getenv(name));
-    if (value == nullptr && find_option(name, OPTION_ANY) != nullptr)
+    std::string value;
+    bool has_value = false;
+    const char *env = getenv(name.c_str());
+    if (env)
+    {
+      value = env;
+      has_value = true;
+    }
+    else if (find_option(name.c_str(), OPTION_ANY) != nullptr)
     {
       char buf[16];
 
-      switch (options_get_type(name))
+      switch (options_get_type(name.c_str()))
       {
         case OPTION_INT:
-          snprintf(buf, sizeof(buf), "%d", options_get_int(name));
-          value = xstrdup(buf);
+          snprintf(buf, sizeof(buf), "%d", options_get_int(name.c_str()));
+          value = buf;
+          has_value = true;
           break;
         case OPTION_BOOL:
-          value = xstrdup(options_get_bool(name) ? "yes" : "no");
+          value = options_get_bool(name.c_str()) ? "yes" : "no";
+          has_value = true;
           break;
         case OPTION_STR:
         case OPTION_PATH:
-          value = xstrdup(options_get_str(name));
+        {
+          const char *s = options_get_str(name.c_str());
+          if (s)
+          {
+            value = s;
+            has_value = true;
+          }
           break;
+        }
         case OPTION_SYMB:
-          value = xstrdup(options_get_symb(name));
+        {
+          const char *s = options_get_symb(name.c_str());
+          if (s)
+          {
+            value = s;
+            has_value = true;
+          }
           break;
+        }
         case OPTION_LIST:
         {
-          const std::vector<std::string> &list = options_get_list(name);
+          const std::vector<std::string> &list = options_get_list(name.c_str());
           if (!list.empty())
           {
-            std::string s;
             for (const auto &item : list)
             {
-              s += item;
-              s += ':';
+              value += item;
+              value += ':';
             }
-            s.pop_back();
-            value = xstrdup(s.c_str());
+            value.pop_back();
+            has_value = true;
           }
           break;
         }
@@ -735,35 +759,27 @@ static char *substitute_variable(const char *name_in, const char *value_in)
           break;
       }
     }
-    if (value && value[0])
+
+    std::string replacement;
+    if (has_value && !value.empty())
     {
-      strs.push_back(value);
+      replacement = value;
     }
-    else if (dflt)
+    else if (has_dflt)
     {
-      strs.push_back(dflt);
+      replacement = dflt;
     }
     else
     {
       fatal("Error in config file option '%s':\n"
             "             substitution variable '%s' not set or null!",
-            name_in, &dollar[2]);
+            name_in, name.c_str());
     }
-    free(value);
 
-    /* Go look for another substitution. */
-    ptr = &end[1];
-    dollar = strstr(ptr, "${");
-  }
+    result.replace(dollar, end_pos - dollar + 1, replacement);
 
-  /* If anything changed copy segments to result. */
-  if (!strs.empty())
-  {
-    strs.push_back(ptr);
-    free(result);
-    std::string cat;
-    for (const auto &s : strs) cat += s;
-    result = xstrdup(cat.c_str());
+    /* Go look for another substitution, starting after the replacement. */
+    pos = dollar + replacement.size();
   }
 
   return result;
@@ -802,15 +818,13 @@ static bool set_option(const char *name, const char *value_in, bool append)
   opt->set_in_config = true;
 
   /* Substitute environmental variables. */
-  char *value = substitute_variable(name, value_in);
+  std::string value = substitute_variable(name, value_in);
 
-  if (!options_set_pair(name, value, append))
+  if (!options_set_pair(name, value.c_str(), append))
   {
-    free(value);
     return false;
   }
 
-  free(value);
   return true;
 }
 
