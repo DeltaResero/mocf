@@ -393,23 +393,23 @@ static void sndfile_get_name(const char *file, char buf[4])
   {
     if (!strcasecmp(ext, "snd"))
     {
-      strcpy(buf, "AU");
+      std::memcpy(buf, "AU", sizeof("AU"));
     }
     else if (!strcasecmp(ext, "8svx"))
     {
-      strcpy(buf, "SVX");
+      std::memcpy(buf, "SVX", sizeof("SVX"));
     }
     else if (!strcasecmp(ext, "oga"))
     {
-      strcpy(buf, "OGG");
+      std::memcpy(buf, "OGG", sizeof("OGG"));
     }
     else if (!strcasecmp(ext, "sf") || !strcasecmp(ext, "icram"))
     {
-      strcpy(buf, "IRC");
+      std::memcpy(buf, "IRC", sizeof("IRC"));
     }
     else if (!strcasecmp(ext, "mat4") || !strcasecmp(ext, "mat5"))
     {
-      strcpy(buf, "MAT");
+      std::memcpy(buf, "MAT", sizeof("MAT"));
     }
   }
 }

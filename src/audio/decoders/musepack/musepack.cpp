@@ -465,7 +465,7 @@ static struct io_stream *musepack_get_stream(void *prv_data)
 
 static void musepack_get_name(const char *unused ATTR_UNUSED, char buf[4])
 {
-  strcpy(buf, "MPC");
+  std::memcpy(buf, "MPC", sizeof("MPC"));
 }
 
 static int musepack_our_format_ext(const char *ext)

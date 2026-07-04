@@ -20,6 +20,7 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <vector>
 #ifndef HAVE_TREMOR
 #include <vorbis/vorbisfile.h>
 #else
@@ -391,8 +392,7 @@ static int vorbis_decode(void *prv_data, char *buf, int buf_len,
     }
     else
     {
-      float *out;
-      out = static_cast<float *>(malloc(buf_len));
+      std::vector<float> out(buf_len / sizeof(float));
       int i, j;
 
       assert(sizeof(float) * ret * sound_params->channels <= (unsigned)buf_len);
@@ -406,9 +406,8 @@ static int vorbis_decode(void *prv_data, char *buf, int buf_len,
             out[sound_params->channels * i + j] = pcm[j][i];
           }
         };
-        memcpy(buf, out, sizeof(float) * ret * sound_params->channels);
+        memcpy(buf, out.data(), sizeof(float) * ret * sound_params->channels);
       }
-      free(out);
     }
 #endif
 #endif
@@ -470,7 +469,7 @@ static struct io_stream *vorbis_get_stream(void *prv_data)
 
 static void vorbis_get_name(const char *unused ATTR_UNUSED, char buf[4])
 {
-  strcpy(buf, "OGG");
+  std::memcpy(buf, "OGG", sizeof("OGG"));
 }
 
 static int vorbis_our_format_ext(const char *ext)

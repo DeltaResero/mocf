@@ -727,26 +727,26 @@ static void mp3_get_name(const char *file, char buf[4])
 {
   char *ext;
 
-  strncpy(buf, "MPx", 4);
+  std::memcpy(buf, "MPx", sizeof("MPx"));
 
   ext = ext_pos(file);
   if (ext)
   {
     if (!strcasecmp(ext, "mp3"))
     {
-      strncpy(buf, "MP3", 4);
+      std::memcpy(buf, "MP3", sizeof("MP3"));
     }
     else if (!strcasecmp(ext, "mp2"))
     {
-      strncpy(buf, "MP2", 4);
+      std::memcpy(buf, "MP2", sizeof("MP2"));
     }
     else if (!strcasecmp(ext, "mp1"))
     {
-      strncpy(buf, "MP1", 4);
+      std::memcpy(buf, "MP1", sizeof("MP1"));
     }
     else if (!strcasecmp(ext, "mpga"))
     {
-      strncpy(buf, "MPG", 4);
+      std::memcpy(buf, "MPG", sizeof("MPG"));
     }
   }
 }

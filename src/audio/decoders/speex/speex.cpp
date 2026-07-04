@@ -63,8 +63,7 @@ struct spx_data
   std::vector<int16_t> output;
   int output_start;
   int output_left;
-  char *comment_packet;
-  int comment_packet_len;
+  std::vector<char> comment_packet;
 };
 
 static void *process_header(struct spx_data *data)
@@ -203,11 +202,8 @@ static int read_speex_header(struct spx_data *data)
         }
         else if (packet_count == 1)
         {
-          data->comment_packet_len = data->op.bytes;
-          data->comment_packet =
-              static_cast<char *>(xmalloc(sizeof(char) * data->comment_packet_len));
-          memcpy(data->comment_packet, data->op.packet,
-                 data->comment_packet_len);
+          data->comment_packet.assign(data->op.packet,
+                                      data->op.packet + data->op.bytes);
         }
 
         packet_count++;
@@ -231,7 +227,6 @@ static struct spx_data *spx_open_internal(struct io_stream *stream)
   data->st = nullptr;
   data->stereo = stereo;
   data->header = nullptr;
-  data->comment_packet = nullptr;
   data->bitrate = -1;
   ogg_sync_init(&data->oy);
   speex_bits_init(&data->bits);
@@ -284,10 +279,6 @@ static void spx_close(void *prv_data)
     {
       speex_decoder_destroy(data->st);
     }
-    if (data->comment_packet)
-    {
-      free(data->comment_packet);
-    }
     speex_bits_destroy(&data->bits);
     ogg_stream_clear(&data->os);
     ogg_sync_clear(&data->oy);
@@ -330,15 +321,14 @@ static void parse_comment(const char *str, struct file_tags *tags)
 
 static void get_comments(struct spx_data *data, struct file_tags *tags)
 {
-  if (data->comment_packet && data->comment_packet_len >= 8)
+  if (!data->comment_packet.empty() && data->comment_packet.size() >= 8)
   {
-    char *c = data->comment_packet;
+    const char *c = data->comment_packet.data();
     int len, i, nb_fields;
-    char *end;
-    std::vector<char> temp;
+    const char *end;
 
     /* Parse out vendor string */
-    end = c + data->comment_packet_len;
+    end = c + data->comment_packet.size();
     len = readint(c, 0);
     c += 4;
 
@@ -374,15 +364,9 @@ static void get_comments(struct spx_data *data, struct file_tags *tags)
         return;
       }
 
-      if (static_cast<int>(temp.size()) < len + 1)
-      {
-        temp.resize(len + 1);
-      }
-
-      strncpy(temp.data(), c, len);
-      temp[len] = '\0';
-      debug("COMMENT: '%s'", temp.data());
-      parse_comment(temp.data(), tags);
+      std::string field(c, len);
+      debug("COMMENT: '%s'", field.c_str());
+      parse_comment(field.c_str(), tags);
 
       c += len;
     }
@@ -687,7 +671,7 @@ static struct io_stream *spx_get_stream(void *prv_data)
 
 static void spx_get_name(const char *unused ATTR_UNUSED, char buf[4])
 {
-  strcpy(buf, "SPX");
+  std::memcpy(buf, "SPX", sizeof("SPX"));
 }
 
 static int spx_our_format_ext(const char *ext)

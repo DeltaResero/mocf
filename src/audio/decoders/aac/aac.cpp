@@ -650,7 +650,7 @@ static int aac_get_duration(void *prv_data)
 
 static void aac_get_name(const char *unused ATTR_UNUSED, char buf[4])
 {
-  strcpy(buf, "AAC");
+  std::memcpy(buf, "AAC", sizeof("AAC"));
 }
 
 static int aac_our_format_ext(const char *ext)

@@ -218,7 +218,6 @@ static off_t seek_cb(void *datasource, off_t offset, int whence)
 static void mpg123_open_stream_internal(struct mpg123_data *data)
 {
   int res;
-  char *mpg123_err;
   int ch, enc;
   long rate;
   struct mpg123_frameinfo info;
@@ -345,10 +344,11 @@ static void mpg123_open_stream_internal(struct mpg123_data *data)
   return;
 
 err:
-  mpg123_err = xstrdup(mpg123_strerror(data->mf));
-  decoder_error(&data->error, ERROR_FATAL, 0, "%s", mpg123_err);
-  debug("mpg123 error: %s", mpg123_err);
-  free(mpg123_err);
+  {
+    const char *mpg123_err = mpg123_strerror(data->mf);
+    decoder_error(&data->error, ERROR_FATAL, 0, "%s", mpg123_err);
+    debug("mpg123 error: %s", mpg123_err);
+  }
   mpg123_delete(data->mf);
   data->mf = nullptr;
   io_close(data->stream);
@@ -526,7 +526,7 @@ static struct io_stream *mpg123_get_stream(void *prv_data)
 
 static void mpg123_get_name(const char *file ATTR_UNUSED, char buf[4])
 {
-  strcpy(buf, "123");
+  std::memcpy(buf, "123", sizeof("123"));
 }
 
 static int mpg123_our_format_ext(const char *ext)

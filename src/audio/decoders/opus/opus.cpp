@@ -405,7 +405,7 @@ static struct io_stream *opus_get_stream(void *prv_data)
 
 static void opus_get_name(const char *file ATTR_UNUSED, char buf[4])
 {
-  strcpy(buf, "OPS");
+  std::memcpy(buf, "OPS", sizeof("OPS"));
 }
 
 static int opus_our_format_ext(const char *ext)

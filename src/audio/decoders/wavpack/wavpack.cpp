@@ -291,7 +291,7 @@ static int wav_our_mime(const char *mime ATTR_UNUSED)
 
 static void wav_get_name(const char *unused ATTR_UNUSED, char buf[4])
 {
-  strcpy(buf, "WV");
+  std::memcpy(buf, "WV", sizeof("WV"));
 }
 
 static int wav_our_format_ext(const char *ext)
