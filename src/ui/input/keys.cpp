@@ -842,7 +842,8 @@ static const char *get_key_name(const int key)
   /* Meta keys */
   if (key & META_KEY_FLAG)
   {
-    strcpy(key_str, "M-");
+    key_str[0] = 'M';
+    key_str[1] = '-';
     key_str[2] = key & ~META_KEY_FLAG;
     key_str[3] = 0;
 

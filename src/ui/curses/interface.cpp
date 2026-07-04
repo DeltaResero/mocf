@@ -1012,7 +1012,7 @@ private:
         bool add_slash = (s.length() > 1 && s.back() == '/');
         char dir[PATH_MAX];
 
-        if (s.front() == '~') {
+        if (!s.empty() && s.front() == '~') {
             const char *home = get_home();
             if (strnlen(home, PATH_MAX) == PATH_MAX) {
                 return std::nullopt;
@@ -1020,7 +1020,7 @@ private:
             snprintf(dir, sizeof(dir), "%s", home);
             if (s == "~") add_slash = true;
             s.remove_prefix(1);
-        } else if (s.front() != '/') {
+        } else if (s.empty() || s.front() != '/') {
             snprintf(dir, sizeof(dir), "%s", cwd.c_str());
         } else {
             dir[0] = '/';
