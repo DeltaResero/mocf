@@ -38,6 +38,10 @@
 #include <vector>
 #include <algorithm>
 #include <string>
+#include <fstream>
+#include <sstream>
+#include <memory>
+#include <new>
 
 #include "core/common.h"
 #include "audio/audio.h"
@@ -96,9 +100,19 @@ typedef struct t_biquad t_biquad;
 
 struct t_biquad
 {
-  float a0, a1, a2, a3, a4;
-  float x1, x2, y1, y2;
-  float cf, bw, gain, srate;
+  float a0;
+  float a1;
+  float a2;
+  float a3;
+  float a4;
+  float x1;
+  float x2;
+  float y1;
+  float y2;
+  float cf;
+  float bw;
+  float gain;
+  float srate;
   int israte;
 };
 
@@ -130,7 +144,8 @@ typedef struct t_eq_set_list t_eq_set_list;
 struct t_eq_set_list
 {
   t_eq_set *set;
-  t_eq_set_list *prev, *next;
+  t_eq_set_list *prev;
+  t_eq_set_list *next;
 };
 
 typedef struct t_active_set t_active_set;
@@ -155,7 +170,7 @@ struct t_eq_settings
 static char *skip_line(char *s);
 static char *skip_whitespace(char *s);
 static int read_float(char *s, float *f, char **endp);
-static int read_setup(char *name, char *desc, t_eq_setup **sp);
+static int read_setup(const char *name, char *desc, std::unique_ptr<t_eq_setup> &s);
 static void equalizer_adjust_preamp();
 static void equalizer_read_config();
 static void equalizer_write_config();
@@ -184,12 +199,18 @@ static void equ_process_buffer_s32(int32_t *buf, size_t samples);
 static void equ_process_buffer_float(float *buf, size_t samples);
 
 /* static global variables */
-static t_eq_set_list equ_list, *current_equ;
+static t_eq_set_list equ_list;
+static t_eq_set_list *current_equ;
 
-static int sample_rate, equ_active, equ_channels;
+static int sample_rate;
+static int equ_active;
+static int equ_channels;
 
-static float mixin_rate, r_mixin_rate;
-static float preamp, preampf;
+static float mixin_rate;
+static float r_mixin_rate;
+
+static float preamp;
+static float preampf;
 
 static std::string eqsetdir;
 
@@ -306,19 +327,6 @@ static t_biquad *mk_biquad(float dbgain, float cf, float srate, float bw,
   return b;
 }
 
-/*
- * not used but keep as example use for biquad filter
-static inline void biquad(float *src, float *dst, int len, t_biquad *b)
-{
-  while(len-->0)
-  {
-    float s = *src++;
-    float f = s * b->a0 + b->a1 * b->x1 + b->a2 * b->x2 - b->a3 * b->y1 - b->a4
-* b->y2; *dst++=f; b->x2 = b->x1; b->x1 = s; b->y2 = b->y1; b->y1 = f;
-  }
-}
-*/
-
 /* Applies a set of biquadratic filters to a buffer of floating point
  * samples.
  * It is safe to have the same input and output buffer.
@@ -328,17 +336,16 @@ static inline void biquad(float *src, float *dst, int len, t_biquad *b)
 static inline void apply_biquads(float *src, float *dst, int channels, int len,
                                  t_biquad *b, int blen)
 {
-  int bi, ci, boffs, idx;
   while (len > 0)
   {
-    boffs = 0;
-    for (ci = 0; ci < channels; ci++)
+    int boffs = 0;
+    for (int ci = 0; ci < channels; ci++)
     {
       float s = *src++;
       float f = s;
-      for (bi = 0; bi < blen; bi++)
+      for (int bi = 0; bi < blen; bi++)
       {
-        idx = boffs + bi;
+        int idx = boffs + bi;
         f = s * b[idx].a0 + b[idx].a1 * b[idx].x1 + b[idx].a2 * b[idx].x2 -
             b[idx].a3 * b[idx].y1 - b[idx].a4 * b[idx].y2;
         b[idx].x2 = b[idx].x1;
@@ -392,50 +399,29 @@ static void equalizer_read_config()
     return;
   }
 
-  char presetbuf[128];
-  presetbuf[0] = 0;
-
-  int tmp;
-  float ftmp;
-
   while (auto linebuffer = read_line(cf))
   {
-    if (strncasecmp(linebuffer->c_str(), EQUALIZER_CFG_ACTIVE,
-                    strlen(EQUALIZER_CFG_ACTIVE)) == 0)
+    if (strncasecmp(linebuffer->c_str(), EQUALIZER_CFG_ACTIVE, sizeof(EQUALIZER_CFG_ACTIVE) - 1) == 0)
     {
-      if (sscanf(linebuffer->c_str(), "%*s %i", &tmp) > 0)
-      {
-        if (tmp > 0)
-        {
-          equ_active = 1;
-        }
-        else
-        {
-          equ_active = 0;
-        }
-      }
+      try {
+        int tmp = std::stoi(linebuffer->substr(sizeof(EQUALIZER_CFG_ACTIVE) - 1));
+        equ_active = (tmp > 0) ? 1 : 0;
+      } catch (const std::exception&) { /* Ignore malformed values */ }
     }
-    if (strncasecmp(linebuffer->c_str(), EQUALIZER_CFG_MIXIN,
-                    strlen(EQUALIZER_CFG_MIXIN)) == 0)
+    else if (strncasecmp(linebuffer->c_str(), EQUALIZER_CFG_MIXIN, sizeof(EQUALIZER_CFG_MIXIN) - 1) == 0)
     {
-      if (sscanf(linebuffer->c_str(), "%*s %f", &ftmp) > 0)
-      {
-        if (in_closed_range(0.0f, ftmp, 1.0f))
-        {
-          mixin_rate = ftmp;
-        }
-      }
+      try {
+        float ftmp = std::stof(linebuffer->substr(sizeof(EQUALIZER_CFG_MIXIN) - 1));
+        if (in_closed_range(0.0f, ftmp, 1.0f)) mixin_rate = ftmp;
+      } catch (const std::exception&) { /* Ignore malformed values */ }
     }
-    if (strncasecmp(linebuffer->c_str(), EQUALIZER_CFG_PRESET,
-                    strlen(EQUALIZER_CFG_PRESET)) == 0)
+    else if (strncasecmp(linebuffer->c_str(), EQUALIZER_CFG_PRESET, sizeof(EQUALIZER_CFG_PRESET) - 1) == 0)
     {
-      if (sscanf(linebuffer->c_str(), "%*s %127s", presetbuf) > 0)
-      {
-        /* ignore too large strings... */
-        if (strlen(presetbuf) < 127)
-        {
-          config_preset_name = presetbuf;
-        }
+      std::string val_str = linebuffer->substr(sizeof(EQUALIZER_CFG_PRESET) - 1);
+      size_t first = val_str.find_first_not_of(" \t\r\n");
+      if (first != std::string::npos) {
+          size_t last = val_str.find_last_not_of(" \t\r\n");
+          config_preset_name = val_str.substr(first, last - first + 1);
       }
     }
   }
@@ -514,7 +500,6 @@ void equalizer_shutdown()
 
 void equalizer_refresh()
 {
-  t_eq_setup *eqs = nullptr;
   char buf[1024];
 
   std::string current_set_name;
@@ -559,32 +544,22 @@ void equalizer_refresh()
 
     if (S_ISREG(st.st_mode))
     {
-      FILE *f = fopen(filename.c_str(), "r");
+      std::ifstream f(filename);
 
       if (f)
       {
-        char filebuffer[4096];
+        std::stringstream buffer;
+        buffer << f.rdbuf();
+        std::string content = buffer.str();
 
-        char *fb = filebuffer;
+        std::vector<char> filebuffer(content.begin(), content.end());
+        filebuffer.push_back('\0');
 
-        int maxread = 4095 - (fb - filebuffer);
-
-        // read in whole file
-        while (!feof(f) && maxread > 0)
-        {
-          maxread = 4095 - (fb - filebuffer);
-          int rb = fread(fb, sizeof(char), maxread, f);
-          fb += rb;
-        }
-
-        fclose(f);
-
-        *fb = 0;
-        int r = read_setup(de->d_name, filebuffer, &eqs);
+        std::unique_ptr<t_eq_setup> eqs;
+        int r = read_setup(de->d_name, filebuffer.data(), eqs);
 
         if (r == 0)
         {
-          int i, channel;
           t_eq_set *eqset = new t_eq_set;
           eqset->b.resize(eqs->bcount * equ_channels);
 
@@ -593,12 +568,12 @@ void equalizer_refresh()
           eqset->bcount = eqs->bcount;
           eqset->channels = equ_channels;
 
-          for (i = 0; i < eqs->bcount; i++)
+          for (int i = 0; i < eqs->bcount; i++)
           {
             mk_biquad(eqs->dg[i], eqs->cf[i], sample_rate, eqs->bw[i],
                       &eqset->b[i]);
 
-            for (channel = 1; channel < equ_channels; channel++)
+            for (int channel = 1; channel < equ_channels; channel++)
             {
               eqset->b[channel * eqset->bcount + i] = eqset->b[i];
             }
@@ -610,11 +585,6 @@ void equalizer_refresh()
         {
           switch (r)
           {
-            case 0:
-              logit("This should not happen: No error but no EQSET was parsed: "
-                    "%s",
-                    filename.c_str());
-              break;
             case -1:
               logit("Not an EQSET (empty file): %s", filename.c_str());
               break;
@@ -629,13 +599,6 @@ void equalizer_refresh()
               break;
           }
         }
-
-        if (eqs)
-        {
-          delete eqs;
-        }
-
-        eqs = nullptr;
       }
     }
 
@@ -730,7 +693,7 @@ void equalizer_process_buffer(char *buf, size_t size,
       equ_process_buffer_s32(reinterpret_cast<int32_t *>(buf), size / sizeof(int32_t));
       break;
     case SFMT_FLOAT:
-      equ_process_buffer_float(reinterpret_cast<float *>(buf), size / sizeof(float));
+      equ_process_buffer_float(std::launder(reinterpret_cast<float *>(buf)), size / sizeof(float));
       break;
   }
 }
@@ -993,11 +956,9 @@ static void clear_eq_set(t_eq_set_list *l)
 }
 
 /* parsing stuff */
-static int read_setup(char *name, char *desc, t_eq_setup **sp)
+static int read_setup(const char *name, char *desc, std::unique_ptr<t_eq_setup> &s)
 {
   ScopedCLocale locale_guard(LC_NUMERIC);
-
-  t_eq_setup *s = *sp;
 
   desc = skip_whitespace(desc);
 
@@ -1015,10 +976,9 @@ static int read_setup(char *name, char *desc, t_eq_setup **sp)
 
   desc = skip_whitespace(skip_line(desc));
 
-  if (s == nullptr)
+  if (!s)
   {
-    s = new t_eq_setup;
-    *sp = s;
+    s = std::make_unique<t_eq_setup>();
   }
 
   s->name = name;
@@ -1029,15 +989,13 @@ static int read_setup(char *name, char *desc, t_eq_setup **sp)
   s->bw.resize(max_values);
   s->dg.resize(max_values);
 
-  int r;
-
   while (*desc)
   {
     char *endp;
 
     float cf_val = 0.0f;
 
-    r = read_float(desc, &cf_val, &endp);
+    int r = read_float(desc, &cf_val, &endp);
 
     if (r != 0)
     {
