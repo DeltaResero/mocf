@@ -22,10 +22,17 @@
    * as the storage inside struct engine_event_queue.
    * ----------------------------------------------------------------------- */
 
+  /* Returns the deleter that knows how to free data of the given event
+   * type; used to give each Event's data pointer the right cleanup
+   * without every event queue consumer needing to know per-type. */
+  void (*event_deleter(int type))(void *);
+
   struct Event
   {
-    int type;           /* type of the event (one of EV_*) */
-    void *data;         /* optional data associated with the event */
+    int type;                                     /* type of the event (one of EV_*) */
+    std::unique_ptr<void, void(*)(void*)> data;    /* optional data associated with the event */
+
+    Event(int t, void *d) : type(t), data(d, event_deleter(t)) {}
   };
 
   /* Used as data field in the event queue for EV_FILE_TAGS. */

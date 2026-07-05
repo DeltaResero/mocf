@@ -34,6 +34,7 @@
 #include <queue>
 #include <string>
 #include <memory>
+#include <utility>
 
 #define DEBUG
 
@@ -88,7 +89,6 @@ void engine_event_queue_free(struct engine_event_queue *eq)
     std::lock_guard<std::mutex> lock(eq->mtx);
     while (!eq->q.empty())
     {
-      free_event_data(eq->q.front().type, eq->q.front().data);
       eq->q.pop();
     }
   }
@@ -128,7 +128,7 @@ void engine_event_queue_flush(struct engine_event_queue *eq,
   std::lock_guard<std::mutex> lock(eq->mtx);
   while (!eq->q.empty())
   {
-    dest.push(eq->q.front());
+    dest.push(std::move(eq->q.front()));
     eq->q.pop();
   }
 }

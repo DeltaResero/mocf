@@ -28,37 +28,38 @@
 #include "library/playlist.h"
 
 
+namespace {
+
+void free_plist_item(void *p)      { delete static_cast<struct plist_item *>(p); }
+void free_std_string(void *p)      { delete static_cast<std::string *>(p); }
+void free_tag_ev_response(void *p) { delete static_cast<struct tag_ev_response *>(p); }
+void free_srv_error_ev(void *p)    { delete static_cast<struct srv_error_ev *>(p); }
+void free_move_ev_data(void *p)    { delete static_cast<struct move_ev_data *>(p); }
+
+/* Events that carry no data should never see a non-nullptr pointer;
+ * abort() catches that bug immediately instead of leaking it. */
+void free_none(void *p)            { if (p) abort(); }
+
+} // namespace
+
+/* Returns the deleter appropriate for the given event type's data. */
+void (*event_deleter(const int type))(void *)
+{
+  switch (type)
+  {
+    case EV_QUEUE_ADD:                  return free_plist_item;
+    case EV_FILE_TAGS:                  return free_tag_ev_response;
+    case EV_SRV_ERROR:                  return free_srv_error_ev;
+    case EV_STATUS_MSG: case EV_QUEUE_DEL: return free_std_string;
+    case EV_QUEUE_MOVE:                  return free_move_ev_data;
+    default:                             return free_none;
+  }
+}
+
 /* Free data associated with an event. */
 void free_event_data(const int type, void *data)
 {
-  if (!data)
-    return;
-
-  if (type == EV_QUEUE_ADD)
-  {
-    auto *item = static_cast<struct plist_item *>(data);
-    delete item;
-  }
-  else if (type == EV_FILE_TAGS)
-  {
-    delete static_cast<struct tag_ev_response *>(data);
-  }
-  else if (type == EV_SRV_ERROR)
-  {
-    delete static_cast<struct srv_error_ev *>(data);
-  }
-  else if (type == EV_STATUS_MSG || type == EV_QUEUE_DEL)
-  {
-    delete static_cast<std::string *>(data);
-  }
-  else if (type == EV_QUEUE_MOVE)
-  {
-    delete static_cast<struct move_ev_data *>(data);
-  }
-  else
-  {
-    abort(); /* BUG: unknown event type with non-nullptr data */
-  }
+  event_deleter(type)(data);
 }
 
 // EOF

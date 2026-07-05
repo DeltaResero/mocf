@@ -533,16 +533,16 @@ private:
             int type;
             void *data;
             if (!no_iface && !events.empty()) {
-                Event e = events.front();
+                Event e = std::move(events.front());
                 type = e.type;
-                data = e.data;
+                data = e.data.release();
                 events.pop();
             } else {
                 wait_and_drain_engine_events();
                 if (events.empty()) continue;
-                Event e = events.front();
+                Event e = std::move(events.front());
                 type = e.type;
-                data = e.data;
+                data = e.data.release();
                 events.pop();
             }
 
@@ -1446,9 +1446,9 @@ private:
 
     void dequeue_events() {
         while (!events.empty()) {
-            Event e = events.front();
+            Event e = std::move(events.front());
             events.pop();
-            server_event(e.type, e.data);
+            server_event(e.type, e.data.release());
         }
     }
 
@@ -1598,7 +1598,6 @@ public:
 
 
         while (!events.empty()) {
-            free_event_data(events.front().type, events.front().data);
             events.pop();
         }
         log_close();
