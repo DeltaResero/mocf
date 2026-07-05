@@ -139,15 +139,6 @@ struct t_eq_set
   std::vector<t_biquad> b;
 };
 
-typedef struct t_eq_set_list t_eq_set_list;
-
-struct t_eq_set_list
-{
-  t_eq_set *set;
-  t_eq_set_list *prev;
-  t_eq_set_list *next;
-};
-
 typedef struct t_active_set t_active_set;
 
 struct t_active_set
@@ -183,10 +174,6 @@ static inline void apply_biquads(float *src, float *dst, int channels, int len,
 static t_biquad *mk_biquad(float dbgain, float cf, float srate, float bw,
                            t_biquad *b);
 
-/* equalizer list processing */
-static t_eq_set_list *append_eq_set(t_eq_set *eqs, t_eq_set_list *l);
-static void clear_eq_set(t_eq_set_list *l);
-
 /* sound processing */
 static void equ_process_buffer_u8(uint8_t *buf, size_t samples);
 static void equ_process_buffer_s8(int8_t *buf, size_t samples);
@@ -199,8 +186,15 @@ static void equ_process_buffer_s32(int32_t *buf, size_t samples);
 static void equ_process_buffer_float(float *buf, size_t samples);
 
 /* static global variables */
-static t_eq_set_list equ_list;
-static t_eq_set_list *current_equ;
+static std::vector<t_eq_set> equ_sets;
+static int current_equ_idx = -1; /* -1: no preset loaded */
+
+/* Currently-selected preset, or nullptr if none is loaded. */
+static t_eq_set *current_set()
+{
+  return (current_equ_idx >= 0 && current_equ_idx < static_cast<int>(equ_sets.size()))
+         ? &equ_sets[current_equ_idx] : nullptr;
+}
 
 static int sample_rate;
 static int equ_active;
@@ -223,9 +217,10 @@ int equalizer_set_active(int active) { return equ_active = active ? 1 : 0; }
 
 std::string equalizer_current_eqname()
 {
-  if (equ_active && current_equ && current_equ->set)
+  if (equ_active)
   {
-    return current_equ->set->name;
+    if (t_eq_set *cur = current_set())
+      return cur->name;
   }
 
   return std::string("off");
@@ -233,21 +228,9 @@ std::string equalizer_current_eqname()
 
 void equalizer_next()
 {
-  if (current_equ)
+  if (!equ_sets.empty())
   {
-    if (current_equ->next)
-    {
-      current_equ = current_equ->next;
-    }
-    else
-    {
-      current_equ = &equ_list;
-    }
-
-    if (!current_equ->set && !(current_equ == &equ_list && !current_equ->next))
-    {
-      equalizer_next();
-    }
+    current_equ_idx = (current_equ_idx + 1) % static_cast<int>(equ_sets.size());
   }
 
   equalizer_adjust_preamp();
@@ -255,24 +238,10 @@ void equalizer_next()
 
 void equalizer_prev()
 {
-  if (current_equ)
+  if (!equ_sets.empty())
   {
-    if (current_equ->prev)
-    {
-      current_equ = current_equ->prev;
-    }
-    else
-    {
-      while (current_equ->next)
-      {
-        current_equ = current_equ->next;
-      }
-    }
-
-    if (!current_equ->set && !(current_equ == &equ_list && !current_equ->next))
-    {
-      equalizer_prev();
-    }
+    int count = static_cast<int>(equ_sets.size());
+    current_equ_idx = (current_equ_idx - 1 + count) % count;
   }
 
   equalizer_adjust_preamp();
@@ -378,10 +347,10 @@ static inline void apply_biquads(float *src, float *dst, int channels, int len,
 */
 static void equalizer_adjust_preamp()
 {
-  if (current_equ && current_equ->set)
+  if (t_eq_set *cur = current_set())
   {
-    preamp = current_equ->set->preamp;
-    preampf = powf(10.0f, current_equ->set->preamp / 20.0f);
+    preamp = cur->preamp;
+    preampf = powf(10.0f, cur->preamp / 20.0f);
   }
 }
 
@@ -444,9 +413,9 @@ static void equalizer_write_config()
   }
 
   fprintf(cf, "%s %i\n", EQUALIZER_CFG_ACTIVE, equ_active);
-  if (current_equ && current_equ->set)
+  if (t_eq_set *cur = current_set())
   {
-    fprintf(cf, "%s %s\n", EQUALIZER_CFG_PRESET, current_equ->set->name.c_str());
+    fprintf(cf, "%s %s\n", EQUALIZER_CFG_PRESET, cur->name.c_str());
   }
   fprintf(cf, "%s %f\n", EQUALIZER_CFG_MIXIN, mixin_rate);
 
@@ -459,9 +428,8 @@ void equalizer_init()
 {
   equ_active = 1;
 
-  equ_list.set = nullptr;
-  equ_list.next = nullptr;
-  equ_list.prev = nullptr;
+  equ_sets.clear();
+  current_equ_idx = -1;
 
   sample_rate = 44100;
 
@@ -493,7 +461,7 @@ void equalizer_shutdown()
     equalizer_write_config();
   }
 
-  clear_eq_set(&equ_list);
+  equ_sets.clear();
 
   logit("Equalizer stopped");
 }
@@ -504,9 +472,9 @@ void equalizer_refresh()
 
   std::string current_set_name;
 
-  if (current_equ && current_equ->set)
+  if (t_eq_set *cur = current_set())
   {
-    current_set_name = current_equ->set->name;
+    current_set_name = cur->name;
   }
   else
   {
@@ -516,9 +484,9 @@ void equalizer_refresh()
     }
   }
 
-  clear_eq_set(&equ_list);
+  equ_sets.clear();
 
-  current_equ = nullptr;
+  current_equ_idx = -1;
 
   DIR *d = opendir(eqsetdir.c_str());
 
@@ -529,10 +497,6 @@ void equalizer_refresh()
 
   struct dirent *de = readdir(d);
   struct stat st;
-
-  t_eq_set_list *last_elem;
-
-  last_elem = &equ_list;
 
   while (de)
   {
@@ -560,26 +524,26 @@ void equalizer_refresh()
 
         if (r == 0)
         {
-          t_eq_set *eqset = new t_eq_set;
-          eqset->b.resize(eqs->bcount * equ_channels);
+          t_eq_set eqset;
+          eqset.b.resize(eqs->bcount * equ_channels);
 
-          eqset->name = eqs->name;
-          eqset->preamp = eqs->preamp;
-          eqset->bcount = eqs->bcount;
-          eqset->channels = equ_channels;
+          eqset.name = eqs->name;
+          eqset.preamp = eqs->preamp;
+          eqset.bcount = eqs->bcount;
+          eqset.channels = equ_channels;
 
           for (int i = 0; i < eqs->bcount; i++)
           {
             mk_biquad(eqs->dg[i], eqs->cf[i], sample_rate, eqs->bw[i],
-                      &eqset->b[i]);
+                      &eqset.b[i]);
 
             for (int channel = 1; channel < equ_channels; channel++)
             {
-              eqset->b[channel * eqset->bcount + i] = eqset->b[i];
+              eqset.b[channel * eqset.bcount + i] = eqset.b[i];
             }
           }
 
-          last_elem = append_eq_set(eqset, last_elem);
+          equ_sets.push_back(std::move(eqset));
         }
         else
         {
@@ -607,34 +571,27 @@ void equalizer_refresh()
 
   closedir(d);
 
-  current_equ = &equ_list;
+  current_equ_idx = equ_sets.empty() ? -1 : 0;
 
   if (!current_set_name.empty())
   {
-    current_equ = &equ_list;
+    current_equ_idx = -1;
 
-    while (current_equ)
+    for (size_t i = 0; i < equ_sets.size(); i++)
     {
-      if (current_equ->set)
+      if (current_set_name == equ_sets[i].name)
       {
-        if (current_set_name == current_equ->set->name)
-        {
-          break;
-        }
+        current_equ_idx = static_cast<int>(i);
+        break;
       }
-      current_equ = current_equ->next;
     }
-  }
 
-  if (!current_equ && !current_set_name.empty())
-  {
-    logit("EQ %s not found.", current_set_name.c_str());
-    /* equalizer not found, pick next equalizer */
-    current_equ = &equ_list;
-  }
-  if (current_equ && !current_equ->set)
-  {
-    equalizer_next();
+    if (current_equ_idx == -1)
+    {
+      logit("EQ %s not found.", current_set_name.c_str());
+      /* equalizer not found, pick the first one (if any) */
+      current_equ_idx = equ_sets.empty() ? -1 : 0;
+    }
   }
 
   equalizer_adjust_preamp();
@@ -646,12 +603,14 @@ void equalizer_process_buffer(char *buf, size_t size,
 {
   debug("EQ Processing %zu bytes...", size);
 
-  if (!equ_active || !current_equ || !current_equ->set)
+  t_eq_set *cur = current_set();
+
+  if (!equ_active || !cur)
   {
     return;
   }
 
-  if (sound_params->rate != current_equ->set->b[0].israte ||
+  if (sound_params->rate != cur->b[0].israte ||
       sound_params->channels != equ_channels)
   {
     logit("Recreating filters due to sound parameter changes...");
@@ -710,8 +669,8 @@ static void equ_process_buffer_u8(uint8_t *buf, size_t samples)
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
-                current_equ->set->bcount);
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
+                current_set()->bcount);
 
   for (i = 0; i < samples; i++)
   {
@@ -734,8 +693,8 @@ static void equ_process_buffer_s8(int8_t *buf, size_t samples)
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
-                current_equ->set->bcount);
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
+                current_set()->bcount);
 
   for (i = 0; i < samples; i++)
   {
@@ -758,8 +717,8 @@ static void equ_process_buffer_u16(uint16_t *buf, size_t samples)
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
-                current_equ->set->bcount);
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
+                current_set()->bcount);
 
   for (i = 0; i < samples; i++)
   {
@@ -782,8 +741,8 @@ static void equ_process_buffer_s16(int16_t *buf, size_t samples)
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
-                current_equ->set->bcount);
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
+                current_set()->bcount);
 
   for (i = 0; i < samples; i++)
   {
@@ -806,8 +765,8 @@ static void equ_process_buffer_u24(uint32_t *buf, size_t samples)
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
-                current_equ->set->bcount);
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
+                current_set()->bcount);
 
   for (i = 0; i < samples; i++)
   {
@@ -830,8 +789,8 @@ static void equ_process_buffer_s24(int32_t *buf, size_t samples)
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
-                current_equ->set->bcount);
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
+                current_set()->bcount);
 
   for (i = 0; i < samples; i++)
   {
@@ -854,8 +813,8 @@ static void equ_process_buffer_u32(uint32_t *buf, size_t samples)
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
-                current_equ->set->bcount);
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
+                current_set()->bcount);
 
   for (i = 0; i < samples; i++)
   {
@@ -878,8 +837,8 @@ static void equ_process_buffer_s32(int32_t *buf, size_t samples)
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
-                current_equ->set->bcount);
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
+                current_set()->bcount);
 
   for (i = 0; i < samples; i++)
   {
@@ -902,8 +861,8 @@ static void equ_process_buffer_float(float *buf, size_t samples)
     tmp[i] = preampf * buf[i];
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_equ->set->b.data(),
-                current_equ->set->bcount);
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
+                current_set()->bcount);
 
   for (i = 0; i < samples; i++)
   {
@@ -912,47 +871,6 @@ static void equ_process_buffer_float(float *buf, size_t samples)
     buf[i] = tmp[i];
   }
 
-}
-
-/* equalizer list maintenance */
-static t_eq_set_list *append_eq_set(t_eq_set *eqs, t_eq_set_list *l)
-{
-  if (l->set == nullptr)
-  {
-    l->set = eqs;
-  }
-  else
-  {
-    if (l->next)
-    {
-      append_eq_set(eqs, l->next);
-    }
-    else
-    {
-      l->next = new t_eq_set_list;
-      l->next->set  = nullptr;
-      l->next->next = nullptr;
-      l->next->prev = l;
-      l = append_eq_set(eqs, l->next);
-    }
-  }
-
-  return l;
-}
-
-static void clear_eq_set(t_eq_set_list *l)
-{
-  if (l->set)
-  {
-    delete l->set;
-    l->set = nullptr;
-  }
-  if (l->next)
-  {
-    clear_eq_set(l->next);
-    delete l->next;
-    l->next = nullptr;
-  }
 }
 
 /* parsing stuff */
