@@ -177,7 +177,9 @@ class AudioDecoder;
   const char *get_decoder_name(const AudioPlugin *decoder);
   void decoder_init(int debug_info);
   void decoder_cleanup();
-  char *file_type_name(const char *file);
+  /* Return short type name for the given file, or an empty string if
+   * the type could not be determined. */
+  std::string file_type_name(const char *file);
 
 
 /** @defgroup decoder_error_funcs Decoder error functions

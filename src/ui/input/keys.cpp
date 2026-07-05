@@ -18,6 +18,7 @@
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include <vector>
 
 #define DEBUG
@@ -813,12 +814,10 @@ static void load_key_map(const char *file_name)
   fclose(file);
 }
 
-/* Get a nice key name.
- * Returned memory may be static. */
-static const char *get_key_name(const int key)
+/* Get a nice key name. */
+static std::string get_key_name(const int key)
 {
   size_t i;
-  static char key_str[4];
 
   /* Search for special keys */
   for (i = 0; i < SPECIAL_KEYS_NUM; i += 1)
@@ -832,28 +831,19 @@ static const char *get_key_name(const int key)
   /* CTRL combination */
   if (!(key & ~CTRL_KEY_CODE))
   {
-    key_str[0] = '^';
-    key_str[1] = key + 0x60;
-    key_str[2] = 0;
-
+    char key_str[3] = {'^', static_cast<char>(key + 0x60), 0};
     return key_str;
   }
 
   /* Meta keys */
   if (key & META_KEY_FLAG)
   {
-    key_str[0] = 'M';
-    key_str[1] = '-';
-    key_str[2] = key & ~META_KEY_FLAG;
-    key_str[3] = 0;
-
+    char key_str[4] = {'M', '-', static_cast<char>(key & ~META_KEY_FLAG), 0};
     return key_str;
   }
 
   /* Normal key */
-  key_str[0] = key;
-  key_str[1] = 0;
-
+  char key_str[2] = {static_cast<char>(key), 0};
   return key_str;
 }
 
@@ -872,8 +862,8 @@ static void compare_keys(struct command *cmd1, struct command *cmd2)
     }
     if (cmd2->keys[j] != -1)
     {
-      fatal("Key %s is defined for %s and %s!", get_key_name(cmd2->keys[j]),
-            cmd1->name, cmd2->name);
+      fatal("Key %s is defined for %s and %s!",
+            get_key_name(cmd2->keys[j]).c_str(), cmd1->name, cmd2->name);
     }
     i++;
   }
@@ -896,27 +886,20 @@ static void check_keys()
   }
 }
 
-/* Return a string contains the list of keys used for command.
- * Returned memory is static. */
-static char *get_command_keys(const int idx)
+/* Return a string containing the list of keys used for command. */
+static std::string get_command_keys(const int idx)
 {
-  static char keys[64];
+  std::string keys;
   int i = 0;
-
-  keys[0] = 0;
 
   while (commands[idx].keys[i] != -1)
   {
-    strncat(keys, get_key_name(commands[idx].keys[i]),
-            sizeof(keys) - strlen(keys) - 1);
-    strncat(keys, " ", sizeof(keys) - strlen(keys) - 1);
+    if (i > 0)
+    {
+      keys += ' ';
+    }
+    keys += get_key_name(commands[idx].keys[i]);
     i++;
-  }
-
-  /* strip the last space */
-  if (keys[0] != 0)
-  {
-    keys[strlen(keys) - 1] = 0;
   }
 
   return keys;

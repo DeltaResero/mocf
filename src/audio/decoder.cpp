@@ -263,17 +263,17 @@ static int find_type(const char *file)
 
 int is_sound_file(const char *name) { return find_type(name) != -1 ? 1 : 0; }
 
-/* Return short type name for the given file or nullptr if not found.
- * Not thread safe! */
-char *file_type_name(const char *file)
+/* Return short type name for the given file, or an empty string if the
+ * type could not be determined. */
+std::string file_type_name(const char *file)
 {
   int i;
-  static char buf[4];
+  char buf[4];
 
   i = find_type(file);
   if (i == -1)
   {
-    return nullptr;
+    return "";
   }
 
   memset(buf, 0, sizeof(buf));
@@ -300,11 +300,6 @@ char *file_type_name(const char *file)
         buf[ix] = toupper(ext[ix]);
       }
     }
-  }
-
-  if (!buf[0])
-  {
-    return nullptr;
   }
 
   return buf;

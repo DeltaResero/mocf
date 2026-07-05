@@ -1070,7 +1070,7 @@ static int add_to_menu(struct menu *menu, const struct plist *plist,
   struct menu_item *added;
   const struct plist_item *item = &plist->items[num];
   std::string title;
-  const char *type_name;
+  std::string type_name;
 
   made_from_tags = (options_get_bool("ReadTags") && !item->title_tags.empty());
 
@@ -1104,11 +1104,8 @@ static int add_to_menu(struct menu *menu, const struct plist *plist,
   menu_item_set_attr_sel_marked(added,
                                 get_color(CLR_MENU_ITEM_FILE_MARKED_SELECTED));
 
-  if (!(type_name = file_type_name(item->file.c_str())))
-  {
-    type_name = "";
-  }
-  menu_item_set_format(added, type_name);
+  type_name = file_type_name(item->file.c_str());
+  menu_item_set_format(added, type_name.c_str());
   menu_item_set_queue_pos(added, item->queue_pos);
 
   if (full_paths && !made_from_tags)
