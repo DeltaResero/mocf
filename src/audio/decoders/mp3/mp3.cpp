@@ -797,36 +797,36 @@ static void mp3_destroy()
 
 class Mp3Decoder : public AudioDecoder {
 public:
-    void *data;
-    explicit Mp3Decoder(void *d) : data(d) {}
-    ~Mp3Decoder() override { mp3_close(data); }
+    std::unique_ptr<void, void(*)(void*)> data;
+    explicit Mp3Decoder(void *d) : data(d, mp3_close) {}
+    ~Mp3Decoder() override = default;
 
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
-        return mp3_decode(data, buf, buf_len, sound_params);
+        return mp3_decode(data.get(), buf, buf_len, sound_params);
     }
 
     int seek(int sec) override {
-        return mp3_seek(data, sec);
+        return mp3_seek(data.get(), sec);
     }
 
     int get_bitrate() override {
-        return mp3_get_bitrate(data);
+        return mp3_get_bitrate(data.get());
     }
 
     int get_duration() override {
-        return mp3_get_duration(data);
+        return mp3_get_duration(data.get());
     }
 
     void get_error(struct decoder_error *error) override {
-        mp3_get_error(data, error);
+        mp3_get_error(data.get(), error);
     }
 
     struct io_stream *get_stream() override {
-        return mp3_get_stream(data);
+        return mp3_get_stream(data.get());
     }
 
     int get_avg_bitrate() override {
-        return mp3_get_avg_bitrate(data);
+        return mp3_get_avg_bitrate(data.get());
     }
 };
 

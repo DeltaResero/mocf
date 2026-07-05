@@ -431,28 +431,28 @@ static void destroy()
 
 class SidplayfpDecoder : public AudioDecoder {
 public:
-    void *data;
-    SidplayfpDecoder(void *d) : data(d) {}
-    ~SidplayfpDecoder() override { sidplayfp_close(data); }
+    std::unique_ptr<void, void(*)(void*)> data;
+    SidplayfpDecoder(void *d) : data(d, sidplayfp_close) {}
+    ~SidplayfpDecoder() override = default;
 
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
-        return sidplayfp_decode(data, buf, buf_len, sound_params);
+        return sidplayfp_decode(data.get(), buf, buf_len, sound_params);
     }
 
     int seek(int sec) override {
-        return sidplayfp_seek(data, sec);
+        return sidplayfp_seek(data.get(), sec);
     }
 
     int get_bitrate() override {
-        return sidplayfp_get_bitrate(data);
+        return sidplayfp_get_bitrate(data.get());
     }
 
     int get_duration() override {
-        return sidplayfp_get_duration(data);
+        return sidplayfp_get_duration(data.get());
     }
 
     void get_error(struct decoder_error *error) override {
-        sidplayfp_get_error(data, error);
+        sidplayfp_get_error(data.get(), error);
     }
 };
 

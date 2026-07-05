@@ -272,28 +272,28 @@ static void modplug_get_error(void *prv_data, struct decoder_error *error)
 
 class ModplugDecoder : public AudioDecoder {
 public:
-    void *data;
-    ModplugDecoder(void *d) : data(d) {}
-    ~ModplugDecoder() override { modplug_close(data); }
+    std::unique_ptr<void, void(*)(void*)> data;
+    ModplugDecoder(void *d) : data(d, modplug_close) {}
+    ~ModplugDecoder() override = default;
 
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
-        return modplug_decode(data, buf, buf_len, sound_params);
+        return modplug_decode(data.get(), buf, buf_len, sound_params);
     }
 
     int seek(int sec) override {
-        return modplug_seek(data, sec);
+        return modplug_seek(data.get(), sec);
     }
 
     int get_bitrate() override {
-        return modplug_get_bitrate(data);
+        return modplug_get_bitrate(data.get());
     }
 
     int get_duration() override {
-        return modplug_get_duration(data);
+        return modplug_get_duration(data.get());
     }
 
     void get_error(struct decoder_error *error) override {
-        modplug_get_error(data, error);
+        modplug_get_error(data.get(), error);
     }
 };
 

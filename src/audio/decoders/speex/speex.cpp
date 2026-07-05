@@ -697,32 +697,32 @@ static int spx_our_mime(const char *mime)
 
 class SpeexDecoder : public AudioDecoder {
 public:
-    void *data;
-    SpeexDecoder(void *d) : data(d) {}
-    ~SpeexDecoder() override { spx_close(data); }
+    std::unique_ptr<void, void(*)(void*)> data;
+    SpeexDecoder(void *d) : data(d, spx_close) {}
+    ~SpeexDecoder() override = default;
 
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
-        return spx_decode(data, buf, buf_len, sound_params);
+        return spx_decode(data.get(), buf, buf_len, sound_params);
     }
 
     int seek(int sec) override {
-        return spx_seek(data, sec);
+        return spx_seek(data.get(), sec);
     }
 
     int get_bitrate() override {
-        return spx_get_bitrate(data);
+        return spx_get_bitrate(data.get());
     }
 
     int get_duration() override {
-        return spx_get_duration(data);
+        return spx_get_duration(data.get());
     }
 
     void get_error(struct decoder_error *error) override {
-        spx_get_error(data, error);
+        spx_get_error(data.get(), error);
     }
 
     struct io_stream *get_stream() override {
-        return spx_get_stream(data);
+        return spx_get_stream(data.get());
     }
 };
 

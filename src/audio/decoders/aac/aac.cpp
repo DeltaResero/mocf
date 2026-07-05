@@ -676,32 +676,32 @@ static int aac_our_mime(const char *mime)
 
 class AacDecoder : public AudioDecoder {
 public:
-    void *data;
-    AacDecoder(void *d) : data(d) {}
-    ~AacDecoder() override { aac_close(data); }
+    std::unique_ptr<void, void(*)(void*)> data;
+    AacDecoder(void *d) : data(d, aac_close) {}
+    ~AacDecoder() override = default;
 
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
-        return aac_decode(data, buf, buf_len, sound_params);
+        return aac_decode(data.get(), buf, buf_len, sound_params);
     }
 
     int seek(int sec) override {
-        return aac_seek(data, sec);
+        return aac_seek(data.get(), sec);
     }
 
     int get_bitrate() override {
-        return aac_get_bitrate(data);
+        return aac_get_bitrate(data.get());
     }
 
     int get_duration() override {
-        return aac_get_duration(data);
+        return aac_get_duration(data.get());
     }
 
     void get_error(struct decoder_error *error) override {
-        aac_get_error(data, error);
+        aac_get_error(data.get(), error);
     }
 
     int get_avg_bitrate() override {
-        return aac_get_avg_bitrate(data);
+        return aac_get_avg_bitrate(data.get());
     }
 };
 

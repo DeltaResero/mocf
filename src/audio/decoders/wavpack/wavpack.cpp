@@ -302,32 +302,32 @@ static int wav_our_format_ext(const char *ext)
 
 class WavpackDecoder : public AudioDecoder {
 public:
-    void *data;
-    WavpackDecoder(void *d) : data(d) {}
-    ~WavpackDecoder() override { wav_close(data); }
+    std::unique_ptr<void, void(*)(void*)> data;
+    WavpackDecoder(void *d) : data(d, wav_close) {}
+    ~WavpackDecoder() override = default;
     
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
-        return wav_decode(data, buf, buf_len, sound_params);
+        return wav_decode(data.get(), buf, buf_len, sound_params);
     }
 
     int seek(int sec) override {
-        return wav_seek(data, sec);
+        return wav_seek(data.get(), sec);
     }
 
     int get_bitrate() override {
-        return wav_get_bitrate(data);
+        return wav_get_bitrate(data.get());
     }
 
     int get_duration() override {
-        return wav_get_duration(data);
+        return wav_get_duration(data.get());
     }
 
     void get_error(struct decoder_error *error) override {
-        wav_get_error(data, error);
+        wav_get_error(data.get(), error);
     }
 
     int get_avg_bitrate() override {
-        return wav_get_avg_bitrate(data);
+        return wav_get_avg_bitrate(data.get());
     }
 };
 

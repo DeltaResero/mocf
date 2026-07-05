@@ -429,40 +429,40 @@ static int opus_our_mime(const char *mime)
 
 class OpusDecoder : public AudioDecoder {
 public:
-    void *data;
-    OpusDecoder(void *d) : data(d) {}
-    ~OpusDecoder() override { opus_close(data); }
+    std::unique_ptr<void, void(*)(void*)> data;
+    OpusDecoder(void *d) : data(d, opus_close) {}
+    ~OpusDecoder() override = default;
     
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
-        return opus_decodeX(data, buf, buf_len, sound_params);
+        return opus_decodeX(data.get(), buf, buf_len, sound_params);
     }
 
     int seek(int sec) override {
-        return opus_seek(data, sec);
+        return opus_seek(data.get(), sec);
     }
 
     int get_bitrate() override {
-        return opus_get_bitrate(data);
+        return opus_get_bitrate(data.get());
     }
 
     int get_duration() override {
-        return opus_get_duration(data);
+        return opus_get_duration(data.get());
     }
 
     void get_error(struct decoder_error *error) override {
-        opus_get_error(data, error);
+        opus_get_error(data.get(), error);
     }
 
     int current_tags(struct file_tags *tags) override {
-        return opus_current_tags(data, tags);
+        return opus_current_tags(data.get(), tags);
     }
 
     struct io_stream *get_stream() override {
-        return opus_get_stream(data);
+        return opus_get_stream(data.get());
     }
 
     int get_avg_bitrate() override {
-        return opus_get_avg_bitrate(data);
+        return opus_get_avg_bitrate(data.get());
     }
 };
 

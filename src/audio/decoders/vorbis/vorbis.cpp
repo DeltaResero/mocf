@@ -495,40 +495,40 @@ static int vorbis_our_mime(const char *mime)
 
 class VorbisDecoder : public AudioDecoder {
 public:
-    void *data;
-    VorbisDecoder(void *d) : data(d) {}
-    ~VorbisDecoder() override { vorbis_close(data); }
+    std::unique_ptr<void, void(*)(void*)> data;
+    VorbisDecoder(void *d) : data(d, vorbis_close) {}
+    ~VorbisDecoder() override = default;
     
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
-        return vorbis_decode(data, buf, buf_len, sound_params);
+        return vorbis_decode(data.get(), buf, buf_len, sound_params);
     }
 
     int seek(int sec) override {
-        return vorbis_seek(data, sec);
+        return vorbis_seek(data.get(), sec);
     }
 
     int get_bitrate() override {
-        return vorbis_get_bitrate(data);
+        return vorbis_get_bitrate(data.get());
     }
 
     int get_duration() override {
-        return vorbis_get_duration(data);
+        return vorbis_get_duration(data.get());
     }
 
     void get_error(struct decoder_error *error) override {
-        vorbis_get_error(data, error);
+        vorbis_get_error(data.get(), error);
     }
 
     int current_tags(struct file_tags *tags) override {
-        return vorbis_current_tags(data, tags);
+        return vorbis_current_tags(data.get(), tags);
     }
 
     struct io_stream *get_stream() override {
-        return vorbis_get_stream(data);
+        return vorbis_get_stream(data.get());
     }
 
     int get_avg_bitrate() override {
-        return vorbis_get_avg_bitrate(data);
+        return vorbis_get_avg_bitrate(data.get());
     }
 };
 

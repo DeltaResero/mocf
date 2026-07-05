@@ -429,28 +429,28 @@ static void sndfile_get_error(void *prv_data, struct decoder_error *error)
 
 class SndfileDecoder : public AudioDecoder {
 public:
-    void *data;
-    SndfileDecoder(void *d) : data(d) {}
-    ~SndfileDecoder() override { sndfile_close(data); }
+    std::unique_ptr<void, void(*)(void*)> data;
+    SndfileDecoder(void *d) : data(d, sndfile_close) {}
+    ~SndfileDecoder() override = default;
     
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
-        return sndfile_decode(data, buf, buf_len, sound_params);
+        return sndfile_decode(data.get(), buf, buf_len, sound_params);
     }
 
     int seek(int sec) override {
-        return sndfile_seek(data, sec);
+        return sndfile_seek(data.get(), sec);
     }
 
     int get_bitrate() override {
-        return sndfile_get_bitrate(data);
+        return sndfile_get_bitrate(data.get());
     }
 
     int get_duration() override {
-        return sndfile_get_duration(data);
+        return sndfile_get_duration(data.get());
     }
 
     void get_error(struct decoder_error *error) override {
-        sndfile_get_error(data, error);
+        sndfile_get_error(data.get(), error);
     }
 };
 

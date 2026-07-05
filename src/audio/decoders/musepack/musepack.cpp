@@ -483,36 +483,36 @@ static void musepack_get_error(void *prv_data, struct decoder_error *error)
 
 class MusepackDecoder : public AudioDecoder {
 public:
-    void *data;
-    MusepackDecoder(void *d) : data(d) {}
-    ~MusepackDecoder() override { musepack_close(data); }
+    std::unique_ptr<void, void(*)(void*)> data;
+    MusepackDecoder(void *d) : data(d, musepack_close) {}
+    ~MusepackDecoder() override = default;
 
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
-        return musepack_decode(data, buf, buf_len, sound_params);
+        return musepack_decode(data.get(), buf, buf_len, sound_params);
     }
 
     int seek(int sec) override {
-        return musepack_seek(data, sec);
+        return musepack_seek(data.get(), sec);
     }
 
     int get_bitrate() override {
-        return musepack_get_bitrate(data);
+        return musepack_get_bitrate(data.get());
     }
 
     int get_duration() override {
-        return musepack_get_duration(data);
+        return musepack_get_duration(data.get());
     }
 
     void get_error(struct decoder_error *error) override {
-        musepack_get_error(data, error);
+        musepack_get_error(data.get(), error);
     }
 
     struct io_stream *get_stream() override {
-        return musepack_get_stream(data);
+        return musepack_get_stream(data.get());
     }
 
     int get_avg_bitrate() override {
-        return musepack_get_avg_bitrate(data);
+        return musepack_get_avg_bitrate(data.get());
     }
 };
 
