@@ -358,8 +358,9 @@ static struct poptOption general_opts[] = {
     POPT_TABLEEND};
 
 static struct poptOption misc_opts[] = {
-    {nullptr, 0, POPT_ARG_CALLBACK, (void *)(uintptr_t)show_misc_cb, 0, nullptr,
-     nullptr},
+    {nullptr, 0, POPT_ARG_CALLBACK,
+     reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(show_misc_cb)), 0,
+     nullptr, nullptr},
     {"version", 'V', POPT_ARG_NONE, nullptr, 0, "Print version information", nullptr},
     {"echo-args", 0, POPT_ARG_NONE, nullptr, 0, "Print POPT-interpreted arguments",
      nullptr},

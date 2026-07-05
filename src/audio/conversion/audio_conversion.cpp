@@ -348,7 +348,7 @@ static void u16_to_float(const unsigned char *in, float *out,
                          const size_t samples)
 {
   size_t i;
-  const uint16_t *in_16 = (uint16_t *)in;
+  const uint16_t *in_16 = reinterpret_cast<const uint16_t *>(in);
 
   assert(in != nullptr);
   assert(out != nullptr);
@@ -362,7 +362,7 @@ static void u16_to_float(const unsigned char *in, float *out,
 static void s16_to_float(const char *in, float *out, const size_t samples)
 {
   size_t i;
-  const int16_t *in_16 = (int16_t *)in;
+  const int16_t *in_16 = reinterpret_cast<const int16_t *>(in);
 
   assert(in != nullptr);
   assert(out != nullptr);
@@ -377,7 +377,7 @@ static void u24_to_float(const unsigned char *in, float *out,
                          const size_t samples)
 {
   size_t i;
-  const uint32_t *in_32 = (uint32_t *)in;
+  const uint32_t *in_32 = reinterpret_cast<const uint32_t *>(in);
 
   assert(in != nullptr);
   assert(out != nullptr);
@@ -391,7 +391,7 @@ static void u24_to_float(const unsigned char *in, float *out,
 static void s24_to_float(const char *in, float *out, const size_t samples)
 {
   size_t i;
-  const int32_t *in_32 = (int32_t *)in;
+  const int32_t *in_32 = reinterpret_cast<const int32_t *>(in);
 
   assert(in != nullptr);
   assert(out != nullptr);
@@ -405,7 +405,7 @@ static void s24_to_float(const char *in, float *out, const size_t samples)
 static void s24_3_to_float(const char *in, float *out, const size_t samples)
 {
   size_t i;
-  const int8_t *in_8 = (int8_t *)in;
+  const int8_t *in_8 = reinterpret_cast<const int8_t *>(in);
 
   assert(in != nullptr);
   assert(out != nullptr);
@@ -426,7 +426,7 @@ static void s24_3_to_float(const char *in, float *out, const size_t samples)
 static void u24_3_to_float(const char *in, float *out, const size_t samples)
 {
   size_t i;
-  const uint8_t *in_8 = (uint8_t *)in;
+  const uint8_t *in_8 = reinterpret_cast<const uint8_t *>(in);
 
   assert(in != nullptr);
   assert(out != nullptr);
@@ -450,7 +450,7 @@ static void u32_to_float(const unsigned char *in, float *out,
                          const size_t samples)
 {
   size_t i;
-  const uint32_t *in_32 = (uint32_t *)in;
+  const uint32_t *in_32 = reinterpret_cast<const uint32_t *>(in);
 
   assert(in != nullptr);
   assert(out != nullptr);
@@ -464,7 +464,7 @@ static void u32_to_float(const unsigned char *in, float *out,
 static void s32_to_float(const char *in, float *out, const size_t samples)
 {
   size_t i;
-  const int32_t *in_32 = (int32_t *)in;
+  const int32_t *in_32 = reinterpret_cast<const int32_t *>(in);
 
   assert(in != nullptr);
   assert(out != nullptr);
@@ -487,7 +487,7 @@ static std::vector<float> fixed_to_float(const char *buf, const size_t size, con
   {
     case SFMT_U8:
       out.resize(size);
-      u8_to_float((unsigned char *)buf, out.data(), size);
+      u8_to_float(reinterpret_cast<const unsigned char *>(buf), out.data(), size);
       break;
     case SFMT_S8:
       out.resize(size);
@@ -495,7 +495,7 @@ static std::vector<float> fixed_to_float(const char *buf, const size_t size, con
       break;
     case SFMT_U16:
       out.resize(size / 2);
-      u16_to_float((unsigned char *)buf, out.data(), size / 2);
+      u16_to_float(reinterpret_cast<const unsigned char *>(buf), out.data(), size / 2);
       break;
     case SFMT_S16:
       out.resize(size / 2);
@@ -503,7 +503,7 @@ static std::vector<float> fixed_to_float(const char *buf, const size_t size, con
       break;
     case SFMT_U24:
       out.resize(size / 4);
-      u24_to_float((unsigned char *)buf, out.data(), size / 4);
+      u24_to_float(reinterpret_cast<const unsigned char *>(buf), out.data(), size / 4);
       break;
     case SFMT_S24:
       out.resize(size / 4);
@@ -519,7 +519,7 @@ static std::vector<float> fixed_to_float(const char *buf, const size_t size, con
       break;
     case SFMT_U32:
       out.resize(size / 4);
-      u32_to_float((unsigned char *)buf, out.data(), size / 4);
+      u32_to_float(reinterpret_cast<const unsigned char *>(buf), out.data(), size / 4);
       break;
     case SFMT_S32:
       out.resize(size / 4);

@@ -1006,7 +1006,7 @@ static inline AVPacket *new_packet(struct ffmpeg_data *data)
 #if HAVE_AV_PACKET_FNS
   pkt = av_packet_alloc();
 #else
-  pkt = (AVPacket *)av_malloc(sizeof(AVPacket));
+  pkt = static_cast<AVPacket *>(av_malloc(sizeof(AVPacket)));
   if (!pkt)
   {
     fatal("av_malloc() failed to allocate memory");

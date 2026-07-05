@@ -260,11 +260,11 @@ int JackOutput::play_audio(const char *buff, const size_t size)
       while (to_write--)
       {
         jack_default_audio_sample_t sample;
-        sample = *(jack_default_audio_sample_t *)(buff + pos) * volume;
+        sample = *reinterpret_cast<const jack_default_audio_sample_t *>(buff + pos) * volume;
         pos += sizeof(jack_default_audio_sample_t);
         jack_ringbuffer_write(ringbuffer[0], reinterpret_cast<char *>(&sample), sizeof(sample));
 
-        sample = *(jack_default_audio_sample_t *)(buff + pos) * volume;
+        sample = *reinterpret_cast<const jack_default_audio_sample_t *>(buff + pos) * volume;
         pos += sizeof(jack_default_audio_sample_t);
         jack_ringbuffer_write(ringbuffer[1], reinterpret_cast<char *>(&sample), sizeof(sample));
       }

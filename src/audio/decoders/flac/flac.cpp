@@ -369,7 +369,7 @@ static void fill_tag(FLAC__StreamMetadata_VorbisComment_Entry *comm,
     return;
   }
 
-  std::string value((char *)(eq + 1), value_length);
+  std::string value(reinterpret_cast<const char *>(eq + 1), value_length);
 
   if (!strcasecmp(name.c_str(), "title"))
   {

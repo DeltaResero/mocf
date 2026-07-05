@@ -315,7 +315,7 @@ static int opus_decodeX(void *prv_data, char *buf, int buf_len,
                         &current_section);
     debug("opus float!");
 #else
-    ret = op_read(data->of, (opus_int16 *)buf, buf_len / sizeof(opus_int16),
+    ret = op_read(data->of, reinterpret_cast<opus_int16 *>(buf), buf_len / sizeof(opus_int16),
                   &current_section);
     debug("opus fixed!");
 #endif
