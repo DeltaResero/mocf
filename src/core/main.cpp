@@ -24,6 +24,7 @@
 #include <ctime>
 #include <locale.h>
 #include <algorithm>
+#include <memory>
 #include <string>
 #include <vector>
 #include <sys/stat.h>
@@ -481,14 +482,14 @@ static void prepend_mocf_opts(poptContext ctx)
     {
       fatal("Error parsing MOCF_OPTS: %s", poptStrerror(rc));
     }
+    std::unique_ptr<char *, decltype(&::free)> env_argv_guard(
+        const_cast<char **>(env_argv), &::free);
 
     rc = poptStuffArgs(ctx, env_argv);
     if (rc < 0)
     {
       fatal("Error prepending MOCF_OPTS: %s", poptStrerror(rc));
     }
-
-    free(env_argv);
   }
 }
 
@@ -696,6 +697,8 @@ static std::string render_popt_command_line()
     }
 
     arg = poptGetOptArg(ctx);
+    std::unique_ptr<char, decltype(&::free)> arg_guard(
+        const_cast<char *>(arg), &::free);
 
     if (opt->longName)
     {
@@ -711,7 +714,6 @@ static std::string render_popt_command_line()
     }
 
     cmdline.push_back(std::move(str));
-    free(const_cast<char *>(arg));
   }
 
   rest = poptGetArgs(ctx);
@@ -801,6 +803,8 @@ static void process_options(poptContext ctx, std::vector<std::string> *deferred)
     const char *arg;
 
     arg = poptGetOptArg(ctx);
+    std::unique_ptr<char, decltype(&::free)> arg_guard(
+        const_cast<char *>(arg), &::free);
 
     switch (rc)
     {
@@ -834,8 +838,6 @@ static void process_options(poptContext ctx, std::vector<std::string> *deferred)
         show_usage(ctx);
         exit(EXIT_FAILURE);
     }
-
-    free(const_cast<char *>(arg));
   }
 
   if (rc < -1)

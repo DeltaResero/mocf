@@ -438,11 +438,11 @@ static std::string get_tag(struct id3_tag *tag, const char *what)
     ucs4 = id3_field_getstrings(field, 0);
     if (ucs4)
     {
-      char *comm = reinterpret_cast<char *>(id3_ucs4_utf8duplicate(ucs4));
+      std::unique_ptr<char, decltype(&::free)> comm(
+          reinterpret_cast<char *>(id3_ucs4_utf8duplicate(ucs4)), &::free);
       if (comm)
       {
-        result = comm;
-        free(comm);
+        result = comm.get();
       }
     }
   }

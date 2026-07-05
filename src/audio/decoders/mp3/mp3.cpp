@@ -170,20 +170,20 @@ static std::string get_tag(struct id3_tag *tag, const char *what)
             (id3_field_gettextencoding((encoding_field)) ==
              ID3_FIELD_TEXTENCODING_ISO_8859_1))))
       {
-        char *latin1 = reinterpret_cast<char *>(id3_ucs4_latin1duplicate(ucs4));
+        std::unique_ptr<char, decltype(&::free)> latin1(
+            reinterpret_cast<char *>(id3_ucs4_latin1duplicate(ucs4)), &::free);
         if (latin1)
         {
-          result = id3v1_fix(latin1);
-          free(latin1);
+          result = id3v1_fix(latin1.get());
         }
       }
       else
       {
-        char *utf8 = reinterpret_cast<char *>(id3_ucs4_utf8duplicate(ucs4));
+        std::unique_ptr<char, decltype(&::free)> utf8(
+            reinterpret_cast<char *>(id3_ucs4_utf8duplicate(ucs4)), &::free);
         if (utf8)
         {
-          result = utf8;
-          free(utf8);
+          result = utf8.get();
         }
       }
     }
