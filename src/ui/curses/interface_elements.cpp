@@ -27,6 +27,8 @@
 #include <cwctype>
 #include <unistd.h>
 #include <algorithm>
+#include <deque>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -181,7 +183,6 @@ enum message_type
 /* Save a new message for display. */
 struct queued_message
 {
-  struct queued_message *next;
   /* What type is this message? */
   enum message_type type;
   /* Message to be displayed instead of the file's title. */
@@ -199,12 +200,11 @@ static struct info_win
 {
   WINDOW *win;
 
-  struct queued_message
-      *current_message; /* Message currently being displayed */
+  std::optional<queued_message>
+      current_message; /* Message currently being displayed */
 
-  struct queued_message *queued_message_head; /* FIFO queue on which pending */
-  struct queued_message *queued_message_tail; /*          messages get saved */
-  int queued_message_total;                   /* Total messages on queue */
+  std::deque<queued_message> queued_messages; /* FIFO queue of pending
+                                                  messages */
   int queued_message_errors;                  /* Error messages on queue */
 
   int too_small; /* is the current window too small to display this widget? */
@@ -2679,27 +2679,16 @@ static void bar_resize(struct bar *b, const int width)
   }
 }
 
-static struct queued_message *queued_message_create(enum message_type type)
+static struct queued_message queued_message_create(enum message_type type)
 {
-  struct queued_message *result;
+  struct queued_message result{};
 
-  result = new queued_message;
-  result->next = nullptr;
-  result->type = type;
-  result->msg = "";
-  result->prompt = "";
-  result->timeout = 0;
-  result->callback = nullptr;
-  result->data = nullptr;
+  result.type = type;
+  result.timeout = 0;
+  result.callback = nullptr;
+  result.data = nullptr;
 
   return result;
-}
-
-static void queued_message_destroy(struct queued_message *msg)
-{
-  assert(msg != nullptr);
-
-  delete msg;
 }
 
 static void set_startup_message(struct info_win *w)
@@ -2713,15 +2702,12 @@ static void set_startup_message(struct info_win *w)
 
   if (is_help_still_h())
   {
-    struct queued_message *msg;
+    struct queued_message msg = queued_message_create(NORMAL_MSG);
 
-    msg = queued_message_create(NORMAL_MSG);
-    msg->msg = "Press 'h' for the list of commands.";
-    msg->timeout = options_get_int("MessageLingerTime");
+    msg.msg = "Press 'h' for the list of commands.";
+    msg.timeout = options_get_int("MessageLingerTime");
 
-    w->queued_message_head = msg;
-    w->queued_message_tail = msg;
-    w->queued_message_total = 1;
+    w->queued_messages.push_back(std::move(msg));
   }
 }
 
@@ -2732,9 +2718,7 @@ static void info_win_init(struct info_win *w)
   w->win = newwin(4, COLS, LINES - 4, 0);
   wbkgd(w->win, get_color(CLR_BACKGROUND));
 
-  w->queued_message_head = nullptr;
-  w->queued_message_tail = nullptr;
-  w->queued_message_total = 0;
+  w->queued_messages.clear();
   w->queued_message_errors = 0;
 
   w->too_small = 0;
@@ -3239,21 +3223,14 @@ static void info_win_display_msg(struct info_win *w)
   {
     w->callback = w->current_message->callback;
     w->data = w->current_message->data;
-    queued_message_destroy(w->current_message);
-    w->current_message = nullptr;
+    w->current_message.reset();
     msg_changed = 1;
   }
 
-  if (!w->current_message && w->queued_message_head && !w->in_entry)
+  if (!w->current_message && !w->queued_messages.empty() && !w->in_entry)
   {
-    w->current_message = w->queued_message_head;
-    w->queued_message_head = w->current_message->next;
-    w->current_message->next = nullptr;
-    if (!w->queued_message_head)
-    {
-      w->queued_message_tail = nullptr;
-    }
-    w->queued_message_total -= 1;
+    w->current_message = std::move(w->queued_messages.front());
+    w->queued_messages.pop_front();
     if (w->current_message->type == ERROR_MSG)
     {
       w->queued_message_errors -= 1;
@@ -3265,7 +3242,8 @@ static void info_win_display_msg(struct info_win *w)
       const char *decorator;
 
       decorator = options_get_str("ErrorMessagesQueued");
-      w->current_message->msg = "(" + std::to_string(w->queued_message_total) +
+      w->current_message->msg = "(" +
+                                std::to_string(w->queued_messages.size()) +
                                 (w->queued_message_errors ? decorator : "") +
                                 ") " + w->current_message->msg;
     }
@@ -3303,24 +3281,10 @@ static void info_win_clear_msg(struct info_win *w)
 {
   assert(w != nullptr);
 
-  while (w->queued_message_head)
-  {
-    struct queued_message *this_msg;
-
-    this_msg = w->queued_message_head;
-    w->queued_message_head = this_msg->next;
-    queued_message_destroy(this_msg);
-  }
-
-  w->queued_message_total = 0;
+  w->queued_messages.clear();
   w->queued_message_errors = 0;
-  w->queued_message_tail = nullptr;
 
-  if (w->current_message)
-  {
-    queued_message_destroy(w->current_message);
-    w->current_message = nullptr;
-  }
+  w->current_message.reset();
 }
 
 /* Queue a new message for display. */
@@ -3328,35 +3292,24 @@ static void info_win_msg(struct info_win *w, const char *msg,
                          enum message_type msg_type, const char *prompt,
                          t_user_reply_callback *callback, void *data)
 {
-  struct queued_message *this_msg;
+  struct queued_message this_msg = queued_message_create(msg_type);
 
   assert(w != nullptr);
   assert(msg != nullptr || prompt != nullptr);
 
-  this_msg = queued_message_create(msg_type);
   if (msg)
   {
-    this_msg->msg = msg;
+    this_msg.msg = msg;
   }
   if (prompt)
   {
-    this_msg->prompt = prompt;
+    this_msg.prompt = prompt;
   }
-  this_msg->timeout = options_get_int("MessageLingerTime");
-  this_msg->callback = callback;
-  this_msg->data = data;
+  this_msg.timeout = options_get_int("MessageLingerTime");
+  this_msg.callback = callback;
+  this_msg.data = data;
 
-  if (w->queued_message_head)
-  {
-    w->queued_message_tail->next = this_msg;
-    w->queued_message_tail = this_msg;
-  }
-  else
-  {
-    w->queued_message_head = this_msg;
-    w->queued_message_tail = this_msg;
-  }
-  w->queued_message_total += 1;
+  w->queued_messages.push_back(std::move(this_msg));
   if (msg_type == ERROR_MSG)
   {
     w->queued_message_errors += 1;
