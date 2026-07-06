@@ -90,7 +90,7 @@ static enum {
 } tags_source;
 
 /* Tags of the currently played file. */
-static struct file_tags *curr_tags = nullptr;
+static std::unique_ptr<struct file_tags> curr_tags;
 
 /* Mutex for curr_tags and tags_source. */
 static std::mutex curr_tags_mtx;
@@ -321,27 +321,23 @@ static void update_tags(AudioDecoder *decoder_data,
                         struct io_stream *s ATTR_UNUSED)
 {
   int tags_changed = 0;
-  struct file_tags *new_tags;
-
-  new_tags = new file_tags{};
+  auto new_tags = std::make_unique<file_tags>();
 
   std::lock_guard<std::mutex> lock(curr_tags_mtx);
-  if (decoder_data->current_tags(new_tags) &&
+  if (decoder_data->current_tags(new_tags.get()) &&
       !new_tags->title.empty())
   {
     tags_changed = 1;
     *curr_tags = *new_tags;
     logit("Tags change from the decoder");
     tags_source = TAGS_SOURCE_DECODER;
-    show_tags(curr_tags);
+    show_tags(curr_tags.get());
   }
 
   if (tags_changed)
   {
     tags_change();
   }
-
-  delete new_tags;
 }
 
 /* Called when some free space in the output buffer appears. */
@@ -373,7 +369,7 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
 
   {
     std::lock_guard<std::mutex> lock(curr_tags_mtx);
-    curr_tags = new file_tags{};
+    curr_tags = std::make_unique<file_tags>();
   }
 
   {
@@ -554,11 +550,7 @@ static void decode_loop(std::unique_ptr<AudioDecoder> &decoder_data,
 
   {
     std::lock_guard<std::mutex> lock(curr_tags_mtx);
-    if (curr_tags)
-    {
-      delete curr_tags;
-      curr_tags = nullptr;
-    }
+    curr_tags.reset();
   }
 
   out_buf->wait();
