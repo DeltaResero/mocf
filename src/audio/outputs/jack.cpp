@@ -42,7 +42,7 @@ private:
     jack_ringbuffer_t *ringbuffer[2] = {nullptr, nullptr};
     jack_default_audio_sample_t volume = 1.0;
     int volume_integer = 100;
-    int play = 0;
+    bool playing = false;
     int rate = 0;
     volatile int our_xrun = 0;
     volatile int jack_shutdown_flag = 0;
@@ -57,7 +57,7 @@ public:
     void shutdown() override;
     int open(struct sound_params *sound_params) override;
     void close() override;
-    int play_audio(const char *buff, const size_t size) override;
+    int play_audio(const char *buff, const size_t size);
     int play(const char *buff, const size_t size) override { return play_audio(buff, size); }
     int read_mixer() override;
     void set_mixer(int vol) override;
@@ -79,7 +79,7 @@ int JackOutput::process_cb(jack_nframes_t nframes, void *arg)
   out[0] = static_cast<jack_default_audio_sample_t *>(jack_port_get_buffer(self->output_port[0], nframes));
   out[1] = static_cast<jack_default_audio_sample_t *>(jack_port_get_buffer(self->output_port[1], nframes));
 
-  if (self->play)
+  if (self->playing)
   {
     size_t i;
     size_t avail_data = jack_ringbuffer_read_space(self->ringbuffer[1]);
@@ -217,14 +217,14 @@ int JackOutput::open(struct sound_params *sound_params)
   }
 
   logit("jack open");
-  play = 1;
+  playing = true;
   return 1;
 }
 
 void JackOutput::close()
 {
   logit("jack close");
-  play = 0;
+  playing = false;
 }
 
 int JackOutput::play_audio(const char *buff, const size_t size)
