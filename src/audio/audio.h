@@ -178,7 +178,7 @@
   void audio_queue_add(const char *file);
   void audio_queue_delete(const char *file);
   void audio_queue_clear();
-  struct plist *audio_queue_get_contents();
+  std::unique_ptr<struct plist> audio_queue_get_contents();
 
 
 #endif

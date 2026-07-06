@@ -1556,14 +1556,13 @@ void audio_plist_move(const char *file1, const char *file2)
 }
 
 /* Return a copy of the song queue.  We cannot just return constant
- * pointer, because it will be used in a different thread.
- * It obviously needs to be freed after use. */
-struct plist *audio_queue_get_contents()
+ * pointer, because it will be used in a different thread. */
+std::unique_ptr<struct plist> audio_queue_get_contents()
 {
-  struct plist *ret = new plist;
+  auto ret = std::make_unique<plist>();
 
   std::lock_guard<std::mutex> lock(plist_mtx);
-  plist_cat(ret, &queue);
+  plist_cat(ret.get(), &queue);
 
   return ret;
 }

@@ -13,6 +13,7 @@
 
 #include "core/protocol.h"
 #include "library/playlist.h"
+#include <memory>
 #include <queue>
 
   /* -----------------------------------------------------------------------
@@ -108,7 +109,7 @@
 
   /* Returns a freshly allocated copy of the server queue; caller must
    * delete it. */
-  struct plist *engine_get_queue(void);
+  std::unique_ptr<struct plist> engine_get_queue(void);
 
   /* -----------------------------------------------------------------------
    * Compound commands with side effects (UI→engine)

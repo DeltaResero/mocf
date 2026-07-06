@@ -455,12 +455,11 @@ private:
     }
 
     void recv_engine_queue(plist *q) {
-        plist *engine_q = engine_get_queue();
+        std::unique_ptr<plist> engine_q = engine_get_queue();
         if (!engine_q) return;
         for (int i = 0; i < static_cast<int>(engine_q->items.size()); i++) {
-            if (!plist_deleted(engine_q, i)) plist_add_from_item(q, &engine_q->items[i]);
+            if (!plist_deleted(engine_q.get(), i)) plist_add_from_item(q, &engine_q->items[i]);
         }
-        delete engine_q;
     }
 
     void clear_playlist() {

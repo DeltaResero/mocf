@@ -587,7 +587,7 @@ void engine_queue_clear(void)
   add_event_all(EV_QUEUE_CLEAR, nullptr);
 }
 
-struct plist *engine_get_queue(void)
+std::unique_ptr<struct plist> engine_get_queue(void)
 {
   return audio_queue_get_contents();
 }
