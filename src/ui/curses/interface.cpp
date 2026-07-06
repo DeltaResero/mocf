@@ -320,15 +320,14 @@ private:
     }
 
     void update_item_tags(plist *p, const int num, file_tags *tags) {
-        file_tags *old_tags = plist_get_tags(p, num);
-        if (old_tags) tags_update(tags, old_tags, 1);
+        std::unique_ptr<file_tags> old_tags = plist_get_tags(p, num);
+        if (old_tags) tags_update(tags, old_tags.get(), 1);
         plist_set_tags(p, num, tags);
         if (!p->items[num].title_tags.empty()) p->items[num].title_tags.clear();
         make_tags_title(p, num);
         if (options_get_bool("ReadTags") && p->items[num].title_tags.empty()) {
             if (p->items[num].title_file.empty()) make_file_title(p, num, options_get_bool("HideFileExtension"));
         }
-        if (old_tags) delete old_tags;
     }
 
     void ev_file_tags(const tag_ev_response *data) {

@@ -809,14 +809,15 @@ void plist_set_tags(struct plist *plist, const int num,
   }
 }
 
-struct file_tags *plist_get_tags(const struct plist *plist, const int num)
+std::unique_ptr<struct file_tags> plist_get_tags(const struct plist *plist,
+                                                 const int num)
 {
   assert(plist != nullptr);
   assert(in_range(num, plist->items.size()));
 
   if (plist->items[num].tags)
   {
-    return new file_tags(*plist->items[num].tags);
+    return std::make_unique<file_tags>(*plist->items[num].tags);
   }
 
   return nullptr;
