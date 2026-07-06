@@ -64,7 +64,7 @@ struct vorbis_data
 
   int tags_change; /* the tags were changed from the last call of
                       ogg_current_tags() */
-  struct file_tags *tags;
+  std::unique_ptr<struct file_tags> tags;
 };
 
 static void get_comment_tags(OggVorbis_File *vf, struct file_tags *info)
@@ -224,7 +224,7 @@ static void vorbis_open_stream_internal(struct vorbis_data *data)
   int res;
   ov_callbacks callbacks = {read_cb, seek_cb, close_cb, tell_cb};
 
-  data->tags = new file_tags{};
+  data->tags = std::make_unique<file_tags>();
 
   res = ov_open_callbacks(data->stream, &data->vf, nullptr, 0, callbacks);
   if (res < 0)
@@ -248,7 +248,7 @@ static void vorbis_open_stream_internal(struct vorbis_data *data)
       data->duration = duration / time_scaler;
     }
     data->ok = 1;
-    get_comment_tags(&data->vf, data->tags);
+    get_comment_tags(&data->vf, data->tags.get());
   }
 }
 
@@ -296,10 +296,6 @@ static void vorbis_close(void *prv_data)
 
   io_close(data->stream);
   decoder_error_clear(&data->error);
-  if (data->tags)
-  {
-    delete data->tags;
-  }
   delete data;
 }
 
@@ -357,9 +353,8 @@ static int vorbis_decode(void *prv_data, char *buf, int buf_len,
 
       data->last_section = current_section;
       data->tags_change = 1;
-      delete data->tags;
-      data->tags = new file_tags{};
-      get_comment_tags(&data->vf, data->tags);
+      data->tags = std::make_unique<file_tags>();
+      get_comment_tags(&data->vf, data->tags.get());
     }
 
     info = ov_info(&data->vf, -1);

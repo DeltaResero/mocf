@@ -45,7 +45,7 @@ struct mpg123_data
   int ok;          /* was this stream successfully opened? */
   int tags_change; /* the tags were changed from the last call decode function
                     */
-  struct file_tags *tags;
+  std::unique_ptr<struct file_tags> tags;
 };
 
 // ID3v1 tag values may not be null-terminated. Truncate trailing spaces and
@@ -223,7 +223,7 @@ static void mpg123_open_stream_internal(struct mpg123_data *data)
   struct mpg123_frameinfo info;
   off_t file_size, samples;
 
-  data->tags = new file_tags{};
+  data->tags = std::make_unique<file_tags>();
 
 #if MPG123_API_VERSION < 46
   mpg123_init();
@@ -336,7 +336,7 @@ static void mpg123_open_stream_internal(struct mpg123_data *data)
   {
     data->avg_bitrate = file_size / data->duration * 8;
   }
-  get_tags(data->mf, data->tags);
+  get_tags(data->mf, data->tags.get());
 
   debug("TG: active mpg123 decoder %s", mpg123_current_decoder(data->mf));
 
@@ -389,10 +389,6 @@ static void mpg123_closeX(void *prv_data)
   }
 
   decoder_error_clear(&data->error);
-  if (data->tags)
-  {
-    delete data->tags;
-  }
   delete data;
 }
 
@@ -460,9 +456,8 @@ static int mpg123_decodeX(void *prv_data, char *buf, int buf_len,
     {
       logit("Tags change");
       data->tags_change = 1;
-      delete data->tags;
-      data->tags = new file_tags{};
-      get_tags(data->mf, data->tags);
+      data->tags = std::make_unique<file_tags>();
+      get_tags(data->mf, data->tags.get());
     }
 
     sound_params->channels = data->channels;

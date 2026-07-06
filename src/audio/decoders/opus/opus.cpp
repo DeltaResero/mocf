@@ -42,7 +42,7 @@ struct opus_data
   int ok;          /* was this stream successfully opened? */
   int tags_change; /* the tags were changed from the last call of
                       opus_current_tags */
-  struct file_tags *tags;
+  std::unique_ptr<struct file_tags> tags;
 };
 
 static void get_comment_tags(OggOpusFile *of, struct file_tags *info)
@@ -213,7 +213,7 @@ static void opus_open_stream_internal(struct opus_data *data)
 
   OpusFileCallbacks callbacks = {read_cb, seek_cb, tell_cb, close_cb};
 
-  data->tags = new file_tags{};
+  data->tags = std::make_unique<file_tags>();
 
   data->of = op_open_callbacks(data->stream, &callbacks, nullptr, 0, &res);
   if (res < 0)
@@ -243,7 +243,7 @@ static void opus_open_stream_internal(struct opus_data *data)
     }
     debug("Duration: %d, samples %lld", data->duration, (long long)samples);
     data->ok = 1;
-    get_comment_tags(data->of, data->tags);
+    get_comment_tags(data->of, data->tags.get());
   }
 }
 
@@ -282,10 +282,6 @@ static void opus_close(void *prv_data)
   }
 
   decoder_error_clear(&data->error);
-  if (data->tags)
-  {
-    delete data->tags;
-  }
   delete data;
 }
 
@@ -334,9 +330,8 @@ static int opus_decodeX(void *prv_data, char *buf, int buf_len,
       logit("section change or first section");
       data->last_section = current_section;
       data->tags_change = 1;
-      delete data->tags;
-      data->tags = new file_tags{};
-      get_comment_tags(data->of, data->tags);
+      data->tags = std::make_unique<file_tags>();
+      get_comment_tags(data->of, data->tags.get());
     }
 
     sound_params->channels = op_channel_count(data->of, current_section);
