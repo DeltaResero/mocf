@@ -558,19 +558,15 @@ void engine_abort_tags_requests(const char *file)
 
 void engine_queue_add(const char *file)
 {
-  struct plist_item *item;
-
   logit("Adding '%s' to the queue", file);
   audio_queue_add(file);
 
-  item = new plist_item{};
-  item->file  = file;
-  item->type  = file_type(file);
-  item->mtime = get_mtime(file);
+  struct plist_item item{};
+  item.file  = file;
+  item.type  = file_type(file);
+  item.mtime = get_mtime(file);
 
-  add_event_all(EV_QUEUE_ADD, item);
-
-  delete item;
+  add_event_all(EV_QUEUE_ADD, &item);
 }
 
 void engine_queue_del(const char *file)
@@ -609,16 +605,14 @@ void engine_jump_to(int sec)
       return;
     }
 
-    struct file_tags *tags;
-    tags = tags_cache_get_immediate(tags_cache, file.c_str(), TAGS_TIME);
+    std::unique_ptr<struct file_tags> tags(
+        tags_cache_get_immediate(tags_cache, file.c_str(), TAGS_TIME));
     if (!tags || !(tags->filled & TAGS_TIME))
     {
-      delete tags;
       return;
     }
 
     sec = (tags->time * percent) / 100;
-    delete tags;
   }
 
   logit("Jumping to %ds", sec);
