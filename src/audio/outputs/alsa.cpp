@@ -70,26 +70,29 @@ private:
         unsigned int rate;
         snd_pcm_format_t format;
     } params = {0, 0, SND_PCM_FORMAT_UNKNOWN};
-    snd_pcm_uframes_t buffer_frames;
-    snd_pcm_uframes_t chunk_frames;
+    snd_pcm_uframes_t buffer_frames = 0;
+    snd_pcm_uframes_t chunk_frames = 0;
     int chunk_bytes = -1;
-    char alsa_buf[512 * 1024];
+    char alsa_buf[512 * 1024] = {0};
     int alsa_buf_fill = 0;
-    int bytes_per_frame;
-    int bytes_per_sample;
+    int bytes_per_frame = 0;
+    int bytes_per_sample = 0;
     snd_mixer_t *mixer_handle = nullptr;
     snd_mixer_elem_t *mixer_elem1 = nullptr;
     snd_mixer_elem_t *mixer_elem2 = nullptr;
     snd_mixer_elem_t *mixer_elem_curr = nullptr;
-    long mixer1_min = -1, mixer1_max = -1;
-    long mixer2_min = -1, mixer2_max = -1;
+    long mixer1_min = -1;
+    long mixer1_max = -1;
+    long mixer2_min = -1;
+    long mixer2_max = -1;
     int volume1 = -1;
     int volume2 = -1;
     long real_volume1 = -1;
     long real_volume2 = -1;
     bool use_linear_volume_scale1 = true;
     bool use_linear_volume_scale2 = true;
-    double min_norm1 = 0, min_norm2 = 0;
+    double min_norm1 = 0.0;
+    double min_norm2 = 0.0;
 
     int scale_volume(long real_vol, long *mixer_min, long *mixer_max, double *min_norm, bool *use_linear_volume_scale);
     long scale_volume_inverse(int vol, long *mixer_min, long *mixer_max, double *min_norm, bool *use_linear_volume_scale);
@@ -385,7 +388,8 @@ void AlsaOutput::handle_mixer_events(snd_mixer_t *mixer_handle)
 
   do
   {
-    int rc, count;
+    int rc;
+    int count;
 
     count = snd_mixer_poll_descriptors_count(mixer_handle);
     if (count < 0)
@@ -494,7 +498,8 @@ snd_mixer_elem_t *AlsaOutput::alsa_init_mixer_channel(const char *name,
   snd_mixer_selem_id_t *sid;
   snd_mixer_elem_t *elem = nullptr;
 
-  long db_min, db_max;
+  long db_min;
+  long db_max;
 
   snd_mixer_selem_id_malloc(&sid);
   snd_mixer_selem_id_set_index(sid, 0);
@@ -601,8 +606,17 @@ void AlsaOutput::alsa_open_mixer(const char *device)
 
 void AlsaOutput::alsa_set_current_mixer()
 {
-  if (mixer_elem1 && (real_volume1 = alsa_read_mixer_raw(
-                          mixer_elem1, use_linear_volume_scale1)) != -1)
+  bool elem1_ok = false;
+  if (mixer_elem1)
+  {
+    real_volume1 = alsa_read_mixer_raw(mixer_elem1, use_linear_volume_scale1);
+    if (real_volume1 != -1)
+    {
+      elem1_ok = true;
+    }
+  }
+
+  if (elem1_ok)
   {
     volume1 = scale_volume(real_volume1, &mixer1_min, &mixer1_max, &min_norm1,
                            &use_linear_volume_scale1);
@@ -614,8 +628,17 @@ void AlsaOutput::alsa_set_current_mixer()
     mixer_elem_curr = mixer_elem2;
   }
 
-  if (mixer_elem2 && (real_volume2 = alsa_read_mixer_raw(
-                          mixer_elem2, use_linear_volume_scale2)) != -1)
+  bool elem2_ok = false;
+  if (mixer_elem2)
+  {
+    real_volume2 = alsa_read_mixer_raw(mixer_elem2, use_linear_volume_scale2);
+    if (real_volume2 != -1)
+    {
+      elem2_ok = true;
+    }
+  }
+
+  if (elem2_ok)
   {
     volume2 = scale_volume(real_volume2, &mixer2_min, &mixer2_max, &min_norm2,
                            &use_linear_volume_scale2);
@@ -633,8 +656,13 @@ void AlsaOutput::alsa_set_current_mixer()
  * linkage; this is a lightweight heuristic. */
 bool AlsaOutput::is_pulseaudio_present()
 {
-  if (getenv("PULSE_SERVER") || getenv("PULSE_SINK") ||
-      getenv("PIPEWIRE_REMOTE"))
+  const char *pulse_server = getenv("PULSE_SERVER");
+  const char *pulse_sink = getenv("PULSE_SINK");
+  const char *pipewire_remote = getenv("PIPEWIRE_REMOTE");
+
+  if ((pulse_server != nullptr && pulse_server[0] != '\0') ||
+      (pulse_sink != nullptr && pulse_sink[0] != '\0') ||
+      (pipewire_remote != nullptr && pipewire_remote[0] != '\0'))
   {
     return true;
   }
@@ -642,14 +670,14 @@ bool AlsaOutput::is_pulseaudio_present()
   /* Both PulseAudio and PipeWire (in PA-compatibility mode) create a
    * native socket at $XDG_RUNTIME_DIR/pulse/native when running. */
   const char *xdg = getenv("XDG_RUNTIME_DIR");
-  if (xdg)
+  if (xdg != nullptr && xdg[0] != '\0')
   {
-    const char *suffix  = "/pulse/native";
-    size_t      xdg_len = strlen(xdg);
-    size_t      suf_len = strlen(suffix);
+    const char suffix[] = "/pulse/native";
+    size_t      xdg_len = strnlen(xdg, 4096);
+    size_t      suf_len = sizeof(suffix) - 1;
     char        path[4096];
 
-    if (xdg_len + suf_len < sizeof(path))
+    if (xdg_len > 0 && xdg_len < sizeof(path) && suf_len < sizeof(path) - xdg_len)
     {
       memcpy(path, xdg, xdg_len);
       memcpy(path + xdg_len, suffix, suf_len + 1);
@@ -752,8 +780,10 @@ int AlsaOutput::init(struct output_driver_caps *caps)
 
 int AlsaOutput::open(struct sound_params *sound_params)
 {
-  int rc, result = 0;
-  unsigned int period_time, buffer_time;
+  int rc;
+  int result = 0;
+  unsigned int period_time;
+  unsigned int buffer_time;
   char fmt_name[128];
   const char *device;
   snd_pcm_hw_params_t *hw_params;
@@ -1007,10 +1037,17 @@ int AlsaOutput::play(const char *buff, const size_t size)
     int to_copy;
 
     to_copy = std::min(to_write, static_cast<int>(ssizeof(alsa_buf) - alsa_buf_fill));
-    memcpy(alsa_buf + alsa_buf_fill, buff + buf_pos, to_copy);
-    to_write -= to_copy;
-    buf_pos += to_copy;
-    alsa_buf_fill += to_copy;
+    if (to_copy > 0 && alsa_buf_fill >= 0 && static_cast<size_t>(alsa_buf_fill + to_copy) <= sizeof(alsa_buf))
+    {
+      memcpy(alsa_buf + alsa_buf_fill, buff + buf_pos, to_copy);
+      to_write -= to_copy;
+      buf_pos += to_copy;
+      alsa_buf_fill += to_copy;
+    }
+    else
+    {
+      break;
+    }
 
     debug("Copied %d bytes to alsa_buf (now filled with %d bytes)", to_copy,
           alsa_buf_fill);
