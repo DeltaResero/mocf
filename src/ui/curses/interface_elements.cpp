@@ -86,15 +86,14 @@ struct side_menu
   int total_time;         /* total time of the files on the playlist */
   int total_time_for_all; /* is the total file counted for all files? */
 
-  union
+  struct
   {
     struct
     {
-      struct menu *main; /* visible menu */
-      struct menu *copy; /* copy of the menu when we display
+      unique_menu main; /* visible menu */
+      unique_menu copy; /* copy of the menu when we display
                             matching items while searching */
     } list;
-    /* struct menu_tree *tree;*/
   } menu;
 };
 
@@ -760,8 +759,9 @@ static void side_menu_init_menu(struct side_menu *m)
 {
   assert(m != nullptr);
 
-  m->menu.list.main = menu_new(m->win, m->posx + 1, m->posy + 1, m->width - 2,
-                               side_menu_get_menu_height(m));
+  m->menu.list.main.reset(menu_new(m->win, m->posx + 1, m->posy + 1,
+                                    m->width - 2,
+                                    side_menu_get_menu_height(m)));
 }
 
 static void side_menu_init(struct side_menu *m, const enum side_menu_type type,
@@ -790,19 +790,19 @@ static void side_menu_init(struct side_menu *m, const enum side_menu_type type,
     side_menu_init_menu(m);
     m->menu.list.copy = nullptr;
 
-    menu_set_items_numbering(m->menu.list.main,
+    menu_set_items_numbering(m->menu.list.main.get(),
                              type == MENU_PLAYLIST &&
                                  options_get_bool("PlaylistNumbering"));
-    menu_set_show_format(m->menu.list.main, options_get_bool("ShowFormat"));
-    menu_set_show_time(m->menu.list.main,
+    menu_set_show_format(m->menu.list.main.get(), options_get_bool("ShowFormat"));
+    menu_set_show_time(m->menu.list.main.get(),
                        strcasecmp(options_get_symb("ShowTime"), "no"));
-    menu_set_info_attr_normal(m->menu.list.main, get_color(CLR_MENU_ITEM_INFO));
-    menu_set_info_attr_sel(m->menu.list.main,
+    menu_set_info_attr_normal(m->menu.list.main.get(), get_color(CLR_MENU_ITEM_INFO));
+    menu_set_info_attr_sel(m->menu.list.main.get(),
                            get_color(CLR_MENU_ITEM_INFO_SELECTED));
-    menu_set_info_attr_marked(m->menu.list.main,
+    menu_set_info_attr_marked(m->menu.list.main.get(),
                               get_color(CLR_MENU_ITEM_INFO_MARKED));
     menu_set_info_attr_sel_marked(
-        m->menu.list.main, get_color(CLR_MENU_ITEM_INFO_MARKED_SELECTED));
+        m->menu.list.main.get(), get_color(CLR_MENU_ITEM_INFO_MARKED_SELECTED));
   }
   else if (type == MENU_THEMES)
   {
@@ -826,11 +826,8 @@ static void side_menu_destroy(struct side_menu *m)
     if (m->type == MENU_DIR || m->type == MENU_PLAYLIST ||
         m->type == MENU_THEMES)
     {
-      menu_free(m->menu.list.main);
-      if (m->menu.list.copy)
-      {
-        menu_free(m->menu.list.copy);
-      }
+      m->menu.list.main.reset();
+      m->menu.list.copy.reset();
     }
     else
     {
@@ -1124,21 +1121,21 @@ static void side_menu_clear(struct side_menu *m)
   assert(m->menu.list.main != nullptr);
   assert(m->menu.list.copy == nullptr);
 
-  menu_free(m->menu.list.main);
+  m->menu.list.main.reset();
   side_menu_init_menu(m);
-  menu_set_items_numbering(m->menu.list.main,
+  menu_set_items_numbering(m->menu.list.main.get(),
                            m->type == MENU_PLAYLIST &&
                                options_get_bool("PlaylistNumbering"));
 
-  menu_set_show_format(m->menu.list.main, options_get_bool("ShowFormat"));
-  menu_set_show_time(m->menu.list.main,
+  menu_set_show_format(m->menu.list.main.get(), options_get_bool("ShowFormat"));
+  menu_set_show_time(m->menu.list.main.get(),
                      strcasecmp(options_get_symb("ShowTime"), "no"));
-  menu_set_info_attr_normal(m->menu.list.main, get_color(CLR_MENU_ITEM_INFO));
-  menu_set_info_attr_sel(m->menu.list.main,
+  menu_set_info_attr_normal(m->menu.list.main.get(), get_color(CLR_MENU_ITEM_INFO));
+  menu_set_info_attr_sel(m->menu.list.main.get(),
                          get_color(CLR_MENU_ITEM_INFO_SELECTED));
-  menu_set_info_attr_marked(m->menu.list.main,
+  menu_set_info_attr_marked(m->menu.list.main.get(),
                             get_color(CLR_MENU_ITEM_INFO_MARKED));
-  menu_set_info_attr_sel_marked(m->menu.list.main,
+  menu_set_info_attr_sel_marked(m->menu.list.main.get(),
                                 get_color(CLR_MENU_ITEM_INFO_MARKED_SELECTED));
 }
 
@@ -1161,7 +1158,7 @@ static void side_menu_make_list_content(struct side_menu *m,
 
   if (add_up_dir)
   {
-    added = menu_add(m->menu.list.main, "../", F_DIR, "..");
+    added = menu_add(m->menu.list.main.get(), "../", F_DIR, "..");
     menu_item_set_attr_normal(added, get_color(CLR_MENU_ITEM_DIR));
     menu_item_set_attr_sel(added, get_color(CLR_MENU_ITEM_DIR_SELECTED));
   }
@@ -1181,14 +1178,14 @@ static void side_menu_make_list_content(struct side_menu *m,
       title += "/";
     }
 
-    added = menu_add(m->menu.list.main, title.c_str(), F_DIR, dirs[i].c_str());
+    added = menu_add(m->menu.list.main.get(), title.c_str(), F_DIR, dirs[i].c_str());
     menu_item_set_attr_normal(added, get_color(CLR_MENU_ITEM_DIR));
     menu_item_set_attr_sel(added, get_color(CLR_MENU_ITEM_DIR_SELECTED));
   }
 
   for (i = 0; i < static_cast<int>(playlists.size()); i++)
   {
-    added = menu_add(m->menu.list.main,
+    added = menu_add(m->menu.list.main.get(),
                      strrchr(playlists[i].c_str(), '/') + 1,
                      F_PLAYLIST, playlists[i].c_str());
     menu_item_set_attr_normal(added, get_color(CLR_MENU_ITEM_PLAYLIST));
@@ -1200,7 +1197,7 @@ static void side_menu_make_list_content(struct side_menu *m,
   {
     if (!plist_deleted(files, i))
     {
-      add_to_menu(m->menu.list.main, files, i,
+      add_to_menu(m->menu.list.main.get(), files, i,
                   m->type == MENU_PLAYLIST &&
                       options_get_bool("PlaylistFullPaths"));
     }
@@ -1310,10 +1307,10 @@ static void side_menu_draw(const struct side_menu *m, const int active)
 
   if (m->type == MENU_DIR || m->type == MENU_PLAYLIST || m->type == MENU_THEMES)
   {
-    menu_draw(m->menu.list.main, active);
+    menu_draw(m->menu.list.main.get(), active);
     if (options_get_bool("UseCursorSelection"))
     {
-      menu_set_cursor(m->menu.list.main);
+      menu_set_cursor(m->menu.list.main.get());
     }
   }
   else
@@ -1332,22 +1329,22 @@ static void side_menu_cmd(struct side_menu *m, const enum key_cmd cmd)
     switch (cmd)
     {
       case KEY_CMD_MENU_DOWN:
-        menu_driver(m->menu.list.main, REQ_DOWN);
+        menu_driver(m->menu.list.main.get(), REQ_DOWN);
         break;
       case KEY_CMD_MENU_UP:
-        menu_driver(m->menu.list.main, REQ_UP);
+        menu_driver(m->menu.list.main.get(), REQ_UP);
         break;
       case KEY_CMD_MENU_NPAGE:
-        menu_driver(m->menu.list.main, REQ_PGDOWN);
+        menu_driver(m->menu.list.main.get(), REQ_PGDOWN);
         break;
       case KEY_CMD_MENU_PPAGE:
-        menu_driver(m->menu.list.main, REQ_PGUP);
+        menu_driver(m->menu.list.main.get(), REQ_PGUP);
         break;
       case KEY_CMD_MENU_FIRST:
-        menu_driver(m->menu.list.main, REQ_TOP);
+        menu_driver(m->menu.list.main.get(), REQ_TOP);
         break;
       case KEY_CMD_MENU_LAST:
-        menu_driver(m->menu.list.main, REQ_BOTTOM);
+        menu_driver(m->menu.list.main.get(), REQ_BOTTOM);
         break;
       default:
         abort();
@@ -1368,7 +1365,7 @@ static enum file_type side_menu_curritem_get_type(const struct side_menu *m)
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST ||
          m->type == MENU_THEMES);
 
-  mi = menu_curritem(m->menu.list.main);
+  mi = menu_curritem(m->menu.list.main.get());
 
   if (mi)
   {
@@ -1387,7 +1384,7 @@ static std::string side_menu_get_curr_file(const struct side_menu *m)
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST ||
          m->type == MENU_THEMES);
 
-  mi = menu_curritem(m->menu.list.main);
+  mi = menu_curritem(m->menu.list.main.get());
 
   if (mi)
   {
@@ -1424,7 +1421,7 @@ static void side_menu_set_curr_item_title(struct side_menu *m,
   assert(m->visible);
   assert(title != nullptr);
 
-  menu_setcurritem_title(m->menu.list.main, title);
+  menu_setcurritem_title(m->menu.list.main.get(), title);
 }
 
 /* Update menu item using the playlist item. */
@@ -1502,19 +1499,19 @@ static int side_menu_update_item(struct side_menu *m, const struct plist *plist,
   file = plist_get_file(plist, n);
   assert(!file.empty());
 
-  if ((mi = menu_find(m->menu.list.main, file.c_str())))
+  if ((mi = menu_find(m->menu.list.main.get(), file.c_str())))
   {
     update_menu_item(mi, plist, n,
                      m->type == MENU_PLAYLIST &&
                          options_get_bool("PlaylistFullpaths"));
-    visible = menu_is_visible(m->menu.list.main, mi);
+    visible = menu_is_visible(m->menu.list.main.get(), mi);
   }
-  if (m->menu.list.copy && (mi = menu_find(m->menu.list.copy, file.c_str())))
+  if (m->menu.list.copy && (mi = menu_find(m->menu.list.copy.get(), file.c_str())))
   {
     update_menu_item(mi, plist, n,
                      m->type == MENU_PLAYLIST &&
                          options_get_bool("PlaylistFullpaths"));
-    visible = visible || menu_is_visible(m->menu.list.main, mi);
+    visible = visible || menu_is_visible(m->menu.list.main.get(), mi);
   }
 
   m->total_time = plist_total_time(plist, &m->total_time_for_all);
@@ -1528,10 +1525,10 @@ static void side_menu_unmark_file(struct side_menu *m)
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
-  menu_unmark_item(m->menu.list.main);
+  menu_unmark_item(m->menu.list.main.get());
   if (m->menu.list.copy)
   {
-    menu_unmark_item(m->menu.list.copy);
+    menu_unmark_item(m->menu.list.copy.get());
   }
 }
 
@@ -1541,17 +1538,17 @@ static void side_menu_mark_file(struct side_menu *m, const char *file)
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
-  menu_mark_item(m->menu.list.main, file);
+  menu_mark_item(m->menu.list.main.get(), file);
   if (m->menu.list.copy)
   {
-    menu_mark_item(m->menu.list.copy, file);
+    menu_mark_item(m->menu.list.copy.get(), file);
   }
 }
 
 static void side_menu_add_file(struct side_menu *m, const char *file,
                                const char *title, const enum file_type type)
 {
-  menu_add(m->menu.list.main, title, type, file);
+  menu_add(m->menu.list.main.get(), title, type, file);
 }
 
 static int side_menu_add_plist_item(struct side_menu *m,
@@ -1565,7 +1562,7 @@ static int side_menu_add_plist_item(struct side_menu *m,
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
   visible = add_to_menu(
-      m->menu.list.copy ? m->menu.list.copy : m->menu.list.main, plist, num,
+      (m->menu.list.copy ? m->menu.list.copy : m->menu.list.main).get(), plist, num,
       m->type == MENU_PLAYLIST && options_get_bool("PlaylistFullPaths"));
   m->total_time = plist_total_time(plist, &m->total_time_for_all);
 
@@ -1594,7 +1591,7 @@ static void side_menu_update_show_time(struct side_menu *m)
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
-  menu_set_show_time(m->menu.list.main,
+  menu_set_show_time(m->menu.list.main.get(),
                      strcasecmp(options_get_symb("ShowTime"), "no"));
 }
 
@@ -1604,7 +1601,7 @@ static void side_menu_update_show_format(struct side_menu *m)
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
-  menu_set_show_format(m->menu.list.main, options_get_bool("ShowFormat"));
+  menu_set_show_format(m->menu.list.main.get(), options_get_bool("ShowFormat"));
 }
 
 static void side_menu_get_state(const struct side_menu *m,
@@ -1615,7 +1612,7 @@ static void side_menu_get_state(const struct side_menu *m,
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
-  menu_get_state(m->menu.list.main, &st->menu_state);
+  menu_get_state(m->menu.list.main.get(), &st->menu_state);
 }
 
 static void side_menu_set_state(struct side_menu *m,
@@ -1626,7 +1623,7 @@ static void side_menu_set_state(struct side_menu *m,
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
-  menu_set_state(m->menu.list.main, &st->menu_state);
+  menu_set_state(m->menu.list.main.get(), &st->menu_state);
 }
 
 static void side_menu_del_item(struct side_menu *m, const char *file)
@@ -1635,7 +1632,7 @@ static void side_menu_del_item(struct side_menu *m, const char *file)
   assert(m->visible);
   assert(m->type == MENU_DIR || m->type == MENU_PLAYLIST);
 
-  menu_del_item(m->menu.list.copy ? m->menu.list.copy : m->menu.list.main,
+  menu_del_item((m->menu.list.copy ? m->menu.list.copy : m->menu.list.main).get(),
                 file);
 }
 
@@ -1655,33 +1652,32 @@ static void side_menu_set_plist_time(struct side_menu *m, const int time,
  * Return the number of matching items. */
 static int side_menu_filter(struct side_menu *m, const char *pattern)
 {
-  struct menu *filtered_menu;
-
   assert(m != nullptr);
   assert(pattern != nullptr);
   assert(m->menu.list.main != nullptr);
 
-  filtered_menu = menu_filter_pattern(
-      m->menu.list.copy ? m->menu.list.copy : m->menu.list.main, pattern);
+  unique_menu filtered_menu(menu_filter_pattern(
+      (m->menu.list.copy ? m->menu.list.copy : m->menu.list.main).get(),
+      pattern));
 
-  if (menu_nitems(filtered_menu) == 0)
+  int nitems = menu_nitems(filtered_menu.get());
+  if (nitems == 0)
   {
-    menu_free(filtered_menu);
     return 0;
   }
 
   if (m->menu.list.copy)
   {
-    menu_free(m->menu.list.main);
+    m->menu.list.main.reset();
   }
   else
   {
-    m->menu.list.copy = m->menu.list.main;
+    m->menu.list.copy = std::move(m->menu.list.main);
   }
 
-  m->menu.list.main = filtered_menu;
+  m->menu.list.main = std::move(filtered_menu);
 
-  return menu_nitems(filtered_menu);
+  return nitems;
 }
 
 static void side_menu_use_main(struct side_menu *m)
@@ -1691,9 +1687,7 @@ static void side_menu_use_main(struct side_menu *m)
 
   if (m->menu.list.copy)
   {
-    menu_free(m->menu.list.main);
-    m->menu.list.main = m->menu.list.copy;
-    m->menu.list.copy = nullptr;
+    m->menu.list.main = std::move(m->menu.list.copy);
   }
 }
 
@@ -1706,7 +1700,7 @@ static void side_menu_make_visible(struct side_menu *m, const char *file)
 
   if (!m->menu.list.copy)
   {
-    menu_make_visible(m->menu.list.main, file);
+    menu_make_visible(m->menu.list.main.get(), file);
   }
 }
 
@@ -1721,7 +1715,7 @@ static void side_menu_swap_items(struct side_menu *m, const char *file1,
   assert(m->menu.list.main != nullptr);
   assert(m->menu.list.copy == nullptr);
 
-  menu_swap_items(m->menu.list.main, file1, file2);
+  menu_swap_items(m->menu.list.main.get(), file1, file2);
 }
 
 static void side_menu_select_file(struct side_menu *m, const char *file)
@@ -1731,7 +1725,7 @@ static void side_menu_select_file(struct side_menu *m, const char *file)
 
   if (m->type == MENU_DIR || m->type == MENU_PLAYLIST)
   {
-    menu_setcurritem_file(m->menu.list.main, file);
+    menu_setcurritem_file(m->menu.list.main.get(), file);
   }
   else
   {
@@ -1751,11 +1745,11 @@ static void side_menu_resize(struct side_menu *m,
 
   if (m->type == MENU_DIR || m->type == MENU_PLAYLIST || m->type == MENU_THEMES)
   {
-    menu_update_size(m->menu.list.main, m->posx + 1, m->posy + 1, m->width - 2,
+    menu_update_size(m->menu.list.main.get(), m->posx + 1, m->posy + 1, m->width - 2,
                      side_menu_get_menu_height(m));
     if (m->menu.list.copy)
     {
-      menu_update_size(m->menu.list.copy, m->posx + 1, m->posy + 1,
+      menu_update_size(m->menu.list.copy.get(), m->posx + 1, m->posy + 1,
                        m->width - 2, side_menu_get_menu_height(m));
     }
   }
@@ -3898,7 +3892,7 @@ void iface_update_attrs()
   for (ix = 0; ix < std::size(main_win.menus); ix += 1)
   {
     struct side_menu *m = &main_win.menus[ix];
-    struct menu *menu = m->menu.list.main;
+    struct menu *menu = m->menu.list.main.get();
 
     if (m->type == MENU_DIR || m->type == MENU_PLAYLIST)
     {
@@ -3949,7 +3943,7 @@ void iface_update_theme_selection(const char *file)
   /* menus[2] is theme menu. */
   assert(main_win.menus[2].menu.list.main->selected_idx >= 0);
 
-  menu_setcurritem_file(main_win.menus[2].menu.list.main, file);
+  menu_setcurritem_file(main_win.menus[2].menu.list.main.get(), file);
 }
 
 /* Like iface_set_dir_content(), but before replacing the menu content, save
@@ -4615,7 +4609,7 @@ void iface_mark_file_error(const char *file)
     if (m->type != MENU_DIR && m->type != MENU_PLAYLIST)
       continue;
 
-    if ((mi = menu_find(m->menu.list.main, file)))
+    if ((mi = menu_find(m->menu.list.main.get(), file)))
     {
       menu_item_set_time(mi, "ERROR");
       menu_item_set_attr_normal(mi, get_color(CLR_ERROR));
@@ -4624,7 +4618,7 @@ void iface_mark_file_error(const char *file)
       menu_item_set_attr_sel_marked(mi, get_color(CLR_ERROR) | A_REVERSE);
     }
 
-    if (m->menu.list.copy && (mi = menu_find(m->menu.list.copy, file)))
+    if (m->menu.list.copy && (mi = menu_find(m->menu.list.copy.get(), file)))
     {
       menu_item_set_time(mi, "ERROR");
       menu_item_set_attr_normal(mi, get_color(CLR_ERROR));

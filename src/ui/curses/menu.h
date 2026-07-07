@@ -121,6 +121,13 @@
   void menu_item_set_queue_pos(struct menu_item *mi, const int pos);
 
   void menu_free(struct menu *menu);
+
+  /* Deleter for owning a struct menu via std::unique_ptr. */
+  struct menu_deleter
+  {
+    void operator()(struct menu *menu) const noexcept { menu_free(menu); }
+  };
+  using unique_menu = std::unique_ptr<struct menu, menu_deleter>;
   void menu_driver(struct menu *menu, const enum menu_request req);
   void menu_setcurritem_title(struct menu *menu, const char *title);
   void menu_setcurritem_file(struct menu *menu, const char *file);
