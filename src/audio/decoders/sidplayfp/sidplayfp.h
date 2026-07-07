@@ -18,6 +18,8 @@
 
 #ifdef __cplusplus
 
+#include <memory>
+
 // libsidplayfp defines debug/error macros that collide with ours.
 #undef debug
 #undef error
@@ -43,12 +45,18 @@
 
 struct sidplayfp_data
 {
-    SidTune        *tune;
-    sidplayfp      *engine;
-    ReSIDBuilder   *builder;
+    // Declaration order matters here: members are destroyed in reverse
+    // declaration order, and the engine holds a raw (non-owning) pointer
+    // into both tune and builder, so it must be torn down first, while
+    // they're still alive. Declaring tune and builder before engine gives
+    // the destruction order engine -> builder -> tune. Do not reorder
+    // these without re-checking that constraint.
+    std::unique_ptr<SidTune>      tune;
+    std::unique_ptr<ReSIDBuilder> builder;
+    std::unique_ptr<sidplayfp>    engine;
 
     int   length_ms;        // total playback length in milliseconds
-    int  *sublengths_ms;    // per-song lengths in milliseconds
+    std::unique_ptr<int[]> sublengths_ms; // per-song lengths in milliseconds
     int   songs;
     int   startSong;
     int   currentSong;

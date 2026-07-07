@@ -31,7 +31,7 @@
 // Module-level state
 // ---------------------------------------------------------------------------
 
-static SidDatabase     *database;
+static std::unique_ptr<SidDatabase> database;
 static int              init_db;
 static int              defaultLength; // seconds
 static int              minLength;     // seconds
@@ -61,12 +61,11 @@ static void init_database()
     if (dbfile == nullptr || dbfile[0] == '\0')
         return;
 
-    database = new SidDatabase();
+    database = std::make_unique<SidDatabase>();
     if (!database->open(dbfile)) {
         logit("sidplayfp: Unable to open SidDatabase \"%s\": %s",
               dbfile, database->error());
-        delete database;
-        database = nullptr;
+        database.reset();
     }
 }
 
@@ -94,12 +93,11 @@ static int song_length_ms(SidTune &tune)
 // ---------------------------------------------------------------------------
 
 // Create and sanity-check an ReSIDBuilder.  Returns nullptr on failure.
-static ReSIDBuilder *make_builder(unsigned int n_chips)
+static std::unique_ptr<ReSIDBuilder> make_builder(unsigned int n_chips)
 {
-    ReSIDBuilder *b = new ReSIDBuilder("ReSID");
+    auto b = std::make_unique<ReSIDBuilder>("ReSID");
     if (!b->getStatus()) {
         logit("sidplayfp: ReSIDBuilder construction failed");
-        delete b;
         return nullptr;
     }
 
@@ -107,7 +105,6 @@ static ReSIDBuilder *make_builder(unsigned int n_chips)
     if (!b->getStatus()) {
         logit("sidplayfp: ReSIDBuilder::create(%u) failed: %s",
               n_chips, b->error());
-        delete b;
         return nullptr;
     }
 
@@ -115,9 +112,9 @@ static ReSIDBuilder *make_builder(unsigned int n_chips)
 }
 
 // Create and configure a sidplayfp engine.  Returns nullptr on failure.
-static sidplayfp *make_engine(ReSIDBuilder *builder, int frequency)
+static std::unique_ptr<sidplayfp> make_engine(ReSIDBuilder *builder, int frequency)
 {
-    sidplayfp *engine = new sidplayfp();
+    auto engine = std::make_unique<sidplayfp>();
 
     SidConfig cfg    = engine->config();
     cfg.frequency    = static_cast<uint_least32_t>(frequency);
@@ -140,7 +137,6 @@ static sidplayfp *make_engine(ReSIDBuilder *builder, int frequency)
 
     if (!engine->config(cfg)) {
         logit("sidplayfp: engine config failed: %s", engine->error());
-        delete engine;
         return nullptr;
     }
 
@@ -169,7 +165,7 @@ void *sidplayfp_open(const char *file)
 
     // ---- Load tune --------------------------------------------------------
 
-    s->tune = new SidTune(file);
+    s->tune = std::make_unique<SidTune>(file);
     if (!s->tune->getStatus()) {
         decoder_error(&s->error, ERROR_FATAL, 0,
                       "sidplayfp: cannot load \"%s\": %s",
@@ -190,7 +186,7 @@ void *sidplayfp_open(const char *file)
 
     // ---- Accumulate per-song lengths ------------------------------------
 
-    s->sublengths_ms = new int[s->songs]();
+    s->sublengths_ms = std::make_unique<int[]>(s->songs);
     s->length_ms     = 0;
 
     for (int song = s->timeStart; song <= s->timeEnd; ++song) {
@@ -229,7 +225,7 @@ void *sidplayfp_open(const char *file)
         return s;
     }
 
-    s->engine = make_engine(s->builder, s->frequency);
+    s->engine = make_engine(s->builder.get(), s->frequency);
     if (!s->engine) {
         decoder_error(&s->error, ERROR_FATAL, 0,
                       "sidplayfp: cannot create engine");
@@ -241,7 +237,7 @@ void *sidplayfp_open(const char *file)
     s->currentSong = s->timeStart;
     s->tune->selectSong(s->currentSong);
 
-    if (!s->engine->load(s->tune)) {
+    if (!s->engine->load(s->tune.get())) {
         decoder_error(&s->error, ERROR_FATAL, 0,
                       "sidplayfp: load failed: %s", s->engine->error());
         return s;
@@ -256,13 +252,7 @@ void *sidplayfp_open(const char *file)
 
 void sidplayfp_close(void *void_data)
 {
-    struct sidplayfp_data *s = (struct sidplayfp_data *)void_data;
-
-    // engine holds a raw pointer to the tune — delete engine first.
-    delete s->engine;
-    delete s->builder;
-    delete s->tune;
-    delete[] s->sublengths_ms;
+    struct sidplayfp_data *s = static_cast<struct sidplayfp_data *>(void_data);
 
     decoder_error_clear(&s->error);
     delete s;
@@ -275,7 +265,7 @@ void sidplayfp_close(void *void_data)
 void sidplayfp_get_error(void *prv_data,
                                      struct decoder_error *error)
 {
-    struct sidplayfp_data *s = (struct sidplayfp_data *)prv_data;
+    struct sidplayfp_data *s = static_cast<struct sidplayfp_data *>(prv_data);
     decoder_error_copy(error, &s->error);
 }
 
@@ -343,7 +333,7 @@ int sidplayfp_seek(void *, int)
 int sidplayfp_decode(void *void_data, char *buf, int buf_len,
                                  struct sound_params *sound_params)
 {
-    struct sidplayfp_data *s = (struct sidplayfp_data *)void_data;
+    struct sidplayfp_data *s = static_cast<struct sidplayfp_data *>(void_data);
 
     if (!s->engine || !s->tune)
         return 0;
@@ -356,7 +346,7 @@ int sidplayfp_decode(void *void_data, char *buf, int buf_len,
 
         ++s->currentSong;
         s->tune->selectSong(s->currentSong);
-        if (!s->engine->load(s->tune))
+        if (!s->engine->load(s->tune.get()))
             return 0;
 
         s->song_length_frames  = (int)(((long long)s->sublengths_ms[s->currentSong - 1]
@@ -399,7 +389,7 @@ int sidplayfp_get_bitrate(void *)
 
 int sidplayfp_get_duration(void *void_data)
 {
-    struct sidplayfp_data *s = (struct sidplayfp_data *)void_data;
+    struct sidplayfp_data *s = static_cast<struct sidplayfp_data *>(void_data);
     return s->length_ms / 1000;
 }
 
@@ -425,8 +415,7 @@ static void init()
 static void destroy()
 {
     pthread_mutex_destroy(&db_mtx);
-    delete database;
-    database = nullptr;
+    database.reset();
 }
 
 class SidplayfpDecoder : public AudioDecoder {
