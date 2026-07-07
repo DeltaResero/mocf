@@ -351,8 +351,7 @@ void io_close(struct io_stream *s)
 
     if (s->buffered)
     {
-      delete s->buf;
-      s->buf = nullptr;
+      s->buf.reset();
     }
   }
 
@@ -532,7 +531,7 @@ struct io_stream *io_open(const char *file, const int buffered)
 
   if (buffered)
   {
-    s->buf = new fifo_buf(options_get_int("InputBuffer") * 1024);
+    s->buf = std::make_unique<fifo_buf>(options_get_int("InputBuffer") * 1024);
     s->read_thread = std::thread(io_read_thread, s);
   }
 

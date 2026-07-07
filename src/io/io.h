@@ -15,6 +15,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
+#include <memory>
 
 #include "utils/fifo_buf.h"
 
@@ -52,7 +53,7 @@
     off_t mem_pos;
 #endif
 
-    fifo_buf *buf;
+    std::unique_ptr<fifo_buf> buf;
     std::mutex buf_mtx;
     std::condition_variable buf_free_cond; /* some space became available in the
              buffer */
