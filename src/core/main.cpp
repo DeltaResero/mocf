@@ -103,10 +103,10 @@ struct server_thread_args {
 
 static void *server_thread_func(void *arg)
 {
-  auto *args = static_cast<server_thread_args *>(arg);
+  std::unique_ptr<server_thread_args> args(
+      static_cast<server_thread_args *>(arg));
   server_init(args->eq);
   server_loop();
-  delete args;
   return nullptr;
 }
 
@@ -114,12 +114,11 @@ static void *server_thread_func(void *arg)
 static void start_moc(const struct parameters *params, const std::vector<std::string> &args)
 {
   pthread_t server_thread;
-  struct server_thread_args *th_args;
   struct engine_event_queue *eq;
 
   eq = engine_event_queue_new();
 
-  th_args = new server_thread_args;
+  auto th_args = std::make_unique<server_thread_args>();
   th_args->eq    = eq;
 
   if (params->debug)
@@ -136,10 +135,14 @@ static void start_moc(const struct parameters *params, const std::vector<std::st
     log_init_stream(nullptr, nullptr);
   }
 
-  if (pthread_create(&server_thread, nullptr, server_thread_func, th_args) != 0)
+  if (pthread_create(&server_thread, nullptr, server_thread_func,
+                     th_args.get()) != 0)
   {
     fatal("pthread_create() failed: %s", xstrerror(errno));
   }
+
+  /* The thread now owns th_args and will delete it when it exits. */
+  th_args.release();
 
   xsignal(SIGPIPE, SIG_IGN);
 
