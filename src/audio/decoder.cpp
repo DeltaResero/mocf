@@ -58,7 +58,6 @@ static bool have_tremor = false;
 /* This structure holds the user's decoder preferences for audio formats. */
 struct decoder_s_preference
 {
-  struct decoder_s_preference *next; /* chain pointer */
 #ifdef DEBUG
   std::string source; /* entry in PreferredDecoders */
 #endif
@@ -68,7 +67,7 @@ struct decoder_s_preference
   std::string type;              /* MIME type or filename extn */
 };
 typedef struct decoder_s_preference decoder_t_preference;
-static decoder_t_preference *preferences = nullptr;
+static std::vector<std::unique_ptr<decoder_t_preference>> preferences;
 static int default_decoder_list[PLUGINS_NUM];
 
 static std::string clean_mime_subtype(std::string subtype)
@@ -120,17 +119,18 @@ static decoder_t_preference *lookup_preference(const char *extn,
                                                const char *file, std::string &mime)
 {
   std::string type, subtype;
-  decoder_t_preference *result;
 
   assert((extn && extn[0]) || (file && file[0]) || !mime.empty());
 
-  for (result = preferences; result; result = result->next)
+  for (auto &up : preferences)
   {
+    decoder_t_preference *result = up.get();
+
     if (result->subtype.empty())
     {
       if (extn && !strcasecmp(result->type.c_str(), extn))
       {
-        break;
+        return result;
       }
     }
     else
@@ -160,13 +160,13 @@ static decoder_t_preference *lookup_preference(const char *extn,
         if (!strcasecmp(result->type.c_str(), type.c_str()) &&
             !strcasecmp(result->subtype.c_str(), subtype.c_str()))
         {
-          break;
+          return result;
         }
       }
     }
   }
 
-  return result;
+  return nullptr;
 }
 
 /* Return the index of the first decoder able to handle files with the
@@ -411,14 +411,12 @@ static std::string list_decoder_names(int *decoder_list, int count)
 
 
 /* Create a new preferences entry and initialise it. */
-static decoder_t_preference *make_preference(const char *prefix)
+static std::unique_ptr<decoder_t_preference> make_preference(const char *prefix)
 {
-  decoder_t_preference *result;
+  auto result = std::make_unique<decoder_t_preference>();
 
   assert(prefix && prefix[0]);
 
-  result = new decoder_t_preference;
-  result->next = nullptr;
   result->decoders = 0;
   result->subtype = "";
 
@@ -543,19 +541,17 @@ static void load_each_preference(const char *preference)
 {
   const char *prefix;
   std::vector<std::string> tokens;
-  decoder_t_preference *pref;
 
   assert(preference && preference[0]);
 
   tokens = split_on_chars(preference, "(,)");
   prefix = tokens[0].c_str();
-  pref = make_preference(prefix);
+  auto pref = make_preference(prefix);
 #ifdef DEBUG
   pref->source = preference;
 #endif
-  load_decoders(pref, tokens);
-  pref->next = preferences;
-  preferences = pref;
+  load_decoders(pref.get(), tokens);
+  preferences.insert(preferences.begin(), std::move(pref));
 }
 
 /* Load all preferences given by the user in PreferredDecoders. */
@@ -567,14 +563,10 @@ static void load_preferences()
   }
 
 #ifdef DEBUG
+  for (const auto &pref : preferences)
   {
-    decoder_t_preference *pref;
-
-    for (pref = preferences; pref; pref = pref->next)
-    {
-      std::string names = list_decoder_names(pref->decoder_list, pref->decoders);
-      debug("%s:%s", pref->source.c_str(), names.c_str());
-    }
+    std::string names = list_decoder_names(pref->decoder_list, pref->decoders);
+    debug("%s:%s", pref->source.c_str(), names.c_str());
   }
 #endif
 }
@@ -639,15 +631,7 @@ static void cleanup_decoders()
 
 static void cleanup_preferences()
 {
-  decoder_t_preference *pref, *next;
-
-  for (pref = preferences; pref; pref = next)
-  {
-    next = pref->next;
-    delete pref;
-  }
-
-  preferences = nullptr;
+  preferences.clear();
 }
 
 void decoder_cleanup()
