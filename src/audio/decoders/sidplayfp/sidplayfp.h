@@ -19,6 +19,8 @@
 #ifdef __cplusplus
 
 #include <memory>
+#include <vector>
+#include <cstdint>
 
 // libsidplayfp defines debug/error macros that collide with ours.
 #undef debug
@@ -29,7 +31,7 @@
 #include <sidplayfp/SidConfig.h>
 #include <sidplayfp/SidInfo.h>
 #include <sidplayfp/SidTuneInfo.h>
-#include <sidplayfp/builders/resid.h>
+#include <sidplayfp/builders/sidlite.h>
 #include <sidplayfp/SidDatabase.h>
 
 // Option keys — updated from old sidplay2 keys
@@ -51,9 +53,27 @@ struct sidplayfp_data
     // they're still alive. Declaring tune and builder before engine gives
     // the destruction order engine -> builder -> tune. Do not reorder
     // these without re-checking that constraint.
-    std::unique_ptr<SidTune>      tune;
-    std::unique_ptr<ReSIDBuilder> builder;
-    std::unique_ptr<sidplayfp>    engine;
+    std::unique_ptr<SidTune>        tune;
+    std::unique_ptr<SIDLiteBuilder> builder;
+    std::unique_ptr<sidplayfp>      engine;
+
+    // Interleaved stereo samples produced by the engine but not yet
+    // delivered to the caller. The engine is driven in fixed cycle-sized
+    // steps (see SIDPLAYFP_CYCLES in the .cpp) rather than by requested
+    // sample count, so a decode() call rarely lines up exactly with what
+    // the engine just produced. The remainder is queued here for the
+    // next call. Cleared on every song change, since leftover audio was
+    // rendered under the previous song's (now-reset) engine state.
+    std::vector<int16_t> pcm_queue;
+
+    // Fixed-size scratch buffer passed to sidplayfp::mix() each step.
+    // Sized via engine->getBufSize(SIDPLAYFP_CYCLES), which accounts for
+    // the worst-case *interleaved* (stereo-doubled) output for that
+    // cycle count. The mix()'s "samples" parameter is a per-channel count,
+    // not a buffer-size count, so this must NOT be sized to play()'s
+    // return value directly (that undersizes it by 2x for stereo and
+    // corrupts the heap).
+    std::vector<int16_t> mix_scratch;
 
     int   length_ms;        // total playback length in milliseconds
     std::unique_ptr<int[]> sublengths_ms; // per-song lengths in milliseconds

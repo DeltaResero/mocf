@@ -44,7 +44,7 @@ This project uses the **CMake** build system.
     libsamplerate, libmagic, BerkeleyDB.
 * **Decoder Libraries:** libmad, libmpg123, libfaad2, libvorbis, opusfile,
     libflac, libmpcdec, libwavpack, libsndfile, libmodplug, ffmpeg/libav,
-    libspeex, libsidplayfp.
+    libspeex, libsidplayfp (>= 3.0, for the lightweight SIDLite builder).
 
 ### Quick Start
 

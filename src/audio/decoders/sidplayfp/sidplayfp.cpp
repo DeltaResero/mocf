@@ -92,33 +92,27 @@ static int song_length_ms(SidTune &tune)
 // Engine / builder construction
 // ---------------------------------------------------------------------------
 
-// Create and sanity-check an ReSIDBuilder.  Returns nullptr on failure.
-static std::unique_ptr<ReSIDBuilder> make_builder(unsigned int n_chips)
+// Cycles to run the emulation per step. ~5ms of C64 time at ~1MHz; small
+// enough to keep latency reasonable, large enough to avoid excessive call
+// overhead. Matches the value used in libsidplayfp's own reference demo.
+static constexpr unsigned int SIDPLAYFP_CYCLES = 5000;
+
+// Create a SIDLiteBuilder. SIDLiteBuilder's constructor cannot fail
+// visibly (no getStatus()/create(n) in the current API. SID chip
+// emulation objects are allocated lazily by the engine as tunes are
+// loaded), so this just centralizes construction for readability.
+static std::unique_ptr<SIDLiteBuilder> make_builder()
 {
-    auto b = std::make_unique<ReSIDBuilder>("ReSID");
-    if (!b->getStatus()) {
-        logit("sidplayfp: ReSIDBuilder construction failed");
-        return nullptr;
-    }
-
-    b->create(n_chips);
-    if (!b->getStatus()) {
-        logit("sidplayfp: ReSIDBuilder::create(%u) failed: %s",
-              n_chips, b->error());
-        return nullptr;
-    }
-
-    return b;
+    return std::make_unique<SIDLiteBuilder>("SIDLite");
 }
 
 // Create and configure a sidplayfp engine.  Returns nullptr on failure.
-static std::unique_ptr<sidplayfp> make_engine(ReSIDBuilder *builder, int frequency)
+static std::unique_ptr<sidplayfp> make_engine(SIDLiteBuilder *builder, int frequency)
 {
     auto engine = std::make_unique<sidplayfp>();
 
     SidConfig cfg    = engine->config();
     cfg.frequency    = static_cast<uint_least32_t>(frequency);
-    cfg.playback     = SidConfig::STEREO;
     cfg.sidEmulation = builder;
 
     // Honour OPT_SID_MODEL: 0 = auto (trust tune header),
@@ -213,15 +207,10 @@ void *sidplayfp_open(const char *file)
 
     // ---- Build emulation engine -----------------------------------------
 
-    // sidChips() is a property of the whole tune file, not per-song.
-    unsigned int n_chips = (unsigned int)s->tune->getInfo()->sidChips();
-    if (n_chips == 0)
-        n_chips = 1;
-
-    s->builder = make_builder(n_chips);
+    s->builder = make_builder();
     if (!s->builder) {
         decoder_error(&s->error, ERROR_FATAL, 0,
-                      "sidplayfp: cannot create ReSID builder");
+                      "sidplayfp: cannot create SIDLite builder");
         return s;
     }
 
@@ -242,6 +231,17 @@ void *sidplayfp_open(const char *file)
                       "sidplayfp: load failed: %s", s->engine->error());
         return s;
     }
+
+    // Must come after load(): initMixer() reads the set of SID chips the
+    // engine attached for this tune, which load() is what populates.
+    // Calling it earlier (e.g. right after config()) mixes against zero
+    // chips and crashes inside libsidplayfp's own mixer setup.
+    s->engine->initMixer(true);
+
+    // Sized for SIDPLAYFP_CYCLES worth of interleaved output; see the
+    // comment on mix_scratch in the header for why this can't just be
+    // sized to whatever play() returns each call.
+    s->mix_scratch.resize((size_t)s->engine->getBufSize(SIDPLAYFP_CYCLES));
 
     s->song_length_frames  = (int)(((long long)s->sublengths_ms[s->currentSong - 1]
                              * s->frequency) / 1000);
@@ -338,44 +338,73 @@ int sidplayfp_decode(void *void_data, char *buf, int buf_len,
     if (!s->engine || !s->tune)
         return 0;
 
-    // Advance to the next song when the current one has been fully rendered.
-    // The while handles the (unlikely) case of a zero-length sublength.
-    while (s->song_elapsed_frames >= s->song_length_frames) {
-        if (s->currentSong >= s->timeEnd)
-            return 0; // all songs consumed
+    for (;;) {
+        int frames_remaining = s->song_length_frames - s->song_elapsed_frames;
 
-        ++s->currentSong;
-        s->tune->selectSong(s->currentSong);
-        if (!s->engine->load(s->tune.get()))
+        if (frames_remaining <= 0) {
+            if (s->currentSong >= s->timeEnd)
+                return 0; // all songs consumed
+
+            ++s->currentSong;
+            s->tune->selectSong(s->currentSong);
+            if (!s->engine->load(s->tune.get()))
+                return 0;
+
+            s->song_length_frames  = (int)(((long long)s->sublengths_ms[s->currentSong - 1]
+                                     * s->frequency) / 1000);
+            s->song_elapsed_frames = 0;
+
+            // Anything queued was rendered under the previous song's
+            // (now-reset) engine state — discard rather than deliver it
+            // as if it belonged to the new song.
+            s->pcm_queue.clear();
+            continue;
+        }
+
+        // Stereo 16-bit output: 4 bytes per frame (2 samples).
+        int frames_available = buf_len / 4;
+        int frames_to_render = std::min(frames_available, frames_remaining);
+
+        if (frames_to_render <= 0)
             return 0;
 
-        s->song_length_frames  = (int)(((long long)s->sublengths_ms[s->currentSong - 1]
-                                 * s->frequency) / 1000);
-        s->song_elapsed_frames = 0;
+        int samples_needed = frames_to_render * 2;
+
+        // Top up the queue in fixed cycle-sized steps until we have
+        // enough samples to satisfy this call (or the engine stalls).
+        while ((int)s->pcm_queue.size() < samples_needed) {
+            int res = s->engine->play(SIDPLAYFP_CYCLES);
+            if (res < 0) {
+                decoder_error(&s->error, ERROR_FATAL, 0,
+                              "sidplayfp: play failed: %s", s->engine->error());
+                return 0;
+            }
+            if (res == 0)
+                break; // nothing more to render this call; avoid spinning
+
+            unsigned int mixed = s->engine->mix(s->mix_scratch.data(),
+                                                 (unsigned)res);
+            s->pcm_queue.insert(s->pcm_queue.end(),
+                                 s->mix_scratch.begin(),
+                                 s->mix_scratch.begin() + mixed);
+        }
+
+        int have = (int)s->pcm_queue.size();
+        int to_copy = std::min(have, samples_needed);
+        if (to_copy <= 0)
+            return 0;
+
+        std::memcpy(buf, s->pcm_queue.data(), (size_t)to_copy * sizeof(int16_t));
+        s->pcm_queue.erase(s->pcm_queue.begin(), s->pcm_queue.begin() + to_copy);
+
+        s->song_elapsed_frames += to_copy / 2;
+
+        sound_params->channels = 2;
+        sound_params->rate     = s->frequency;
+        sound_params->fmt      = s->sample_format;
+
+        return to_copy * (int)sizeof(int16_t);
     }
-
-    // Stereo 16-bit output: 4 bytes per frame (2 samples).
-    int frames_available = buf_len / 4;
-    int frames_remaining = s->song_length_frames - s->song_elapsed_frames;
-    int frames_to_render = std::min(frames_available, frames_remaining);
-
-    if (frames_to_render <= 0)
-        return 0;
-
-    int samples_to_render = frames_to_render * 2;
-    int samples_rendered = s->engine->play(reinterpret_cast<int_least16_t *>(buf), samples_to_render);
-
-    if (samples_rendered <= 0)
-        return 0;
-
-    int frames_rendered = samples_rendered / 2;
-    s->song_elapsed_frames += frames_rendered;
-
-    sound_params->channels = 2;
-    sound_params->rate     = s->frequency;
-    sound_params->fmt      = s->sample_format;
-
-    return (int)(samples_rendered * sizeof(int16_t));
 }
 
 // ---------------------------------------------------------------------------

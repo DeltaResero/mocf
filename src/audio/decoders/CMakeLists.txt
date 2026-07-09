@@ -269,14 +269,12 @@ if(WITH_SPEEX)
   endif()
 endif()
 
-# SIDPlayFP decoder (replaces old libsidplay2 + ReSID decoder)
-# Requires: libsidplayfp >= 2.0 (Arch: libsidplayfp)
-# CMake option: -DWITH_SIDPLAYFP=ON  (replaces -DWITH_SIDPLAY2=ON)
+# SIDPlayFP decoder, using the lightweight SIDLite builder.
 if(WITH_SIDPLAYFP)
-  pkg_check_modules(SIDPLAYFP libsidplayfp>=2.0)
+  pkg_check_modules(SIDPLAYFP libsidplayfp>=3.0)
 
   if(SIDPLAYFP_FOUND)
-    # residfp.h is a C++ header; check_include_file (C-only) would
+    # sidlite.h is a C++ header; check_include_file (C-only) would
     # reject it even when installed. pkg-config finding the library is
     # sufficient confirmation that the headers are present.
     add_decoder_plugin(
