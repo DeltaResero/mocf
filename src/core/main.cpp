@@ -661,13 +661,15 @@ static std::string render_popt_command_line()
   std::vector<std::string> cmdline;
   std::string result;
   const char **rest;
-  poptContext ctx;
-  struct poptOption *null_opts;
 
-  null_opts = clone_popt_options(mocf_opts);
+  struct poptOption *null_opts = clone_popt_options(mocf_opts);
+  std::unique_ptr<struct poptOption, decltype(&free_popt_clone)>
+      null_opts_guard(null_opts, free_popt_clone);
 
-  ctx = poptGetContext("mocf", mocf_argc, mocf_argv, null_opts,
-                       POPT_CONTEXT_NO_EXEC);
+  poptContext ctx = poptGetContext("mocf", mocf_argc, mocf_argv, null_opts,
+                                   POPT_CONTEXT_NO_EXEC);
+  std::unique_ptr<poptContext_s, decltype(&poptFreeContext)> ctx_guard(
+      ctx, poptFreeContext);
 
   read_popt_config(ctx);
   prepend_mocf_opts(ctx);
@@ -696,8 +698,7 @@ static std::string render_popt_command_line()
     opt = find_popt_option(null_opts, rc);
     if (!opt)
     {
-      result = "Couldn't find option in copied option table!";
-      goto err;
+      return "Couldn't find option in copied option table!";
     }
 
     arg = poptGetOptArg(ctx);
@@ -738,10 +739,6 @@ static std::string render_popt_command_line()
     }
     result = std::move(joined);
   }
-
-err:
-  poptFreeContext(ctx);
-  free_popt_clone(null_opts);
 
   return result;
 }
