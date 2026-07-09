@@ -171,8 +171,8 @@ static inline void apply_biquads(float *src, float *dst, int channels, int len,
                                  t_biquad *b, int blen);
 
 /* biquad filter creation */
-static t_biquad *mk_biquad(float dbgain, float cf, float srate, float bw,
-                           t_biquad *b);
+static void mk_biquad(float dbgain, float cf, float srate, float bw,
+                      t_biquad &b);
 
 /* sound processing */
 static void equ_process_buffer_u8(uint8_t *buf, size_t samples);
@@ -252,14 +252,9 @@ void equalizer_prev()
 /* Create a Peaking EQ Filter.
  * See 'Audio EQ Cookbook' for more information
  */
-static t_biquad *mk_biquad(float dbgain, float cf, float srate, float bw,
-                           t_biquad *b)
+static void mk_biquad(float dbgain, float cf, float srate, float bw,
+                      t_biquad &b)
 {
-  if (b == nullptr)
-  {
-    b = new t_biquad;
-  }
-
   float A = powf(10.0f, dbgain / 40.0f);
   float omega = TWOPI * cf / srate;
   float sn = sin(omega);
@@ -276,24 +271,22 @@ static t_biquad *mk_biquad(float dbgain, float cf, float srate, float bw,
   float a1 = b1;
   float a2 = 1.0f - alpha_d_A;
 
-  b->a0 = b0 / a0;
-  b->a1 = b1 / a0;
-  b->a2 = b2 / a0;
-  b->a3 = a1 / a0;
-  b->a4 = a2 / a0;
+  b.a0 = b0 / a0;
+  b.a1 = b1 / a0;
+  b.a2 = b2 / a0;
+  b.a3 = a1 / a0;
+  b.a4 = a2 / a0;
 
-  b->x1 = 0.0f;
-  b->x2 = 0.0f;
-  b->y1 = 0.0f;
-  b->y2 = 0.0f;
+  b.x1 = 0.0f;
+  b.x2 = 0.0f;
+  b.y1 = 0.0f;
+  b.y2 = 0.0f;
 
-  b->cf = cf;
-  b->bw = bw;
-  b->srate = srate;
-  b->israte = static_cast<int>(srate);
-  b->gain = dbgain;
-
-  return b;
+  b.cf = cf;
+  b.bw = bw;
+  b.srate = srate;
+  b.israte = static_cast<int>(srate);
+  b.gain = dbgain;
 }
 
 /* Applies a set of biquadratic filters to a buffer of floating point
@@ -535,7 +528,7 @@ void equalizer_refresh()
           for (int i = 0; i < eqs->bcount; i++)
           {
             mk_biquad(eqs->dg[i], eqs->cf[i], sample_rate, eqs->bw[i],
-                      &eqset.b[i]);
+                      eqset.b[i]);
 
             for (int channel = 1; channel < equ_channels; channel++)
             {
