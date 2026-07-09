@@ -21,6 +21,7 @@
 #include <ctime>
 #include <dirent.h>
 #include <optional>
+#include <memory>
 #include <mutex>
 #include <condition_variable>
 #include <thread>
@@ -111,7 +112,7 @@ struct cache_record
 {
   time_t mod_time; /* last modification time of the file */
   time_t atime;    /* Time of last access. */
-  struct file_tags *tags;
+  std::unique_ptr<file_tags> tags;
 };
 
 /* BerkleyDB-provided error code to description function wrapper. */
@@ -128,37 +129,42 @@ static inline std::string bdb_strerror(int errnum)
 #endif
 
 
+/* Serialize a cache entry for storage.  Takes the tags by reference rather
+ * than a struct cache_record, since the caller (tags_cache_add) does not
+ * own the file_tags it is asked to store and must not be tempted into
+ * routing it through an owning pointer just to call this function. */
 #ifdef HAVE_DB_H
-static std::vector<char> cache_record_serialize(const struct cache_record *rec)
+static std::vector<char> cache_record_serialize(time_t mod_time, time_t atime,
+                                                const struct file_tags &tags)
 {
   size_t artist_len;
   size_t album_len;
   size_t title_len;
   size_t len;
 
-  artist_len = rec->tags->artist.size();
-  album_len  = rec->tags->album.size();
-  title_len  = rec->tags->title.size();
+  artist_len = tags.artist.size();
+  album_len  = tags.album.size();
+  title_len  = tags.title.size();
 
-  len = sizeof(rec->mod_time) + sizeof(rec->atime) +
+  len = sizeof(mod_time) + sizeof(atime) +
         sizeof(size_t) * 3 /* lengths of title, artist, time. */
-        + artist_len + album_len + title_len + sizeof(rec->tags->track)
-        + sizeof(rec->tags->time);
+        + artist_len + album_len + title_len + sizeof(tags.track)
+        + sizeof(tags.time);
 
   std::vector<char> buf(len);
   char *p = buf.data();
 
-  memcpy(p, &rec->mod_time, sizeof(rec->mod_time));
-  p += sizeof(rec->mod_time);
+  memcpy(p, &mod_time, sizeof(mod_time));
+  p += sizeof(mod_time);
 
-  memcpy(p, &rec->atime, sizeof(rec->atime));
-  p += sizeof(rec->atime);
+  memcpy(p, &atime, sizeof(atime));
+  p += sizeof(atime);
 
   memcpy(p, &artist_len, sizeof(artist_len));
   p += sizeof(artist_len);
   if (artist_len)
   {
-    std::memcpy(p, rec->tags->artist.c_str(), artist_len);
+    std::memcpy(p, tags.artist.c_str(), artist_len);
     p += artist_len;
   }
 
@@ -166,7 +172,7 @@ static std::vector<char> cache_record_serialize(const struct cache_record *rec)
   p += sizeof(album_len);
   if (album_len)
   {
-    std::memcpy(p, rec->tags->album.c_str(), album_len);
+    std::memcpy(p, tags.album.c_str(), album_len);
     p += album_len;
   }
 
@@ -174,15 +180,15 @@ static std::vector<char> cache_record_serialize(const struct cache_record *rec)
   p += sizeof(title_len);
   if (title_len)
   {
-    std::memcpy(p, rec->tags->title.c_str(), title_len);
+    std::memcpy(p, tags.title.c_str(), title_len);
     p += title_len;
   }
 
-  memcpy(p, &rec->tags->track, sizeof(rec->tags->track));
-  p += sizeof(rec->tags->track);
+  memcpy(p, &tags.track, sizeof(tags.track));
+  p += sizeof(tags.track);
 
-  memcpy(p, &rec->tags->time, sizeof(rec->tags->time));
-  p += sizeof(rec->tags->time);
+  memcpy(p, &tags.time, sizeof(tags.time));
+  p += sizeof(tags.time);
 
   return buf;
 }
@@ -202,11 +208,11 @@ static int cache_record_deserialize(struct cache_record *rec,
 
   if (!skip_tags)
   {
-    rec->tags = new file_tags{};
+    rec->tags = std::make_unique<file_tags>();
   }
   else
   {
-    rec->tags = nullptr;
+    rec->tags.reset();
   }
 
 #define extract_num(var)                                                       \
@@ -263,17 +269,9 @@ static int cache_record_deserialize(struct cache_record *rec,
 
 err:
   logit("Cache record deserialization error at %tdB", p - serialized);
-  delete rec->tags;
-  rec->tags = nullptr;
+  rec->tags.reset();
   return 0;
 }
-#endif
-
-/* Locked DB function prototype.
- * The function must not acquire or release DB locks. */
-#ifdef HAVE_DB_H
-typedef void *t_locked_fn(struct tags_cache *, const char *, int, int, DBT *,
-                          DBT *);
 #endif
 
 /* Berkeley DB's DB_DBT_MALLOC flag tells the library to allocate the DBT's
@@ -300,13 +298,22 @@ private:
 
 /* This function ensures that a DB function takes place while holding a
  * database record lock.  It also provides an initialised database thang
- * for the key and record. */
+ * for the key and record.
+ *
+ * fn must accept (struct tags_cache *, const char *file, int tags_sel,
+ * int notify, DBT *key, DBT *record) and must not acquire or release DB
+ * locks itself.  It is a template rather than a void*-returning function
+ * pointer so that each caller's return type -- an owning
+ * std::unique_ptr<file_tags> for locked_read_add, a plain bool for
+ * locked_add_request -- comes back typed, instead of being multiplexed
+ * through void* (which previously relied on nullptr/(void*)1 as an ad hoc
+ * boolean and a raw ownership-transferring pointer sharing one type). */
 #ifdef HAVE_DB_H
-static void *with_db_lock(t_locked_fn fn, struct tags_cache *c,
-                          const char *file, int tags_sel, int notify)
+template <typename Fn>
+static auto with_db_lock(Fn fn, struct tags_cache *c, const char *file,
+                         int tags_sel, int notify)
 {
   int rc;
-  void *result;
   DB_LOCK lock;
   DBT key, record;
 
@@ -326,7 +333,7 @@ static void *with_db_lock(t_locked_fn fn, struct tags_cache *c,
     fatal("Can't get DB lock: %s", db_strerror(rc));
   }
 
-  result = fn(c, file, tags_sel, notify, &key, &record);
+  auto result = fn(c, file, tags_sel, notify, &key, &record);
 
   rc = c->db_env->lock_put(c->db_env, &lock);
   if (rc)
@@ -465,7 +472,6 @@ static void tags_cache_sync(struct tags_cache *c)
 static void tags_cache_add(struct tags_cache *c, const char *file, DBT *key,
                            struct file_tags *tags)
 {
-  struct cache_record rec;
   DBT data;
   int ret;
 
@@ -473,11 +479,11 @@ static void tags_cache_add(struct tags_cache *c, const char *file, DBT *key,
 
   debug("Adding/updating cache object");
 
-  rec.mod_time = get_mtime(file);
-  rec.atime = time(nullptr);
-  rec.tags = tags;
+  time_t mod_time = get_mtime(file);
+  time_t atime = time(nullptr);
 
-  std::vector<char> serialized_cache_rec = cache_record_serialize(&rec);
+  std::vector<char> serialized_cache_rec =
+      cache_record_serialize(mod_time, atime, *tags);
 
   memset(&data, 0, sizeof(data));
   data.data = serialized_cache_rec.data();
@@ -526,12 +532,14 @@ struct file_tags *read_missing_tags(const char *file, struct file_tags *tags,
 
 /* Read the selected tags for this file and add it to the cache. */
 #ifdef HAVE_DB_H
-static void *locked_read_add(struct tags_cache *c, const char *file,
-                             const int tags_sel, const int notify, DBT *key,
-                             DBT *serialized_cache_rec)
+static std::unique_ptr<file_tags> locked_read_add(struct tags_cache *c,
+                                                   const char *file,
+                                                   const int tags_sel,
+                                                   const int notify, DBT *key,
+                                                   DBT *serialized_cache_rec)
 {
   int ret;
-  struct file_tags *tags = nullptr;
+  std::unique_ptr<file_tags> tags;
 
   assert(c->db != nullptr);
 
@@ -556,23 +564,23 @@ static void *locked_read_add(struct tags_cache *c, const char *file,
       if (rec.mod_time != curr_mtime)
       {
         debug("Tags in the cache are outdated");
-        delete rec.tags; /* remove them and reread tags */
+        rec.tags.reset(); /* remove them and reread tags */
       }
       else if ((rec.tags->filled & tags_sel) == tags_sel && !notify)
       {
         debug("Tags are in the cache.");
-        return rec.tags;
+        return std::move(rec.tags);
       }
       else
       {
         debug("Tags in the cache are not what we want");
-        tags = rec.tags; /* read additional tags */
+        tags = std::move(rec.tags); /* read additional tags */
       }
     }
   }
 
-  tags = read_missing_tags(file, tags, tags_sel);
-  tags_cache_add(c, file, key, tags);
+  tags.reset(read_missing_tags(file, tags.release(), tags_sel));
+  tags_cache_add(c, file, key, tags.get());
 
   return tags;
 }
@@ -585,7 +593,7 @@ static struct file_tags *tags_cache_read_add(struct tags_cache *c DB_ONLY,
                                              const char *file, int tags_sel,
                                              int notify)
 {
-  struct file_tags *tags = nullptr;
+  std::unique_ptr<file_tags> tags;
 
   assert(file != nullptr);
 
@@ -594,24 +602,22 @@ static struct file_tags *tags_cache_read_add(struct tags_cache *c DB_ONLY,
 #ifdef HAVE_DB_H
   if (c->max_items)
   {
-    tags = static_cast<struct file_tags *>(with_db_lock(locked_read_add, c, file, tags_sel,
-                                            notify));
+    tags = with_db_lock(locked_read_add, c, file, tags_sel, notify);
   }
   else
 #endif
-    tags = read_missing_tags(file, tags, tags_sel);
+    tags.reset(read_missing_tags(file, nullptr, tags_sel));
 
   if (notify)
   {
-    tags_response(file, tags);
-    delete tags;
-    tags = nullptr;
+    tags_response(file, tags.get());
+    return nullptr;
   }
 
   /* TODO: Remove the oldest items from the cache if we exceeded the maximum
    * cache size */
 
-  return tags;
+  return tags.release();
 }
 
 static void reader_thread(struct tags_cache *c)
@@ -715,9 +721,9 @@ void tags_cache_free(struct tags_cache *c)
 }
 
 #ifdef HAVE_DB_H
-static void *locked_add_request(struct tags_cache *c, const char *file,
-                                int tags_sel, int notify, DBT *key,
-                                DBT *serialized_cache_rec)
+static bool locked_add_request(struct tags_cache *c, const char *file,
+                               int tags_sel, int notify, DBT *key,
+                               DBT *serialized_cache_rec)
 {
   int db_ret;
   struct cache_record rec;
@@ -728,13 +734,13 @@ static void *locked_add_request(struct tags_cache *c, const char *file,
 
   if (db_ret == DB_NOTFOUND)
   {
-    return nullptr;
+    return false;
   }
 
   if (db_ret)
   {
     error_errno("Cache DB search error", db_ret);
-    return nullptr;
+    return false;
   }
 
   if (cache_record_deserialize(&rec, static_cast<const char *>(serialized_cache_rec->data),
@@ -743,24 +749,22 @@ static void *locked_add_request(struct tags_cache *c, const char *file,
     if (rec.mod_time == get_mtime(file) &&
         (rec.tags->filled & tags_sel) == tags_sel)
     {
-      tags_response(file, rec.tags);
-      delete rec.tags;
+      tags_response(file, rec.tags.get());
       debug("Tags are present in the cache");
-      return (void *)1;
+      return true;
     }
 
-    delete rec.tags;
     debug("Found outdated or incomplete tags in the cache");
   }
 
-  return nullptr;
+  return false;
 }
 #endif
 
 void tags_cache_add_request(struct tags_cache *c, const char *file,
                             int tags_sel)
 {
-  void *rc = nullptr;
+  bool found = false;
 
   assert(c != nullptr);
   assert(file != nullptr);
@@ -770,11 +774,11 @@ void tags_cache_add_request(struct tags_cache *c, const char *file,
 #ifdef HAVE_DB_H
   if (c->max_items)
   {
-    rc = with_db_lock(locked_add_request, c, file, tags_sel, 1);
+    found = with_db_lock(locked_add_request, c, file, tags_sel, 1);
   }
 #endif
 
-  if (!rc)
+  if (!found)
   {
     std::lock_guard<std::mutex> lock(c->mutex);
     c->queue.push_back({file, tags_sel});
