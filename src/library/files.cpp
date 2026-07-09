@@ -344,17 +344,18 @@ void resolve_path(char *buf, size_t size, const char *file)
 /* Read selected tags for a file into tags structure (or create it if nullptr).
  * If some tags are already present, don't read them.
  * If present_tags is nullptr, allocate new tags. */
-struct file_tags *read_file_tags(const char *file, struct file_tags *tags,
-                                 const int tags_sel)
+std::unique_ptr<struct file_tags> read_file_tags(
+    const char *file, std::unique_ptr<struct file_tags> tags,
+    const int tags_sel)
 {
   AudioPlugin *df;
   int needed_tags;
 
   assert(file != nullptr);
 
-  if (tags == nullptr)
+  if (!tags)
   {
-    tags = new file_tags{};
+    tags = std::make_unique<file_tags>();
   }
 
   needed_tags = ~tags->filled & tags_sel;
@@ -375,7 +376,7 @@ struct file_tags *read_file_tags(const char *file, struct file_tags *tags,
   assert(!((needed_tags & TAGS_COMMENTS) &&
            (!tags->title.empty() || !tags->artist.empty() || !tags->album.empty())));
 
-  df->info(file, tags, needed_tags);
+  df->info(file, tags.get(), needed_tags);
 
   tags->filled |= tags_sel;
 

@@ -14,6 +14,7 @@
 #include <cstdio>
 
 #include <optional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -35,9 +36,9 @@
   std::string find_match_dir(const std::string &pattern);
   int file_exists(const char *file);
   time_t get_mtime(const char *file);
-  struct file_tags *read_file_tags(const char *file,
-                                   struct file_tags *present_tags,
-                                   const int tags_sel);
+  std::unique_ptr<struct file_tags> read_file_tags(
+      const char *file, std::unique_ptr<struct file_tags> present_tags,
+      const int tags_sel);
   void switch_titles_file(struct plist *plist);
   void switch_titles_tags(struct plist *plist);
   void make_tags_title(struct plist *plist, const int num);

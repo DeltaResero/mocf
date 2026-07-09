@@ -502,12 +502,12 @@ static void tags_cache_add(struct tags_cache *c, const char *file, DBT *key,
 #endif
 
 /* Read time tags for a file into tags structure (or create it if nullptr). */
-struct file_tags *read_missing_tags(const char *file, struct file_tags *tags,
-                                    int tags_sel)
+static std::unique_ptr<file_tags> read_missing_tags(
+    const char *file, std::unique_ptr<file_tags> tags, int tags_sel)
 {
-  if (tags == nullptr)
+  if (!tags)
   {
-    tags = new file_tags{};
+    tags = std::make_unique<file_tags>();
   }
 
   if (tags_sel & TAGS_TIME)
@@ -525,7 +525,7 @@ struct file_tags *read_missing_tags(const char *file, struct file_tags *tags,
     }
   }
 
-  tags = read_file_tags(file, tags, tags_sel);
+  tags = read_file_tags(file, std::move(tags), tags_sel);
 
   return tags;
 }
@@ -579,7 +579,7 @@ static std::unique_ptr<file_tags> locked_read_add(struct tags_cache *c,
     }
   }
 
-  tags.reset(read_missing_tags(file, tags.release(), tags_sel));
+  tags = read_missing_tags(file, std::move(tags), tags_sel);
   tags_cache_add(c, file, key, tags.get());
 
   return tags;
@@ -606,7 +606,7 @@ static struct file_tags *tags_cache_read_add(struct tags_cache *c DB_ONLY,
   }
   else
 #endif
-    tags.reset(read_missing_tags(file, nullptr, tags_sel));
+    tags = read_missing_tags(file, nullptr, tags_sel);
 
   if (notify)
   {
