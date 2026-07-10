@@ -41,7 +41,7 @@
 
 struct musepack_data
 {
-  struct io_stream *stream;
+  unique_io_stream stream;
 #ifdef MPC_IS_OLD_API
   mpc_decoder decoder;
 #else
@@ -69,7 +69,7 @@ static mpc_int32_t read_cb(mpc_reader *t, void *buf, mpc_int32_t size)
 #endif
   ssize_t res;
 
-  res = io_read(data->stream, buf, size);
+  res = io_read(data->stream.get(), buf, size);
   if (res < 0)
   {
     logit("Read error");
@@ -93,7 +93,7 @@ static mpc_bool_t seek_cb(mpc_reader *t, mpc_int32_t offset)
 
   debug("Seek request to %" PRId32, offset);
 
-  return io_seek(data->stream, offset, SEEK_SET) >= 0 ? 1 : 0;
+  return io_seek(data->stream.get(), offset, SEEK_SET) >= 0 ? 1 : 0;
 }
 
 #ifdef MPC_IS_OLD_API
@@ -110,7 +110,7 @@ static mpc_int32_t tell_cb(mpc_reader *t)
 
   debug("tell callback");
 
-  return static_cast<mpc_int32_t>(io_tell(data->stream));
+  return static_cast<mpc_int32_t>(io_tell(data->stream.get()));
 }
 
 #ifdef MPC_IS_OLD_API
@@ -127,7 +127,7 @@ static mpc_int32_t get_size_cb(mpc_reader *t)
 
   debug("size callback");
 
-  return static_cast<mpc_int32_t>(io_file_size(data->stream));
+  return static_cast<mpc_int32_t>(io_file_size(data->stream.get()));
 }
 
 #ifdef MPC_IS_OLD_API
@@ -142,7 +142,7 @@ static mpc_bool_t canseek_cb(mpc_reader *t)
   struct musepack_data *data = static_cast<struct musepack_data *>(t->data);
 #endif
 
-  return io_seekable(data->stream);
+  return io_seekable(data->stream.get());
 }
 
 static void musepack_open_stream_internal(struct musepack_data *data)
@@ -197,16 +197,16 @@ static void *musepack_open(const char *file)
   data->ok = 0;
   decoder_error_init(&data->error);
 
-  data->stream = io_open(file, 1);
-  if (!io_ok(data->stream))
+  data->stream.reset(io_open(file, 1));
+  if (!io_ok(data->stream.get()))
   {
     decoder_error(&data->error, ERROR_FATAL, 0, "Can't open file: %s",
-                  io_strerror(data->stream));
+                  io_strerror(data->stream.get()));
     return data;
   }
 
   /* This a restriction placed on us by the Musepack API. */
-  if (io_file_size(data->stream) > INT32_MAX)
+  if (io_file_size(data->stream.get()) > INT32_MAX)
   {
     decoder_error(&data->error, ERROR_FATAL, 0, "File too large!");
     return data;
@@ -228,7 +228,6 @@ static void musepack_close(void *prv_data)
 #endif
   }
 
-  io_close(data->stream);
   decoder_error_clear(&data->error);
   delete data;
 }
@@ -460,7 +459,7 @@ static struct io_stream *musepack_get_stream(void *prv_data)
 {
   struct musepack_data *data = static_cast<struct musepack_data *>(prv_data);
 
-  return data->stream;
+  return data->stream.get();
 }
 
 static void musepack_get_name(const char *unused ATTR_UNUSED, char buf[4])

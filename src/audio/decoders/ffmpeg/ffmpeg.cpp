@@ -95,7 +95,7 @@ struct ffmpeg_data
   bool okay;  /* was this stream successfully opened? */
 
   std::string filename;
-  struct io_stream *iostream;
+  unique_io_stream iostream;
   struct decoder_error error;
   long fmt;
   int sample_width;
@@ -694,7 +694,6 @@ static struct ffmpeg_data *ffmpeg_make_data()
   data->eof = false;
   data->eos = false;
   data->okay = false;
-  data->iostream = nullptr;
   decoder_error_init(&data->error);
   data->fmt = 0;
   data->sample_width = 0;
@@ -725,7 +724,7 @@ static void *ffmpeg_open_internal(struct ffmpeg_data *data)
     fatal("Can't allocate format context!");
   }
 
-  data->ic->pb = avio_alloc_context(nullptr, 0, 0, data->iostream,
+  data->ic->pb = avio_alloc_context(nullptr, 0, 0, data->iostream.get(),
                                     ffmpeg_io_read_cb, nullptr, ffmpeg_io_seek_cb);
   if (!data->ic->pb)
   {
@@ -914,11 +913,11 @@ static void *ffmpeg_open(const char *file)
   data = ffmpeg_make_data();
 
   data->filename = file;
-  data->iostream = io_open(file, 1);
-  if (!io_ok(data->iostream))
+  data->iostream.reset(io_open(file, 1));
+  if (!io_ok(data->iostream.get()))
   {
     decoder_error(&data->error, ERROR_FATAL, 0, "Can't open file: %s",
-                  io_strerror(data->iostream));
+                  io_strerror(data->iostream.get()));
     return data;
   }
 
@@ -1458,12 +1457,6 @@ static void ffmpeg_close(void *prv_data)
 
   ffmpeg_log_repeats(nullptr);
 
-  if (data->iostream)
-  {
-    io_close(data->iostream);
-    data->iostream = nullptr;
-  }
-
   decoder_error_clear(&data->error);
   delete data;
 }
@@ -1475,7 +1468,7 @@ static struct io_stream *ffmpeg_get_iostream(void *prv_data)
   assert(prv_data);
 
   data = static_cast<struct ffmpeg_data *>(prv_data);
-  return data->iostream;
+  return data->iostream.get();
 }
 
 static int ffmpeg_get_bitrate(void *prv_data)

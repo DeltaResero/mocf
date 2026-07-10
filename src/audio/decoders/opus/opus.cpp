@@ -32,7 +32,7 @@
 
 struct opus_data
 {
-  struct io_stream *stream;
+  unique_io_stream stream;
   OggOpusFile *of;
   int last_section;
   opus_int32 bitrate;
@@ -215,7 +215,7 @@ static void opus_open_stream_internal(struct opus_data *data)
 
   data->tags = std::make_unique<file_tags>();
 
-  data->of = op_open_callbacks(data->stream, &callbacks, nullptr, 0, &res);
+  data->of = op_open_callbacks(data->stream.get(), &callbacks, nullptr, 0, &res);
   if (res < 0)
   {
     const char *opus_err = opus_str_error(res);
@@ -224,7 +224,6 @@ static void opus_open_stream_internal(struct opus_data *data)
     debug("op_open error: %s", opus_err);
     op_free(data->of);
     data->of = nullptr;
-    io_close(data->stream);
   }
   else
   {
@@ -257,12 +256,11 @@ static void *opus_open(const char *file)
   data->tags_change = 0;
   data->tags = nullptr;
 
-  data->stream = io_open(file, 1);
-  if (!io_ok(data->stream))
+  data->stream.reset(io_open(file, 1));
+  if (!io_ok(data->stream.get()))
   {
     decoder_error(&data->error, ERROR_FATAL, 0, "Can't load Opus: %s",
-                  io_strerror(data->stream));
-    io_close(data->stream);
+                  io_strerror(data->stream.get()));
   }
   else
   {
@@ -278,7 +276,6 @@ static void opus_close(void *prv_data)
   if (data->ok)
   {
     op_free(data->of);
-    io_close(data->stream);
   }
 
   decoder_error_clear(&data->error);
@@ -395,7 +392,7 @@ static struct io_stream *opus_get_stream(void *prv_data)
 {
   struct opus_data *data = static_cast<struct opus_data *>(prv_data);
 
-  return data->stream;
+  return data->stream.get();
 }
 
 static void opus_get_name(const char *file ATTR_UNUSED, char buf[4])

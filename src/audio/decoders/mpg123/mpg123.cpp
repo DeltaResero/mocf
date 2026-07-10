@@ -33,7 +33,7 @@
 
 struct mpg123_data
 {
-  struct io_stream *stream;
+  unique_io_stream stream;
   mpg123_handle *mf;
   int bitrate;
   int avg_bitrate;
@@ -294,7 +294,7 @@ static void mpg123_open_stream_internal(struct mpg123_data *data)
   debug("TG: selected S32");
 #endif
 
-  res = mpg123_open_handle(data->mf, data->stream);
+  res = mpg123_open_handle(data->mf, data->stream.get());
   if (res != MPG123_OK)
   {
     goto err;
@@ -331,7 +331,7 @@ static void mpg123_open_stream_internal(struct mpg123_data *data)
     data->duration = samples / rate;
   }
   debug("Duration: %d, samples %lld", data->duration, (long long)samples);
-  file_size = io_file_size(data->stream);
+  file_size = io_file_size(data->stream.get());
   if (data->duration > 0 && file_size != -1)
   {
     data->avg_bitrate = file_size / data->duration * 8;
@@ -351,7 +351,6 @@ err:
   }
   mpg123_delete(data->mf);
   data->mf = nullptr;
-  io_close(data->stream);
 }
 
 static void *mpg123_openX(const char *file)
@@ -364,12 +363,11 @@ static void *mpg123_openX(const char *file)
   data->tags_change = 0;
   data->tags = nullptr;
 
-  data->stream = io_open(file, 1);
-  if (!io_ok(data->stream))
+  data->stream.reset(io_open(file, 1));
+  if (!io_ok(data->stream.get()))
   {
     decoder_error(&data->error, ERROR_FATAL, 0, "Can't open mpg123 file: %s",
-                  io_strerror(data->stream));
-    io_close(data->stream);
+                  io_strerror(data->stream.get()));
   }
   else
   {
@@ -385,7 +383,6 @@ static void mpg123_closeX(void *prv_data)
   if (data->ok)
   {
     mpg123_delete(data->mf);
-    io_close(data->stream);
   }
 
   decoder_error_clear(&data->error);
@@ -516,7 +513,7 @@ static struct io_stream *mpg123_get_stream(void *prv_data)
 {
   struct mpg123_data *data = static_cast<struct mpg123_data *>(prv_data);
 
-  return data->stream;
+  return data->stream.get();
 }
 
 static void mpg123_get_name(const char *file ATTR_UNUSED, char buf[4])

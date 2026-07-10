@@ -53,7 +53,7 @@ static const int64_t time_scaler = 1000;
 
 struct vorbis_data
 {
-  struct io_stream *stream;
+  unique_io_stream stream;
   OggVorbis_File vf;
   int last_section;
   int bitrate;
@@ -226,7 +226,7 @@ static void vorbis_open_stream_internal(struct vorbis_data *data)
 
   data->tags = std::make_unique<file_tags>();
 
-  res = ov_open_callbacks(data->stream, &data->vf, nullptr, 0, callbacks);
+  res = ov_open_callbacks(data->stream.get(), &data->vf, nullptr, 0, callbacks);
   if (res < 0)
   {
     const char *vorbis_err = vorbis_strerror(res);
@@ -263,17 +263,17 @@ static void *vorbis_open(const char *file)
   data->tags_change = 0;
   data->tags = nullptr;
 
-  data->stream = io_open(file, 1);
-  if (!io_ok(data->stream))
+  data->stream.reset(io_open(file, 1));
+  if (!io_ok(data->stream.get()))
   {
     decoder_error(&data->error, ERROR_FATAL, 0, "Can't load OGG: %s",
-                  io_strerror(data->stream));
+                  io_strerror(data->stream.get()));
     return data;
   }
 
   /* This a restriction placed on us by the vorbisfile API. */
 #if INT64_MAX > LONG_MAX
-  if (io_file_size(data->stream) > LONG_MAX)
+  if (io_file_size(data->stream.get()) > LONG_MAX)
   {
     decoder_error(&data->error, ERROR_FATAL, 0, "File too large!");
     return data;
@@ -294,7 +294,6 @@ static void vorbis_close(void *prv_data)
     ov_clear(&data->vf);
   }
 
-  io_close(data->stream);
   decoder_error_clear(&data->error);
   delete data;
 }
@@ -459,7 +458,7 @@ static struct io_stream *vorbis_get_stream(void *prv_data)
 {
   struct vorbis_data *data = static_cast<struct vorbis_data *>(prv_data);
 
-  return data->stream;
+  return data->stream.get();
 }
 
 static void vorbis_get_name(const char *unused ATTR_UNUSED, char buf[4])

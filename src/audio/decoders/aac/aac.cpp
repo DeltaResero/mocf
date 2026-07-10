@@ -38,7 +38,7 @@
 
 struct aac_data
 {
-  struct io_stream *stream;
+  unique_io_stream stream;
   char rbuf[BUFFER_SIZE];
   int rbuf_len;
   int rbuf_pos;
@@ -85,7 +85,7 @@ static int buffer_fill(struct aac_data *data)
     return 1;
   }
 
-  n = io_read(data->stream, data->rbuf + data->rbuf_len,
+  n = io_read(data->stream.get(), data->rbuf + data->rbuf_len,
               BUFFER_SIZE - data->rbuf_len);
   if (n == -1)
   {
@@ -234,13 +234,13 @@ static int aac_count_time(struct aac_data *data)
   off_t file_size;
   int16_t *sample_buf;
 
-  file_size = io_file_size(data->stream);
+  file_size = io_file_size(data->stream.get());
   if (file_size == -1)
   {
     return -1;
   }
 
-  if (io_seek(data->stream, file_size / 2, SEEK_SET) == -1)
+  if (io_seek(data->stream.get(), file_size / 2, SEEK_SET) == -1)
   {
     return -1;
   }
@@ -324,15 +324,15 @@ static struct aac_data *aac_open_internal(struct io_stream *stream,
 
   if (stream)
   {
-    data->stream = stream;
+    data->stream.reset(stream);
   }
   else
   {
-    data->stream = io_open(fname, 1);
-    if (!io_ok(data->stream))
+    data->stream.reset(io_open(fname, 1));
+    if (!io_ok(data->stream.get()))
     {
       decoder_error(&data->error, ERROR_FATAL, 0, "Can't open AAC file: %s",
-                    io_strerror(data->stream));
+                    io_strerror(data->stream.get()));
       return data;
     }
   }
@@ -392,7 +392,6 @@ static void aac_close(void *prv_data)
   struct aac_data *data = static_cast<struct aac_data *>(prv_data);
 
   NeAACDecClose(data->decoder);
-  io_close(data->stream);
   decoder_error_clear(&data->error);
   delete data;
 }
@@ -410,7 +409,7 @@ static void *aac_open(const char *file)
     off_t file_size;
 
     duration = aac_count_time(data);
-    file_size = io_file_size(data->stream);
+    file_size = io_file_size(data->stream.get());
     if (duration > 0 && file_size != -1)
     {
       avg_bitrate = file_size / duration * 8;

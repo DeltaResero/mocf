@@ -41,7 +41,7 @@
 
 struct spx_data
 {
-  struct io_stream *stream;
+  unique_io_stream stream;
   struct decoder_error error;
   int ok; /* was the stream opened succesfully? */
 
@@ -139,13 +139,13 @@ static int read_speex_header(struct spx_data *data)
     buf = ogg_sync_buffer(&data->oy, 200);
 
     /* Read bitstream from input file */
-    nb_read = io_read(data->stream, buf, 200);
+    nb_read = io_read(data->stream.get(), buf, 200);
 
     if (nb_read < 0)
     {
       decoder_error(&data->error, ERROR_FATAL, 0,
                     "Can't open speex file: IO error: %s",
-                    io_strerror(data->stream));
+                    io_strerror(data->stream.get()));
       return 0;
     }
 
@@ -214,7 +214,7 @@ static int read_speex_header(struct spx_data *data)
   return 1;
 }
 
-static struct spx_data *spx_open_internal(struct io_stream *stream)
+static struct spx_data *spx_open_internal(unique_io_stream stream)
 {
   struct spx_data *data;
   SpeexStereoState stereo = SPEEX_STEREO_STATE_INIT;
@@ -222,7 +222,7 @@ static struct spx_data *spx_open_internal(struct io_stream *stream)
   data = new spx_data;
 
   decoder_error_init(&data->error);
-  data->stream = stream;
+  data->stream = std::move(stream);
 
   data->st = nullptr;
   data->stereo = stereo;
@@ -247,22 +247,21 @@ static struct spx_data *spx_open_internal(struct io_stream *stream)
 
 static void *spx_open(const char *file)
 {
-  struct io_stream *stream;
+  unique_io_stream stream(io_open(file, 1));
   struct spx_data *data;
 
-  stream = io_open(file, 1);
-  if (io_ok(stream))
+  if (io_ok(stream.get()))
   {
-    data = spx_open_internal(stream);
+    data = spx_open_internal(std::move(stream));
   }
   else
   {
     data = new spx_data;
-    data->stream = stream;
-    data->header = nullptr;
     decoder_error_init(&data->error);
     decoder_error(&data->error, ERROR_STREAM, 0, "Can't open file: %s",
-                  io_strerror(stream));
+                  io_strerror(stream.get()));
+    data->stream = std::move(stream);
+    data->header = nullptr;
     data->ok = 0;
   }
 
@@ -284,7 +283,6 @@ static void spx_close(void *prv_data)
     ogg_sync_clear(&data->oy);
   }
 
-  io_close(data->stream);
   decoder_error_clear(&data->error);
 
   free(data->header);
@@ -379,7 +377,7 @@ static void get_more_data(struct spx_data *data)
   ssize_t nb_read;
 
   buf = ogg_sync_buffer(&data->oy, 200);
-  nb_read = io_read(data->stream, buf, 200);
+  nb_read = io_read(data->stream.get(), buf, 200);
   ogg_sync_wrote(&data->oy, nb_read);
 }
 
@@ -388,10 +386,10 @@ static int count_time(struct spx_data *data)
   ogg_int64_t last_granulepos = 0;
 
   /* Seek to somewhere near the last page */
-  if (io_file_size(data->stream) > 10000)
+  if (io_file_size(data->stream.get()) > 10000)
   {
     debug("Seeking near the end");
-    if (io_seek(data->stream, -10000, SEEK_END) == -1)
+    if (io_seek(data->stream.get(), -10000, SEEK_END) == -1)
     {
       logit("Seeking failed, scanning whole file");
     }
@@ -399,10 +397,10 @@ static int count_time(struct spx_data *data)
   }
 
   /* Read granulepos from the last packet */
-  while (!io_eof(data->stream))
+  while (!io_eof(data->stream.get()))
   {
     /* Sync to page and read it */
-    while (!io_eof(data->stream))
+    while (!io_eof(data->stream.get()))
     {
       if (ogg_sync_pageout(&data->oy, &data->og) == 1)
       {
@@ -410,7 +408,7 @@ static int count_time(struct spx_data *data)
         break;
       }
 
-      if (!io_eof(data->stream))
+      if (!io_eof(data->stream.get()))
       {
         debug("Need more data");
         get_more_data(data);
@@ -418,7 +416,7 @@ static int count_time(struct spx_data *data)
     }
 
     /* We have last packet */
-    if (io_eof(data->stream))
+    if (io_eof(data->stream.get()))
     {
       break;
     }
@@ -433,12 +431,11 @@ static int count_time(struct spx_data *data)
 static void spx_info(const char *file_name, struct file_tags *tags,
                      const int tags_sel)
 {
-  struct io_stream *s;
+  unique_io_stream s(io_open(file_name, 0));
 
-  s = io_open(file_name, 0);
-  if (io_ok(s))
+  if (io_ok(s.get()))
   {
-    struct spx_data *data = spx_open_internal(s);
+    struct spx_data *data = spx_open_internal(std::move(s));
 
     if (data->ok)
     {
@@ -454,10 +451,6 @@ static void spx_info(const char *file_name, struct file_tags *tags,
 
     spx_close(data);
   }
-  else
-  {
-    io_close(s);
-  }
 }
 
 static int spx_seek(void *prv_data, int sec)
@@ -467,12 +460,12 @@ static int spx_seek(void *prv_data, int sec)
 
   assert(sec >= 0);
 
-  end = io_file_size(data->stream);
+  end = io_file_size(data->stream.get());
   if (end == -1)
   {
     return -1;
   }
-  old_pos = io_tell(data->stream);
+  old_pos = io_tell(data->stream.get());
 
   debug("Seek request to %ds", sec);
 
@@ -484,9 +477,9 @@ static int spx_seek(void *prv_data, int sec)
 
     debug("Seek to %" PRId64, middle);
 
-    if (io_seek(data->stream, middle, SEEK_SET) == -1)
+    if (io_seek(data->stream.get(), middle, SEEK_SET) == -1)
     {
-      io_seek(data->stream, old_pos, SEEK_SET);
+      io_seek(data->stream.get(), old_pos, SEEK_SET);
       ogg_stream_reset(&data->os);
       ogg_sync_reset(&data->oy);
       return -1;
@@ -496,7 +489,7 @@ static int spx_seek(void *prv_data, int sec)
 
     /* Sync to page and read it */
     ogg_sync_reset(&data->oy);
-    while (!io_eof(data->stream))
+    while (!io_eof(data->stream.get()))
     {
       if (ogg_sync_pageout(&data->oy, &data->og) == 1)
       {
@@ -504,14 +497,14 @@ static int spx_seek(void *prv_data, int sec)
         break;
       }
 
-      if (!io_eof(data->stream))
+      if (!io_eof(data->stream.get()))
       {
         debug("Need more data");
         get_more_data(data);
       }
     }
 
-    if (io_eof(data->stream))
+    if (io_eof(data->stream.get()))
     {
       debug("EOF when syncing");
       return -1;
@@ -625,7 +618,7 @@ static int spx_decode(void *prv_data, char *sound_buf, int nbytes,
       ogg_stream_pagein(&data->os, &data->og);
       debug("Granulepos: %" PRId64, ogg_page_granulepos(&data->og));
     }
-    else if (!io_eof(data->stream))
+    else if (!io_eof(data->stream.get()))
     {
       /* Finally, pull in some more data and try again on the next pass */
       get_more_data(data);
@@ -666,7 +659,7 @@ static struct io_stream *spx_get_stream(void *prv_data)
 {
   struct spx_data *data = static_cast<struct spx_data *>(prv_data);
 
-  return data->stream;
+  return data->stream.get();
 }
 
 static void spx_get_name(const char *unused ATTR_UNUSED, char buf[4])

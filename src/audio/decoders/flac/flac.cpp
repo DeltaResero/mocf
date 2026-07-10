@@ -41,7 +41,7 @@ class FlacDecoder : public AudioDecoder
 {
 public:
   FLAC__StreamDecoder *decoder;
-  struct io_stream *stream;
+  unique_io_stream stream;
   int bitrate;
   int avg_bitrate;
   int abort; /* abort playing (due to an error) */
@@ -193,7 +193,7 @@ read_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED, FLAC__byte buffer[],
   FlacDecoder *data = static_cast<FlacDecoder *>(client_data);
   ssize_t res;
 
-  res = io_read(data->stream, buffer, *bytes);
+  res = io_read(data->stream.get(), buffer, *bytes);
 
   if (res > 0)
   {
@@ -208,7 +208,7 @@ read_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED, FLAC__byte buffer[],
     return FLAC__STREAM_DECODER_READ_STATUS_END_OF_STREAM;
   }
 
-  error("read error: %s", io_strerror(data->stream));
+  error("read error: %s", io_strerror(data->stream.get()));
 
   return FLAC__STREAM_DECODER_READ_STATUS_ABORT;
 }
@@ -219,7 +219,7 @@ seek_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
 {
   FlacDecoder *data = static_cast<FlacDecoder *>(client_data);
 
-  return io_seek(data->stream, absolute_byte_offset, SEEK_SET) >= 0
+  return io_seek(data->stream.get(), absolute_byte_offset, SEEK_SET) >= 0
              ? FLAC__STREAM_DECODER_SEEK_STATUS_OK
              : FLAC__STREAM_DECODER_SEEK_STATUS_ERROR;
 }
@@ -230,7 +230,7 @@ tell_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
 {
   FlacDecoder *data = static_cast<FlacDecoder *>(client_data);
 
-  *absolute_byte_offset = io_tell(data->stream);
+  *absolute_byte_offset = io_tell(data->stream.get());
 
   return FLAC__STREAM_DECODER_TELL_STATUS_OK;
 }
@@ -242,7 +242,7 @@ length_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
   off_t file_size;
   FlacDecoder *data = static_cast<FlacDecoder *>(client_data);
 
-  file_size = io_file_size(data->stream);
+  file_size = io_file_size(data->stream.get());
   if (file_size == -1)
   {
     return FLAC__STREAM_DECODER_LENGTH_STATUS_ERROR;
@@ -258,7 +258,7 @@ static FLAC__bool eof_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
 {
   FlacDecoder *data = static_cast<FlacDecoder *>(client_data);
 
-  return io_eof(data->stream);
+  return io_eof(data->stream.get());
 }
 
 FlacDecoder::FlacDecoder()
@@ -282,7 +282,6 @@ FlacDecoder::~FlacDecoder()
     FLAC__stream_decoder_delete(decoder);
   }
 
-  io_close(stream);
   decoder_error_clear(&error);
 }
 
@@ -290,11 +289,11 @@ static std::unique_ptr<AudioDecoder> flac_open_internal(const char *file, const 
 {
   auto data = std::make_unique<FlacDecoder>();
 
-  data->stream = io_open(file, buffered);
-  if (!io_ok(data->stream))
+  data->stream.reset(io_open(file, buffered));
+  if (!io_ok(data->stream.get()))
   {
     decoder_error(&data->error, ERROR_FATAL, 0, "Can't load file: %s",
-                  io_strerror(data->stream));
+                  io_strerror(data->stream.get()));
     return data;
   }
 
@@ -332,7 +331,7 @@ static std::unique_ptr<AudioDecoder> flac_open_internal(const char *file, const 
 
   if (data->length > 0)
   {
-    off_t data_size = io_file_size(data->stream);
+    off_t data_size = io_file_size(data->stream.get());
     if (data_size > 0)
     {
       FLAC__uint64 pos;
