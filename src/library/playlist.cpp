@@ -21,6 +21,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 #include <algorithm>
@@ -301,10 +303,9 @@ const char *plist_get_next_dead_entry(const struct plist *plist,
   return nullptr;
 }
 
-static const char *title_expn_subs(char fmt, const struct file_tags *tags)
+static std::optional<std::string> title_expn_subs(char fmt,
+                                                   const struct file_tags *tags)
 {
-  static char track[16];
-
   switch (fmt)
   {
     case 'n':
@@ -312,19 +313,24 @@ static const char *title_expn_subs(char fmt, const struct file_tags *tags)
       {
         break;
       }
-      snprintf(track, sizeof(track), "%d", tags->track);
-      return track;
+      return std::to_string(tags->track);
     case 'a':
-      return (tags && !tags->artist.empty()) ? tags->artist.c_str() : nullptr;
+      return (tags && !tags->artist.empty())
+                 ? std::optional<std::string>(tags->artist)
+                 : std::nullopt;
     case 'A':
-      return (tags && !tags->album.empty()) ? tags->album.c_str() : nullptr;
+      return (tags && !tags->album.empty())
+                 ? std::optional<std::string>(tags->album)
+                 : std::nullopt;
     case 't':
-      return (tags && !tags->title.empty()) ? tags->title.c_str() : nullptr;
+      return (tags && !tags->title.empty())
+                 ? std::optional<std::string>(tags->title)
+                 : std::nullopt;
     default:
       fatal("Error parsing format string!");
   }
 
-  return nullptr;
+  return std::nullopt;
 }
 
 static inline void check_zero(const char *x)
@@ -339,7 +345,7 @@ static inline void check_zero(const char *x)
 static void do_title_expn(char *dest, int size, const char *fmt,
                           const struct file_tags *tags)
 {
-  const char *h;
+  std::optional<std::string> h;
   int free = --size;
   short escape = 0;
 
@@ -453,8 +459,8 @@ static void do_title_expn(char *dest, int size, const char *fmt,
 
         if (h)
         {
-          strncat(dest, h, free - 1);
-          free -= strlen(h);
+          strncat(dest, h->c_str(), free - 1);
+          free -= static_cast<int>(h->size());
         }
       }
     }
