@@ -686,6 +686,12 @@ void tags_cache_free(struct tags_cache *c)
     c->request_cond.notify_one();
   }
 
+  /* Wait for the reader thread to actually exit before touching db/db_env/
+   * locker below. It may be mid-request right now; closing the environment
+   * or freeing the locker out from under it corrupts BDB's internal state
+   * (BDB2060: "Freeing locker with locks held") and crashes. */
+  if (c->reader_thread.joinable()) c->reader_thread.join();
+
 #ifdef HAVE_DB_H
   if (c->db)
   {
@@ -712,8 +718,6 @@ void tags_cache_free(struct tags_cache *c)
     c->db_env = nullptr;
   }
 #endif
-
-  if (c->reader_thread.joinable()) c->reader_thread.join();
 
   c->queue.clear();
 
