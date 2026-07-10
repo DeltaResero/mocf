@@ -38,7 +38,7 @@
 class JackOutput : public AudioOutput {
 private:
     jack_client_t *client = nullptr;
-    jack_port_t **output_port = nullptr;
+    jack_port_t *output_port[2] = {nullptr, nullptr};
     jack_ringbuffer_t *ringbuffer[2] = {nullptr, nullptr};
     jack_default_audio_sample_t volume = 1.0;
     int volume_integer = 100;
@@ -167,7 +167,6 @@ int JackOutput::init(struct output_driver_caps *caps)
   jack_shutdown_flag = 0;
   jack_on_shutdown(client, shutdown_cb, this);
 
-  output_port = new jack_port_t *[2];
   output_port[0] = jack_port_register(client, "output0", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
   output_port[1] = jack_port_register(client, "output1", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
 
@@ -304,7 +303,6 @@ void JackOutput::shutdown()
 {
   jack_port_unregister(client, output_port[0]);
   jack_port_unregister(client, output_port[1]);
-  delete[] output_port;
   jack_client_close(client);
   jack_ringbuffer_free(ringbuffer[0]);
   jack_ringbuffer_free(ringbuffer[1]);
