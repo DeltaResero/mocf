@@ -203,7 +203,7 @@ static struct
   int channels;
 } sound_info = {-1, -1, -1, -1};
 
-static struct tags_cache *tags_cache;
+static unique_tags_cache tags_cache;
 
 extern char **environ;
 
@@ -382,8 +382,8 @@ void server_init(struct engine_event_queue *eq)
   log_pthread_stack_size();
 
   audio_initialize();
-  tags_cache = tags_cache_new(options_get_int("TagsCacheSize"));
-  tags_cache_load(tags_cache, create_file_name("cache").c_str());
+  tags_cache.reset(tags_cache_new(options_get_int("TagsCacheSize")));
+  tags_cache_load(tags_cache.get(), create_file_name("cache").c_str());
 
   server_tid = pthread_self();
   xsignal(SIGTERM, sig_exit);
@@ -408,8 +408,7 @@ static void server_shutdown()
 {
   logit("Engine exiting...");
   audio_exit();
-  tags_cache_free(tags_cache);
-  tags_cache = nullptr;
+  tags_cache.reset();
   logit("Running OnEngineStop");
   run_extern_cmd("OnEngineStop");
   logit("Engine exited");
@@ -544,12 +543,12 @@ void engine_set_option(const char *name, bool val)
 
 void engine_request_file_tags(const char *file, int tags_sel)
 {
-  tags_cache_add_request(tags_cache, file, tags_sel);
+  tags_cache_add_request(tags_cache.get(), file, tags_sel);
 }
 
 void engine_abort_tags_requests(const char *file)
 {
-  tags_cache_clear_up_to(tags_cache, file);
+  tags_cache_clear_up_to(tags_cache.get(), file);
 }
 
 /* -----------------------------------------------------------------------
@@ -606,7 +605,7 @@ void engine_jump_to(int sec)
     }
 
     std::unique_ptr<struct file_tags> tags(
-        tags_cache_get_immediate(tags_cache, file.c_str(), TAGS_TIME));
+        tags_cache_get_immediate(tags_cache.get(), file.c_str(), TAGS_TIME));
     if (!tags || !(tags->filled & TAGS_TIME))
     {
       return;

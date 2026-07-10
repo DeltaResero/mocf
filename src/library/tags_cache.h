@@ -11,6 +11,7 @@
 #ifndef TAGS_CACHE_H
 #define TAGS_CACHE_H
 
+#include <memory>
 
   struct file_tags;
   struct tags_cache;
@@ -18,6 +19,13 @@
   /* Administrative functions: */
   struct tags_cache *tags_cache_new(size_t max_size);
   void tags_cache_free(struct tags_cache *c);
+
+  /* Deleter for owning a struct tags_cache via std::unique_ptr. */
+  struct tags_cache_deleter
+  {
+    void operator()(struct tags_cache *c) const noexcept { tags_cache_free(c); }
+  };
+  using unique_tags_cache = std::unique_ptr<struct tags_cache, tags_cache_deleter>;
 
   /* Request queue manipulation functions: */
   void tags_cache_clear_queue(struct tags_cache *c);
