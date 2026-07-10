@@ -84,6 +84,13 @@
                                 buf_fill_callback_t callback, void *data_ptr);
   int io_seekable(const struct io_stream *s);
 
+  /* Deleter for owning a struct io_stream via std::unique_ptr. */
+  struct io_stream_deleter
+  {
+    void operator()(struct io_stream *s) const noexcept { io_close(s); }
+  };
+  using unique_io_stream = std::unique_ptr<struct io_stream, io_stream_deleter>;
+
 
 #endif
 

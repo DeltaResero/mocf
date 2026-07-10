@@ -99,28 +99,25 @@ static struct modplug_data *make_modplug_data(const char *file)
   data->modplugfile = nullptr;
   decoder_error_init(&data->error);
 
-  struct io_stream *s = io_open(file, 0);
-  if (!io_ok(s))
+  unique_io_stream s(io_open(file, 0));
+  if (!io_ok(s.get()))
   {
     decoder_error(&data->error, ERROR_FATAL, 0, "Can't open file: %s", file);
-    io_close(s);
     return data;
   }
 
-  off_t size = io_file_size(s);
+  off_t size = io_file_size(s.get());
 
   if (!in_closed_range(1, size, INT_MAX))
   {
     decoder_error(&data->error, ERROR_FATAL, 0,
                   "Module size unsuitable for loading: %s", file);
-    io_close(s);
     return data;
   }
 
   int max_size = options_get_int("ModPlug_MaxFileSize");
   if (size > static_cast<off_t>(max_size))
   {
-    io_close(s);
     decoder_error(&data->error, ERROR_FATAL, 0,
                   "Module file too large (%ldMB). Increase ModPlug_MaxFileSize in config.",
                   static_cast<long>(size) / (1024 * 1024));
@@ -129,8 +126,8 @@ static struct modplug_data *make_modplug_data(const char *file)
 
   std::vector<char> filedata(static_cast<size_t>(size));
 
-  io_read(s, filedata.data(), static_cast<size_t>(size));
-  io_close(s);
+  io_read(s.get(), filedata.data(), static_cast<size_t>(size));
+  s.reset();
 
   data->modplugfile = ModPlug_Load(filedata.data(), static_cast<int>(size));
 
