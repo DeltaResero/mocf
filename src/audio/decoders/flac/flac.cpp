@@ -19,6 +19,7 @@
 #include <string>
 #include <memory>
 #include <algorithm>
+#include <vector>
 #include <FLAC/all.h>
 
 #define DEBUG
@@ -49,7 +50,11 @@ public:
   unsigned int length;
   FLAC__uint64 total_samples;
 
-  FLAC__byte sample_buffer[SAMPLE_BUFFER_SIZE];
+  /* Decode scratch space; only needed once real decoding starts, so it's
+   * left empty until write_cb() first needs it (see below). A query that
+   * only wants metadata, e.g. duration for the tags cache, never touches
+   * this and so never pays for it. */
+  std::vector<FLAC__byte> sample_buffer;
   unsigned int sample_buffer_fill;
 
   /* sound parameters */
@@ -143,8 +148,13 @@ write_cb(const FLAC__StreamDecoder *unused ATTR_UNUSED,
     return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
   }
 
+  if (data->sample_buffer.empty())
+  {
+    data->sample_buffer.resize(SAMPLE_BUFFER_SIZE);
+  }
+
   data->sample_buffer_fill =
-      pack_pcm_signed(data->sample_buffer, buffer, wide_samples, data->channels,
+      pack_pcm_signed(data->sample_buffer.data(), buffer, wide_samples, data->channels,
                       data->bits_per_sample);
 
   return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
@@ -532,8 +542,8 @@ int FlacDecoder::decode(char *buf, int buf_len,
   debug("Decoded %d bytes", sample_buffer_fill);
 
   to_copy = std::min(static_cast<unsigned int>(buf_len), sample_buffer_fill);
-  memcpy(buf, sample_buffer, to_copy);
-  memmove(sample_buffer, sample_buffer + to_copy,
+  memcpy(buf, sample_buffer.data(), to_copy);
+  memmove(sample_buffer.data(), sample_buffer.data() + to_copy,
           sample_buffer_fill - to_copy);
   sample_buffer_fill -= to_copy;
 
