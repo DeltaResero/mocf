@@ -175,15 +175,8 @@ static void mk_biquad(float dbgain, float cf, float srate, float bw,
                       t_biquad &b);
 
 /* sound processing */
-static void equ_process_buffer_u8(uint8_t *buf, size_t samples);
-static void equ_process_buffer_s8(int8_t *buf, size_t samples);
-static void equ_process_buffer_u16(uint16_t *buf, size_t samples);
-static void equ_process_buffer_s16(int16_t *buf, size_t samples);
-static void equ_process_buffer_u24(uint32_t *buf, size_t samples);
-static void equ_process_buffer_s24(int32_t *buf, size_t samples);
-static void equ_process_buffer_u32(uint32_t *buf, size_t samples);
-static void equ_process_buffer_s32(int32_t *buf, size_t samples);
-static void equ_process_buffer_float(float *buf, size_t samples);
+template <typename T>
+static void equ_process_buffer(T *buf, size_t samples, float min_val, float max_val);
 
 /* static global variables */
 static std::vector<t_eq_set> equ_sets;
@@ -621,36 +614,37 @@ void equalizer_process_buffer(char *buf, size_t size,
   switch (sound_format)
   {
     case SFMT_U8:
-      equ_process_buffer_u8(reinterpret_cast<uint8_t *>(buf), size);
+      equ_process_buffer(reinterpret_cast<uint8_t *>(buf), size, 0.0f, static_cast<float>(UINT8_MAX));
       break;
     case SFMT_S8:
-      equ_process_buffer_s8(reinterpret_cast<int8_t *>(buf), size);
+      equ_process_buffer(reinterpret_cast<int8_t *>(buf), size, static_cast<float>(INT8_MIN), static_cast<float>(INT8_MAX));
       break;
     case SFMT_U16:
-      equ_process_buffer_u16(reinterpret_cast<uint16_t *>(buf), size / sizeof(uint16_t));
+      equ_process_buffer(reinterpret_cast<uint16_t *>(buf), size / sizeof(uint16_t), 0.0f, static_cast<float>(UINT16_MAX));
       break;
     case SFMT_S16:
-      equ_process_buffer_s16(reinterpret_cast<int16_t *>(buf), size / sizeof(int16_t));
+      equ_process_buffer(reinterpret_cast<int16_t *>(buf), size / sizeof(int16_t), static_cast<float>(INT16_MIN), static_cast<float>(INT16_MAX));
       break;
     case SFMT_U24:
-      equ_process_buffer_u24(reinterpret_cast<uint32_t *>(buf), size / sizeof(uint32_t));
+      equ_process_buffer(reinterpret_cast<uint32_t *>(buf), size / sizeof(uint32_t), 0.0f, static_cast<float>(U24_MAX));
       break;
     case SFMT_S24:
-      equ_process_buffer_s24(reinterpret_cast<int32_t *>(buf), size / sizeof(int32_t));
+      equ_process_buffer(reinterpret_cast<int32_t *>(buf), size / sizeof(int32_t), static_cast<float>(S24_MIN), static_cast<float>(S24_MAX));
       break;
     case SFMT_U32:
-      equ_process_buffer_u32(reinterpret_cast<uint32_t *>(buf), size / sizeof(uint32_t));
+      equ_process_buffer(reinterpret_cast<uint32_t *>(buf), size / sizeof(uint32_t), 0.0f, static_cast<float>(UINT32_MAX));
       break;
     case SFMT_S32:
-      equ_process_buffer_s32(reinterpret_cast<int32_t *>(buf), size / sizeof(int32_t));
+      equ_process_buffer(reinterpret_cast<int32_t *>(buf), size / sizeof(int32_t), static_cast<float>(INT32_MIN), static_cast<float>(INT32_MAX));
       break;
     case SFMT_FLOAT:
-      equ_process_buffer_float(std::launder(reinterpret_cast<float *>(buf)), size / sizeof(float));
+      equ_process_buffer(std::launder(reinterpret_cast<float *>(buf)), size / sizeof(float), -1.0f, 1.0f);
       break;
   }
 }
 
-static void equ_process_buffer_u8(uint8_t *buf, size_t samples)
+template <typename T>
+static void equ_process_buffer(T *buf, size_t samples, float min_val, float max_val)
 {
   size_t i;
   std::vector<float> tmp(samples);
@@ -667,203 +661,10 @@ static void equ_process_buffer_u8(uint8_t *buf, size_t samples)
 
   for (i = 0; i < samples; i++)
   {
-    tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = std::clamp<float>(tmp[i], 0, UINT8_MAX);
-    buf[i] = static_cast<uint8_t>(tmp[i]);
+    tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * static_cast<float>(buf[i]);
+    tmp[i] = std::clamp(tmp[i], min_val, max_val);
+    buf[i] = static_cast<T>(tmp[i]);
   }
-
-}
-
-static void equ_process_buffer_s8(int8_t *buf, size_t samples)
-{
-  size_t i;
-  std::vector<float> tmp(samples);
-
-  debug("equalizing");
-
-  for (i = 0; i < samples; i++)
-  {
-    tmp[i] = preampf * static_cast<float>(buf[i]);
-  }
-
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
-                current_set()->bcount);
-
-  for (i = 0; i < samples; i++)
-  {
-    tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = std::clamp<float>(tmp[i], INT8_MIN, INT8_MAX);
-    buf[i] = static_cast<int8_t>(tmp[i]);
-  }
-
-}
-
-static void equ_process_buffer_u16(uint16_t *buf, size_t samples)
-{
-  size_t i;
-  std::vector<float> tmp(samples);
-
-  debug("equalizing");
-
-  for (i = 0; i < samples; i++)
-  {
-    tmp[i] = preampf * static_cast<float>(buf[i]);
-  }
-
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
-                current_set()->bcount);
-
-  for (i = 0; i < samples; i++)
-  {
-    tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = std::clamp<float>(tmp[i], 0, UINT16_MAX);
-    buf[i] = static_cast<uint16_t>(tmp[i]);
-  }
-
-}
-
-static void equ_process_buffer_s16(int16_t *buf, size_t samples)
-{
-  size_t i;
-  std::vector<float> tmp(samples);
-
-  debug("equalizing");
-
-  for (i = 0; i < samples; i++)
-  {
-    tmp[i] = preampf * static_cast<float>(buf[i]);
-  }
-
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
-                current_set()->bcount);
-
-  for (i = 0; i < samples; i++)
-  {
-    tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = std::clamp<float>(tmp[i], INT16_MIN, INT16_MAX);
-    buf[i] = static_cast<int16_t>(tmp[i]);
-  }
-
-}
-
-static void equ_process_buffer_u24(uint32_t *buf, size_t samples)
-{
-  size_t i;
-  std::vector<float> tmp(samples);
-
-  debug("equalizing");
-
-  for (i = 0; i < samples; i++)
-  {
-    tmp[i] = preampf * static_cast<float>(buf[i]);
-  }
-
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
-                current_set()->bcount);
-
-  for (i = 0; i < samples; i++)
-  {
-    tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = std::clamp<float>(tmp[i], 0, U24_MAX);
-    buf[i] = static_cast<uint32_t>(tmp[i]);
-  }
-
-}
-
-static void equ_process_buffer_s24(int32_t *buf, size_t samples)
-{
-  size_t i;
-  std::vector<float> tmp(samples);
-
-  debug("equalizing");
-
-  for (i = 0; i < samples; i++)
-  {
-    tmp[i] = preampf * static_cast<float>(buf[i]);
-  }
-
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
-                current_set()->bcount);
-
-  for (i = 0; i < samples; i++)
-  {
-    tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = std::clamp<float>(tmp[i], S24_MIN, S24_MAX);
-    buf[i] = static_cast<int32_t>(tmp[i]);
-  }
-
-}
-
-static void equ_process_buffer_u32(uint32_t *buf, size_t samples)
-{
-  size_t i;
-  std::vector<float> tmp(samples);
-
-  debug("equalizing");
-
-  for (i = 0; i < samples; i++)
-  {
-    tmp[i] = preampf * static_cast<float>(buf[i]);
-  }
-
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
-                current_set()->bcount);
-
-  for (i = 0; i < samples; i++)
-  {
-    tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = std::clamp(tmp[i], 0.0f, static_cast<float>(UINT32_MAX));
-    buf[i] = static_cast<uint32_t>(tmp[i]);
-  }
-
-}
-
-static void equ_process_buffer_s32(int32_t *buf, size_t samples)
-{
-  size_t i;
-  std::vector<float> tmp(samples);
-
-  debug("equalizing");
-
-  for (i = 0; i < samples; i++)
-  {
-    tmp[i] = preampf * static_cast<float>(buf[i]);
-  }
-
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
-                current_set()->bcount);
-
-  for (i = 0; i < samples; i++)
-  {
-    tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = std::clamp(tmp[i], static_cast<float>(INT32_MIN), static_cast<float>(INT32_MAX));
-    buf[i] = static_cast<int32_t>(tmp[i]);
-  }
-
-}
-
-static void equ_process_buffer_float(float *buf, size_t samples)
-{
-  size_t i;
-  std::vector<float> tmp(samples);
-
-  debug("equalizing");
-
-  for (i = 0; i < samples; i++)
-  {
-    tmp[i] = preampf * buf[i];
-  }
-
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
-                current_set()->bcount);
-
-  for (i = 0; i < samples; i++)
-  {
-    tmp[i] = r_mixin_rate * tmp[i] + mixin_rate * buf[i];
-    tmp[i] = std::clamp(tmp[i], -1.0f, 1.0f);
-    buf[i] = tmp[i];
-  }
-
 }
 
 /* parsing stuff */
