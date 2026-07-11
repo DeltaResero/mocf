@@ -128,7 +128,7 @@ static void ffmpeg_log_repeats(const char *msg LOGIT_ONLY)
   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
   /* We need to gate the decoder and precaching threads. */
-  LOCK(mutex);
+  pthread_mutex_lock(&mutex);
 
   if (!prev_msg.empty() && (!msg || prev_msg != msg))
   {
@@ -170,7 +170,7 @@ static void ffmpeg_log_repeats(const char *msg LOGIT_ONLY)
     prev_msg = msg;
     msg_count = 1;
   }
-  UNLOCK(mutex);
+  pthread_mutex_unlock(&mutex);
 #endif
 }
 
