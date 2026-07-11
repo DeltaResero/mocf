@@ -116,24 +116,44 @@ int softmixer_is_mono() { return mix_mono; }
 
 /* private code */
 
-static void process_buffer_u8(uint8_t *buf, size_t samples);
-static void process_buffer_s8(int8_t *buf, size_t samples);
-static void process_buffer_u16(uint16_t *buf, size_t samples);
-static void process_buffer_s16(int16_t *buf, size_t samples);
-static void process_buffer_u24(uint32_t *buf, size_t samples);
-static void process_buffer_s24(int32_t *buf, size_t samples);
-static void process_buffer_u32(uint32_t *buf, size_t samples);
-static void process_buffer_s32(int32_t *buf, size_t samples);
-static void process_buffer_float(float *buf, size_t samples);
-static void mix_mono_u8(uint8_t *buf, int channels, size_t samples);
-static void mix_mono_s8(int8_t *buf, int channels, size_t samples);
-static void mix_mono_u16(uint16_t *buf, int channels, size_t samples);
-static void mix_mono_s16(int16_t *buf, int channels, size_t samples);
-static void mix_mono_u24(uint32_t *buf, int channels, size_t samples);
-static void mix_mono_s24(int32_t *buf, int channels, size_t samples);
-static void mix_mono_u32(uint32_t *buf, int channels, size_t samples);
-static void mix_mono_s32(int32_t *buf, int channels, size_t samples);
-static void mix_mono_float(float *buf, int channels, size_t samples);
+/* Apply the softmixer gain to each sample, clamping to [min_val, max_val].
+ * For unsigned types the sample is re-centred around zero before scaling. */
+template <typename T, typename AccT, AccT min_val, AccT max_val, AccT offset = 0>
+static void process_buffer_impl(T *buf, size_t samples)
+{
+  debug("mixing");
+  for (size_t i = 0; i < samples; i++)
+  {
+    AccT tmp = static_cast<AccT>(buf[i]) - offset;
+    tmp *= mixer_real;
+    tmp /= 1000;
+    tmp += offset;
+    tmp = std::clamp<AccT>(tmp, min_val, max_val);
+    buf[i] = static_cast<T>(tmp);
+  }
+}
+
+/* Average all channels for each frame into a mono value, then write it back
+ * to all channels, clamping to [min_val, max_val]. */
+template <typename T, typename AccT, AccT min_val, AccT max_val>
+static void mix_mono_impl(T *buf, int channels, size_t samples)
+{
+  debug("making mono");
+  assert(channels > 1);
+  size_t i = 0;
+  while (i < samples)
+  {
+    AccT mono = 0;
+    for (int c = 0; c < channels; c++)
+      mono += static_cast<AccT>(*buf++);
+    buf -= channels;
+    mono /= channels;
+    mono = std::clamp<AccT>(mono, min_val, max_val);
+    for (int c = 0; c < channels; c++)
+      *buf++ = static_cast<T>(mono);
+    i += channels;
+  }
+}
 
 static void softmixer_read_config()
 {
@@ -264,549 +284,65 @@ void softmixer_process_buffer(char *buf, size_t size,
   {
     case SFMT_U8:
       if (do_softmix)
-      {
-        process_buffer_u8(reinterpret_cast<uint8_t *>(buf), size);
-      }
+        process_buffer_impl<uint8_t, int16_t, 0, UINT8_MAX, (int16_t)(UINT8_MAX >> 1)>(reinterpret_cast<uint8_t *>(buf), size);
       if (do_monomix)
-      {
-        mix_mono_u8(reinterpret_cast<uint8_t *>(buf), sound_params->channels, size);
-      }
+        mix_mono_impl<uint8_t, int16_t, 0, UINT8_MAX>(reinterpret_cast<uint8_t *>(buf), sound_params->channels, size);
       break;
     case SFMT_S8:
       if (do_softmix)
-      {
-        process_buffer_s8(reinterpret_cast<int8_t *>(buf), size);
-      }
+        process_buffer_impl<int8_t, int16_t, INT8_MIN, INT8_MAX>(reinterpret_cast<int8_t *>(buf), size);
       if (do_monomix)
-      {
-        mix_mono_s8(reinterpret_cast<int8_t *>(buf), sound_params->channels, size);
-      }
+        mix_mono_impl<int8_t, int16_t, INT8_MIN, INT8_MAX>(reinterpret_cast<int8_t *>(buf), sound_params->channels, size);
       break;
     case SFMT_U16:
       if (do_softmix)
-      {
-        process_buffer_u16(reinterpret_cast<uint16_t *>(buf), size / sizeof(uint16_t));
-      }
+        process_buffer_impl<uint16_t, int32_t, 0, UINT16_MAX, (int32_t)(UINT16_MAX >> 1)>(reinterpret_cast<uint16_t *>(buf), size / sizeof(uint16_t));
       if (do_monomix)
-      {
-        mix_mono_u16(reinterpret_cast<uint16_t *>(buf), sound_params->channels,
-                     size / sizeof(uint16_t));
-      }
+        mix_mono_impl<uint16_t, int32_t, 0, UINT16_MAX>(reinterpret_cast<uint16_t *>(buf), sound_params->channels, size / sizeof(uint16_t));
       break;
     case SFMT_S16:
       if (do_softmix)
-      {
-        process_buffer_s16(reinterpret_cast<int16_t *>(buf), size / sizeof(int16_t));
-      }
+        process_buffer_impl<int16_t, int32_t, INT16_MIN, INT16_MAX>(reinterpret_cast<int16_t *>(buf), size / sizeof(int16_t));
       if (do_monomix)
-      {
-        mix_mono_s16(reinterpret_cast<int16_t *>(buf), sound_params->channels,
-                     size / sizeof(int16_t));
-      }
+        mix_mono_impl<int16_t, int32_t, INT16_MIN, INT16_MAX>(reinterpret_cast<int16_t *>(buf), sound_params->channels, size / sizeof(int16_t));
       break;
     case SFMT_U24:
       if (do_softmix)
-      {
-        process_buffer_u24(reinterpret_cast<uint32_t *>(buf), size / sizeof(uint32_t));
-      }
-      if (mix_mono)
-      {
-        mix_mono_u24(reinterpret_cast<uint32_t *>(buf), sound_params->channels,
-                     size / sizeof(uint32_t));
-      }
+        process_buffer_impl<uint32_t, int64_t, 0, U24_MAX, (int64_t)(-S24_MIN)>(reinterpret_cast<uint32_t *>(buf), size / sizeof(uint32_t));
+      if (do_monomix)  /* was incorrectly checking mix_mono; fixed */
+        mix_mono_impl<uint32_t, int64_t, 0, U24_MAX>(reinterpret_cast<uint32_t *>(buf), sound_params->channels, size / sizeof(uint32_t));
       break;
     case SFMT_S24:
       if (do_softmix)
-      {
-        process_buffer_s24(reinterpret_cast<int32_t *>(buf), size / sizeof(int32_t));
-      }
-      if (mix_mono)
-      {
-        mix_mono_s24(reinterpret_cast<int32_t *>(buf), sound_params->channels,
-                     size / sizeof(int32_t));
-      }
+        process_buffer_impl<int32_t, int64_t, S24_MIN, S24_MAX>(reinterpret_cast<int32_t *>(buf), size / sizeof(int32_t));
+      if (do_monomix)  /* was incorrectly checking mix_mono; fixed */
+        mix_mono_impl<int32_t, int64_t, S24_MIN, S24_MAX>(reinterpret_cast<int32_t *>(buf), sound_params->channels, size / sizeof(int32_t));
       break;
     case SFMT_U32:
       if (do_softmix)
-      {
-        process_buffer_u32(reinterpret_cast<uint32_t *>(buf), size / sizeof(uint32_t));
-      }
+        process_buffer_impl<uint32_t, int64_t, 0, UINT32_MAX, (int64_t)(UINT32_MAX >> 1)>(reinterpret_cast<uint32_t *>(buf), size / sizeof(uint32_t));
       if (do_monomix)
-      {
-        mix_mono_u32(reinterpret_cast<uint32_t *>(buf), sound_params->channels,
-                     size / sizeof(uint32_t));
-      }
+        mix_mono_impl<uint32_t, int64_t, 0, UINT32_MAX>(reinterpret_cast<uint32_t *>(buf), sound_params->channels, size / sizeof(uint32_t));
       break;
     case SFMT_S32:
       if (do_softmix)
-      {
-        process_buffer_s32(reinterpret_cast<int32_t *>(buf), size / sizeof(int32_t));
-      }
+        process_buffer_impl<int32_t, int64_t, INT32_MIN, INT32_MAX>(reinterpret_cast<int32_t *>(buf), size / sizeof(int32_t));
       if (do_monomix)
-      {
-        mix_mono_s32(reinterpret_cast<int32_t *>(buf), sound_params->channels,
-                     size / sizeof(int32_t));
-      }
+        mix_mono_impl<int32_t, int64_t, INT32_MIN, INT32_MAX>(reinterpret_cast<int32_t *>(buf), sound_params->channels, size / sizeof(int32_t));
       break;
     case SFMT_FLOAT:
       if (do_softmix)
       {
-        process_buffer_float(reinterpret_cast<float *>(buf), size / sizeof(float));
+        float *fbuf = reinterpret_cast<float *>(buf);
+        size_t n = size / sizeof(float);
+        for (size_t i = 0; i < n; i++)
+          fbuf[i] = std::clamp(fbuf[i] * mixer_realf, -1.0f, 1.0f);
       }
       if (do_monomix)
-      {
-        mix_mono_float(reinterpret_cast<float *>(buf), sound_params->channels,
-                       size / sizeof(float));
-      }
+        mix_mono_impl<float, float, -1.0f, 1.0f>(reinterpret_cast<float *>(buf), sound_params->channels, size / sizeof(float));
       break;
     default:
       debug("No softmixer/monomixer for chosen format.");
-  }
-}
-
-static void process_buffer_u8(uint8_t *buf, size_t samples)
-{
-  size_t i;
-
-  debug("mixing");
-
-  for (i = 0; i < samples; i++)
-  {
-    int16_t tmp = buf[i];
-    tmp -= (UINT8_MAX >> 1);
-    tmp *= mixer_real;
-    tmp /= 1000;
-    tmp += (UINT8_MAX >> 1);
-    tmp = std::clamp<int16_t>(tmp, 0, UINT8_MAX);
-    buf[i] = static_cast<uint8_t>(tmp);
-  }
-}
-
-static void process_buffer_s8(int8_t *buf, size_t samples)
-{
-  size_t i;
-
-  debug("mixing");
-
-  for (i = 0; i < samples; i++)
-  {
-    int16_t tmp = buf[i];
-    tmp *= mixer_real;
-    tmp /= 1000;
-    tmp = std::clamp<int16_t>(tmp, INT8_MIN, INT8_MAX);
-    buf[i] = static_cast<int8_t>(tmp);
-  }
-}
-
-static void process_buffer_u16(uint16_t *buf, size_t samples)
-{
-  size_t i;
-
-  debug("mixing");
-
-  for (i = 0; i < samples; i++)
-  {
-    int32_t tmp = buf[i];
-    tmp -= (UINT16_MAX >> 1);
-    tmp *= mixer_real;
-    tmp /= 1000;
-    tmp += (UINT16_MAX >> 1);
-    tmp = std::clamp<int32_t>(tmp, 0, UINT16_MAX);
-    buf[i] = static_cast<uint16_t>(tmp);
-  }
-}
-
-static void process_buffer_s16(int16_t *buf, size_t samples)
-{
-  size_t i;
-
-  debug("mixing");
-
-  for (i = 0; i < samples; i++)
-  {
-    int32_t tmp = buf[i];
-    tmp *= mixer_real;
-    tmp /= 1000;
-    tmp = std::clamp<int32_t>(tmp, INT16_MIN, INT16_MAX);
-    buf[i] = static_cast<int16_t>(tmp);
-  }
-}
-
-static void process_buffer_u24(uint32_t *buf, size_t samples)
-{
-  size_t i;
-
-  debug("mixing");
-
-  for (i = 0; i < samples; i++)
-  {
-    int64_t tmp = buf[i];
-    tmp -= S24_MIN;
-    tmp *= mixer_real;
-    tmp /= 1000;
-    tmp += S24_MIN;
-    tmp = std::clamp<int64_t>(tmp, 0, U24_MAX);
-    buf[i] = static_cast<uint32_t>(tmp);
-  }
-}
-
-static void process_buffer_s24(int32_t *buf, size_t samples)
-{
-  size_t i;
-
-  debug("mixing");
-
-  for (i = 0; i < samples; i++)
-  {
-    int64_t tmp = buf[i];
-    tmp *= mixer_real;
-    tmp /= 1000;
-    tmp = std::clamp<int64_t>(tmp, S24_MIN, S24_MAX);
-    buf[i] = static_cast<int32_t>(tmp);
-  }
-}
-
-static void process_buffer_u32(uint32_t *buf, size_t samples)
-{
-  size_t i;
-
-  debug("mixing");
-
-  for (i = 0; i < samples; i++)
-  {
-    int64_t tmp = buf[i];
-    tmp -= (UINT32_MAX >> 1);
-    tmp *= mixer_real;
-    tmp /= 1000;
-    tmp += (UINT32_MAX >> 1);
-    tmp = std::clamp<int64_t>(tmp, 0, UINT32_MAX);
-    buf[i] = static_cast<uint32_t>(tmp);
-  }
-}
-
-static void process_buffer_s32(int32_t *buf, size_t samples)
-{
-  size_t i;
-
-  debug("mixing");
-
-  for (i = 0; i < samples; i++)
-  {
-    int64_t tmp = buf[i];
-    tmp *= mixer_real;
-    tmp /= 1000;
-    tmp = std::clamp<int64_t>(tmp, INT32_MIN, INT32_MAX);
-    buf[i] = static_cast<int32_t>(tmp);
-  }
-}
-
-static void process_buffer_float(float *buf, size_t samples)
-{
-  size_t i;
-
-  debug("mixing");
-
-  for (i = 0; i < samples; i++)
-  {
-    float tmp = buf[i];
-    tmp *= mixer_realf;
-    tmp = std::clamp(tmp, -1.0f, 1.0f);
-    buf[i] = tmp;
-  }
-}
-
-// Mono-Mixing
-static void mix_mono_u8(uint8_t *buf, int channels, size_t samples)
-{
-  int c;
-  size_t i = 0;
-
-  debug("making mono");
-
-  assert(channels > 1);
-
-  while (i < samples)
-  {
-    int16_t mono = 0;
-
-    for (c = 0; c < channels; c++)
-    {
-      mono += *buf++;
-    }
-
-    buf -= channels;
-
-    mono /= channels;
-    mono = std::min<int16_t>(mono, UINT8_MAX); // can't be negative
-
-    for (c = 0; c < channels; c++)
-    {
-      *buf++ = static_cast<uint8_t>(mono);
-    }
-
-    i += channels;
-  }
-}
-
-static void mix_mono_s8(int8_t *buf, int channels, size_t samples)
-{
-  int c;
-  size_t i = 0;
-
-  debug("making mono");
-
-  assert(channels > 1);
-
-  while (i < samples)
-  {
-    int16_t mono = 0;
-
-    for (c = 0; c < channels; c++)
-    {
-      mono += *buf++;
-    }
-
-    buf -= channels;
-
-    mono /= channels;
-    mono = std::clamp<int16_t>(mono, INT8_MIN, INT8_MAX);
-
-    for (c = 0; c < channels; c++)
-    {
-      *buf++ = static_cast<int8_t>(mono);
-    }
-
-    i += channels;
-  }
-}
-
-static void mix_mono_u16(uint16_t *buf, int channels, size_t samples)
-{
-  int c;
-  size_t i = 0;
-
-  debug("making mono");
-
-  assert(channels > 1);
-
-  while (i < samples)
-  {
-    int32_t mono = 0;
-
-    for (c = 0; c < channels; c++)
-    {
-      mono += *buf++;
-    }
-
-    buf -= channels;
-
-    mono /= channels;
-    mono = std::min<int32_t>(mono, UINT16_MAX); // can't be negative
-
-    for (c = 0; c < channels; c++)
-    {
-      *buf++ = static_cast<uint16_t>(mono);
-    }
-
-    i += channels;
-  }
-}
-
-static void mix_mono_s16(int16_t *buf, int channels, size_t samples)
-{
-  int c;
-  size_t i = 0;
-
-  debug("making mono");
-
-  assert(channels > 1);
-
-  while (i < samples)
-  {
-    int32_t mono = 0;
-
-    for (c = 0; c < channels; c++)
-    {
-      mono += *buf++;
-    }
-
-    buf -= channels;
-
-    mono /= channels;
-    mono = std::clamp<int32_t>(mono, INT16_MIN, INT16_MAX);
-
-    for (c = 0; c < channels; c++)
-    {
-      *buf++ = static_cast<int16_t>(mono);
-    }
-
-    i += channels;
-  }
-}
-
-static void mix_mono_u24(uint32_t *buf, int channels, size_t samples)
-{
-  int c;
-  size_t i = 0;
-
-  debug("making mono");
-
-  if (channels < 2)
-  {
-    return;
-  }
-
-  while (i < samples)
-  {
-    int64_t mono = 0;
-
-    for (c = 0; c < channels; c++)
-    {
-      mono += *buf++;
-    }
-
-    buf -= channels;
-
-    mono /= channels;
-    mono = std::min<int64_t>(mono, U24_MAX); // can't be negative
-
-    for (c = 0; c < channels; c++)
-    {
-      *buf++ = static_cast<uint32_t>(mono);
-    }
-
-    i += channels;
-  }
-}
-
-static void mix_mono_s24(int32_t *buf, int channels, size_t samples)
-{
-  int c;
-  size_t i = 0;
-
-  debug("making mono");
-
-  if (channels < 2)
-  {
-    return;
-  }
-
-  while (i < samples)
-  {
-    int64_t mono = 0;
-
-    for (c = 0; c < channels; c++)
-    {
-      mono += *buf++;
-    }
-
-    buf -= channels;
-
-    mono /= channels;
-    mono = std::clamp<int64_t>(mono, S24_MIN, S24_MAX);
-
-    for (c = 0; c < channels; c++)
-    {
-      *buf++ = static_cast<int32_t>(mono);
-    }
-
-    i += channels;
-  }
-}
-
-static void mix_mono_u32(uint32_t *buf, int channels, size_t samples)
-{
-  int c;
-  size_t i = 0;
-
-  debug("making mono");
-
-  assert(channels > 1);
-
-  while (i < samples)
-  {
-    int64_t mono = 0;
-
-    for (c = 0; c < channels; c++)
-    {
-      mono += *buf++;
-    }
-
-    buf -= channels;
-
-    mono /= channels;
-    mono = std::min<int64_t>(mono, UINT32_MAX); // can't be negative
-
-    for (c = 0; c < channels; c++)
-    {
-      *buf++ = static_cast<uint32_t>(mono);
-    }
-
-    i += channels;
-  }
-}
-
-static void mix_mono_s32(int32_t *buf, int channels, size_t samples)
-{
-  int c;
-  size_t i = 0;
-
-  debug("making mono");
-
-  assert(channels > 1);
-
-  while (i < samples)
-  {
-    int64_t mono = 0;
-
-    for (c = 0; c < channels; c++)
-    {
-      mono += *buf++;
-    }
-
-    buf -= channels;
-
-    mono /= channels;
-    mono = std::clamp<int64_t>(mono, INT32_MIN, INT32_MAX);
-
-    for (c = 0; c < channels; c++)
-    {
-      *buf++ = static_cast<int32_t>(mono);
-    }
-
-    i += channels;
-  }
-}
-
-static void mix_mono_float(float *buf, int channels, size_t samples)
-{
-  int c;
-  size_t i = 0;
-
-  debug("making mono");
-
-  assert(channels > 1);
-
-  while (i < samples)
-  {
-    float mono = 0.0f;
-
-    for (c = 0; c < channels; c++)
-    {
-      mono += *buf++;
-    }
-
-    buf -= channels;
-
-    mono /= channels;
-    mono = std::clamp(mono, -1.0f, 1.0f);
-
-    for (c = 0; c < channels; c++)
-    {
-      *buf++ = mono;
-    }
-
-    i += channels;
   }
 }
 
