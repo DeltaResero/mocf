@@ -341,17 +341,17 @@ static inline void check_zero(const char *x)
   }
 }
 
-/* Generate a title from fmt. */
-static void do_title_expn(char *dest, int size, const char *fmt,
-                          const struct file_tags *tags)
+/* Generate a title from fmt, truncated to at most max_len characters.
+ * The cap mirrors the previous fixed-size char[512] staging buffer;
+ * it exists to bound title length on memory-constrained targets. */
+static std::string do_title_expn(size_t max_len, const char *fmt,
+                                  const struct file_tags *tags)
 {
+  std::string dest;
   std::optional<std::string> h;
-  int free = --size;
   short escape = 0;
 
-  dest[0] = 0;
-
-  while (free > 0 && *fmt)
+  while (dest.size() < max_len && *fmt)
   {
     if (*fmt == '%' && !escape)
     {
@@ -450,8 +450,7 @@ static void do_title_expn(char *dest, int size, const char *fmt,
           expr[expr_pos] = '\0';
         }
 
-        do_title_expn((dest + size - free), free, expr, tags);
-        free -= strlen(dest + size - free);
+        dest += do_title_expn(max_len - dest.size(), expr, tags);
       }
       else
       {
@@ -459,8 +458,8 @@ static void do_title_expn(char *dest, int size, const char *fmt,
 
         if (h)
         {
-          strncat(dest, h->c_str(), free - 1);
-          free -= static_cast<int>(h->size());
+          size_t room = max_len - dest.size();
+          dest.append(*h, 0, room);
         }
       }
     }
@@ -470,25 +469,23 @@ static void do_title_expn(char *dest, int size, const char *fmt,
     }
     else
     {
-      dest[size - free] = *fmt;
-      dest[size - free + 1] = 0;
-      --free;
+      dest += *fmt;
       escape = 0;
     }
     fmt++;
   }
 
-  free = std::max(free, 0); /* Possible integer overflow? */
-  dest[size - free] = '\0';
+  return dest;
 }
 
 /* Build file title from struct file_tags. */
 std::string build_title_with_format(const struct file_tags *tags, const char *fmt)
 {
-  char title[512];
+  /* Cap matches the previous char title[512] buffer (511 usable chars;
+   * std::string needs no extra slot for a terminator). */
+  constexpr size_t kMaxTitleLen = 511;
 
-  do_title_expn(title, sizeof(title), fmt, tags);
-  return title;
+  return do_title_expn(kMaxTitleLen, fmt, tags);
 }
 
 /* Build file title from struct file_tags. */
