@@ -35,169 +35,57 @@
 #include "audio/conversion/audio_conversion.h"
 #include "core/log.h"
 #include "core/options.h"
-
-static void float_to_u8(const float *in, unsigned char *out,
-                        const size_t samples)
+template <typename InT>
+static void to_float_impl(const void *in_ptr, float *out, const size_t samples, float offset, float divisor)
 {
-  size_t i;
-
-  assert(in != nullptr);
-  assert(out != nullptr);
-
-  for (i = 0; i < samples; i++)
+  const InT *in = reinterpret_cast<const InT *>(in_ptr);
+  for (size_t i = 0; i < samples; i++)
   {
-    float f = in[i] * static_cast<float>INT32_MAX;
+    out[i] = (static_cast<float>(*in++) + offset) / divisor;
+  }
+}
 
-    if (f >= static_cast<float>INT32_MAX)
+template <typename OutT>
+static void float_to_impl(const float *in, void *out_ptr, const size_t samples, float mult, float max_val, float min_val, float out_max, float out_min, float offset, int shift)
+{
+  OutT *out = reinterpret_cast<OutT *>(out_ptr);
+  for (size_t i = 0; i < samples; i++)
+  {
+    float f = in[i] * mult;
+    if (f >= max_val)
     {
-      out[i] = UINT8_MAX;
+      out[i] = static_cast<OutT>(out_max);
     }
-    else if (f <= INT32_MIN)
+    else if (f <= min_val)
     {
-      out[i] = 0;
+      out[i] = static_cast<OutT>(out_min);
     }
     else
     {
-      out[i] = static_cast<unsigned int>((lrintf(f) >> 24) - INT8_MIN);
+      if (shift > 0)
+        out[i] = static_cast<OutT>((lrintf(f) >> shift) - offset);
+      else
+        out[i] = static_cast<OutT>(lrintf(f) - offset);
     }
   }
 }
 
-static void float_to_s8(const float *in, char *out, const size_t samples)
+template <typename T>
+static inline void change_sign_impl(void *buf_ptr, const size_t samples)
 {
-  size_t i;
-
-  assert(in != nullptr);
-  assert(out != nullptr);
-
-  for (i = 0; i < samples; i++)
+  T *buf = reinterpret_cast<T *>(buf_ptr);
+  for (size_t i = 0; i < samples; i++)
   {
-    float f = in[i] * static_cast<float>INT32_MAX;
-
-    if (f >= static_cast<float>INT32_MAX)
-    {
-      out[i] = INT8_MAX;
-    }
-    else if (f <= INT32_MIN)
-    {
-      out[i] = INT8_MIN;
-    }
-    else
-    {
-      out[i] = lrintf(f) >> 24;
-    }
+    *buf++ ^= static_cast<T>(1) << (sizeof(T) * 8 - 1);
   }
 }
 
-static void float_to_u16(const float *in, unsigned char *out,
-                         const size_t samples)
-{
-  size_t i;
 
-  assert(in != nullptr);
-  assert(out != nullptr);
 
-  for (i = 0; i < samples; i++)
-  {
-    uint16_t *out_val = reinterpret_cast<uint16_t *>(out + i * sizeof(uint16_t));
-    float f = in[i] * static_cast<float>INT32_MAX;
 
-    if (f >= static_cast<float>INT32_MAX)
-    {
-      *out_val = UINT16_MAX;
-    }
-    else if (f <= INT32_MIN)
-    {
-      *out_val = 0;
-    }
-    else
-    {
-      *out_val = static_cast<unsigned int>((lrintf(f) >> 16) - INT16_MIN);
-    }
-  }
-}
 
-static void float_to_s16(const float *in, char *out, const size_t samples)
-{
-  size_t i;
 
-  assert(in != nullptr);
-  assert(out != nullptr);
 
-  for (i = 0; i < samples; i++)
-  {
-    int16_t *out_val = reinterpret_cast<int16_t *>(out + i * sizeof(int16_t));
-    float f = in[i] * static_cast<float>INT32_MAX;
-
-    if (f >= static_cast<float>INT32_MAX)
-    {
-      *out_val = INT16_MAX;
-    }
-    else if (f <= INT32_MIN)
-    {
-      *out_val = INT16_MIN;
-    }
-    else
-    {
-      *out_val = lrintf(f) >> 16;
-    }
-  }
-}
-
-static void float_to_u24(const float *in, unsigned char *out,
-                         const size_t samples)
-{
-  size_t i;
-
-  assert(in != nullptr);
-  assert(out != nullptr);
-
-  for (i = 0; i < samples; i++)
-  {
-    uint32_t *out_val = reinterpret_cast<uint32_t *>(out + i * sizeof(uint32_t));
-    float f = in[i] * S24_MAX;
-
-    if (f >= S24_MAX)
-    {
-      *out_val = U24_MAX;
-    }
-    else if (f <= S24_MIN)
-    {
-      *out_val = 0;
-    }
-    else
-    {
-      *out_val = static_cast<uint32_t>(lrintf(f) - S24_MIN);
-    }
-  }
-}
-
-static void float_to_s24(const float *in, char *out, const size_t samples)
-{
-  size_t i;
-
-  assert(in != nullptr);
-  assert(out != nullptr);
-
-  for (i = 0; i < samples; i++)
-  {
-    int32_t *out_val = reinterpret_cast<int32_t *>(out + i * sizeof(int32_t));
-    float f = in[i] * S24_MAX;
-
-    if (f >= S24_MAX)
-    {
-      *out_val = S24_MAX;
-    }
-    else if (f <= S24_MIN)
-    {
-      *out_val = S24_MIN;
-    }
-    else
-    {
-      *out_val = lrintf(f);
-    }
-  }
-}
 
 static void float_to_u24_3(const float *in, unsigned char *out,
                            const size_t samples)
@@ -262,145 +150,13 @@ static void float_to_s24_3(const float *in, char *out, const size_t samples)
   }
 }
 
-static void float_to_u32(const float *in, unsigned char *out,
-                         const size_t samples)
-{
-  size_t i;
 
-  assert(in != nullptr);
-  assert(out != nullptr);
 
-  for (i = 0; i < samples; i++)
-  {
-    uint32_t *out_val = reinterpret_cast<uint32_t *>(out + i * sizeof(uint32_t));
-    float f = in[i] * INT32_MAX;
 
-    if (f >= INT32_MAX)
-    {
-      *out_val = INT32_MAX;
-    }
-    else if (f <= INT32_MIN)
-    {
-      *out_val = 0;
-    }
-    else
-    {
-      *out_val = static_cast<uint32_t>(lrintf(f) - INT32_MIN);
-    }
-  }
-}
 
-static void float_to_s32(const float *in, char *out, const size_t samples)
-{
-  size_t i;
 
-  assert(in != nullptr);
-  assert(out != nullptr);
 
-  for (i = 0; i < samples; i++)
-  {
-    int32_t *out_val = reinterpret_cast<int32_t *>(out + i * sizeof(int32_t));
-    float f = in[i] * INT32_MAX;
 
-    if (f >= INT32_MAX)
-    {
-      *out_val = INT32_MAX;
-    }
-    else if (f <= INT32_MIN)
-    {
-      *out_val = INT32_MIN;
-    }
-    else
-    {
-      *out_val = lrintf(f);
-    }
-  }
-}
-
-static void u8_to_float(const unsigned char *in, float *out,
-                        const size_t samples)
-{
-  size_t i;
-
-  assert(in != nullptr);
-  assert(out != nullptr);
-
-  for (i = 0; i < samples; i++)
-  {
-    out[i] = ((static_cast<int>(*in++)) + INT8_MIN) / static_cast<float>(INT8_MAX + 1);
-  }
-}
-
-static void s8_to_float(const char *in, float *out, const size_t samples)
-{
-  size_t i;
-
-  assert(in != nullptr);
-  assert(out != nullptr);
-
-  for (i = 0; i < samples; i++)
-  {
-    out[i] = *in++ / static_cast<float>(INT8_MAX + 1);
-  }
-}
-
-static void u16_to_float(const unsigned char *in, float *out,
-                         const size_t samples)
-{
-  size_t i;
-  const uint16_t *in_16 = reinterpret_cast<const uint16_t *>(in);
-
-  assert(in != nullptr);
-  assert(out != nullptr);
-
-  for (i = 0; i < samples; i++)
-  {
-    out[i] = (static_cast<int>(*in_16++) + INT16_MIN) / static_cast<float>(INT16_MAX + 1);
-  }
-}
-
-static void s16_to_float(const char *in, float *out, const size_t samples)
-{
-  size_t i;
-  const int16_t *in_16 = reinterpret_cast<const int16_t *>(in);
-
-  assert(in != nullptr);
-  assert(out != nullptr);
-
-  for (i = 0; i < samples; i++)
-  {
-    out[i] = *in_16++ / static_cast<float>(INT16_MAX + 1);
-  }
-}
-
-static void u24_to_float(const unsigned char *in, float *out,
-                         const size_t samples)
-{
-  size_t i;
-  const uint32_t *in_32 = reinterpret_cast<const uint32_t *>(in);
-
-  assert(in != nullptr);
-  assert(out != nullptr);
-
-  for (i = 0; i < samples; i++)
-  {
-    out[i] = (static_cast<float>(*in_32++) + static_cast<float>(S24_MIN)) / (static_cast<float>(S24_MAX) + 1.0);
-  }
-}
-
-static void s24_to_float(const char *in, float *out, const size_t samples)
-{
-  size_t i;
-  const int32_t *in_32 = reinterpret_cast<const int32_t *>(in);
-
-  assert(in != nullptr);
-  assert(out != nullptr);
-
-  for (i = 0; i < samples; i++)
-  {
-    out[i] = *in_32++ / (static_cast<float>(S24_MAX) + 1.0);
-  }
-}
 
 static void s24_3_to_float(const char *in, float *out, const size_t samples)
 {
@@ -446,34 +202,7 @@ static void u24_3_to_float(const char *in, float *out, const size_t samples)
   }
 }
 
-static void u32_to_float(const unsigned char *in, float *out,
-                         const size_t samples)
-{
-  size_t i;
-  const uint32_t *in_32 = reinterpret_cast<const uint32_t *>(in);
 
-  assert(in != nullptr);
-  assert(out != nullptr);
-
-  for (i = 0; i < samples; i++)
-  {
-    out[i] = (static_cast<float>(*in_32++) + static_cast<float>INT32_MIN) / (static_cast<float>INT32_MAX + 1.0);
-  }
-}
-
-static void s32_to_float(const char *in, float *out, const size_t samples)
-{
-  size_t i;
-  const int32_t *in_32 = reinterpret_cast<const int32_t *>(in);
-
-  assert(in != nullptr);
-  assert(out != nullptr);
-
-  for (i = 0; i < samples; i++)
-  {
-    out[i] = *in_32++ / (static_cast<float>INT32_MAX + 1.0);
-  }
-}
 
 /* Convert fixed point samples in format fmt (size in bytes) to float. */
 static std::vector<float> fixed_to_float(const char *buf, const size_t size, const long fmt)
@@ -487,27 +216,27 @@ static std::vector<float> fixed_to_float(const char *buf, const size_t size, con
   {
     case SFMT_U8:
       out.resize(size);
-      u8_to_float(reinterpret_cast<const unsigned char *>(buf), out.data(), size);
+      to_float_impl<uint8_t>(buf, out.data(), size, static_cast<float>(INT8_MIN), static_cast<float>(INT8_MAX) + 1.0f);
       break;
     case SFMT_S8:
       out.resize(size);
-      s8_to_float(buf, out.data(), size);
+      to_float_impl<int8_t>(buf, out.data(), size, 0.0f, static_cast<float>(INT8_MAX) + 1.0f);
       break;
     case SFMT_U16:
       out.resize(size / 2);
-      u16_to_float(reinterpret_cast<const unsigned char *>(buf), out.data(), size / 2);
+      to_float_impl<uint16_t>(buf, out.data(), size / 2, static_cast<float>(INT16_MIN), static_cast<float>(INT16_MAX) + 1.0f);
       break;
     case SFMT_S16:
       out.resize(size / 2);
-      s16_to_float(buf, out.data(), size / 2);
+      to_float_impl<int16_t>(buf, out.data(), size / 2, 0.0f, static_cast<float>(INT16_MAX) + 1.0f);
       break;
     case SFMT_U24:
       out.resize(size / 4);
-      u24_to_float(reinterpret_cast<const unsigned char *>(buf), out.data(), size / 4);
+      to_float_impl<uint32_t>(buf, out.data(), size / 4, static_cast<float>(S24_MIN), static_cast<float>(S24_MAX) + 1.0f);
       break;
     case SFMT_S24:
       out.resize(size / 4);
-      s24_to_float(buf, out.data(), size / 4);
+      to_float_impl<int32_t>(buf, out.data(), size / 4, 0.0f, static_cast<float>(S24_MAX) + 1.0f);
       break;
     case SFMT_S24_3:
       out.resize(size / 3);
@@ -519,11 +248,11 @@ static std::vector<float> fixed_to_float(const char *buf, const size_t size, con
       break;
     case SFMT_U32:
       out.resize(size / 4);
-      u32_to_float(reinterpret_cast<const unsigned char *>(buf), out.data(), size / 4);
+      to_float_impl<uint32_t>(buf, out.data(), size / 4, static_cast<float>(INT32_MIN), static_cast<float>(INT32_MAX) + 1.0f);
       break;
     case SFMT_S32:
       out.resize(size / 4);
-      s32_to_float(buf, out.data(), size / 4);
+      to_float_impl<int32_t>(buf, out.data(), size / 4, 0.0f, static_cast<float>(INT32_MAX) + 1.0f);
       break;
     default:
       error("Can't convert from %s to float!",
@@ -547,27 +276,27 @@ static std::vector<char> float_to_fixed(const float *buf, const size_t samples,
   {
     case SFMT_U8:
       new_snd.resize(samples);
-      float_to_u8(buf, reinterpret_cast<unsigned char *>(new_snd.data()), samples);
+      float_to_impl<uint8_t>(buf, new_snd.data(), samples, static_cast<float>(INT32_MAX), static_cast<float>(INT32_MAX), static_cast<float>(INT32_MIN), UINT8_MAX, 0, INT8_MIN, 24);
       break;
     case SFMT_S8:
       new_snd.resize(samples);
-      float_to_s8(buf, new_snd.data(), samples);
+      float_to_impl<int8_t>(buf, new_snd.data(), samples, static_cast<float>(INT32_MAX), static_cast<float>(INT32_MAX), static_cast<float>(INT32_MIN), INT8_MAX, INT8_MIN, 0, 24);
       break;
     case SFMT_U16:
       new_snd.resize(samples * 2);
-      float_to_u16(buf, reinterpret_cast<unsigned char *>(new_snd.data()), samples);
+      float_to_impl<uint16_t>(buf, new_snd.data(), samples, static_cast<float>(INT32_MAX), static_cast<float>(INT32_MAX), static_cast<float>(INT32_MIN), UINT16_MAX, 0, INT16_MIN, 16);
       break;
     case SFMT_S16:
       new_snd.resize(samples * 2);
-      float_to_s16(buf, new_snd.data(), samples);
+      float_to_impl<int16_t>(buf, new_snd.data(), samples, static_cast<float>(INT32_MAX), static_cast<float>(INT32_MAX), static_cast<float>(INT32_MIN), INT16_MAX, INT16_MIN, 0, 16);
       break;
     case SFMT_U24:
       new_snd.resize(samples * 4);
-      float_to_u24(buf, reinterpret_cast<unsigned char *>(new_snd.data()), samples);
+      float_to_impl<uint32_t>(buf, new_snd.data(), samples, static_cast<float>(S24_MAX), static_cast<float>(S24_MAX), static_cast<float>(S24_MIN), U24_MAX, 0, S24_MIN, 0);
       break;
     case SFMT_S24:
       new_snd.resize(samples * 4);
-      float_to_s24(buf, new_snd.data(), samples);
+      float_to_impl<int32_t>(buf, new_snd.data(), samples, static_cast<float>(S24_MAX), static_cast<float>(S24_MAX), static_cast<float>(S24_MIN), S24_MAX, S24_MIN, 0, 0);
       break;
     case SFMT_U24_3:
       new_snd.resize(samples * 3);
@@ -579,11 +308,11 @@ static std::vector<char> float_to_fixed(const float *buf, const size_t samples,
       break;
     case SFMT_U32:
       new_snd.resize(samples * 4);
-      float_to_u32(buf, reinterpret_cast<unsigned char *>(new_snd.data()), samples);
+      float_to_impl<uint32_t>(buf, new_snd.data(), samples, static_cast<float>(INT32_MAX), static_cast<float>(INT32_MAX), static_cast<float>(INT32_MIN), INT32_MAX, 0, INT32_MIN, 0);
       break;
     case SFMT_S32:
       new_snd.resize(samples * 4);
-      float_to_s32(buf, new_snd.data(), samples);
+      float_to_impl<int32_t>(buf, new_snd.data(), samples, static_cast<float>(INT32_MAX), static_cast<float>(INT32_MAX), static_cast<float>(INT32_MIN), INT32_MAX, INT32_MIN, 0, 0);
       break;
     default:
       error("Can't convert from float to %s!",
@@ -594,45 +323,9 @@ static std::vector<char> float_to_fixed(const float *buf, const size_t samples,
   return new_snd;
 }
 
-static inline void change_sign_8(uint8_t *buf, const size_t samples)
-{
-  size_t i;
 
-  for (i = 0; i < samples; i++)
-  {
-    *buf++ ^= 1 << 7;
-  }
-}
 
-static inline void change_sign_16(uint16_t *buf, const size_t samples)
-{
-  size_t i;
 
-  for (i = 0; i < samples; i++)
-  {
-    *buf++ ^= 1 << 15;
-  }
-}
-
-static inline void change_sign_24(uint32_t *buf, const size_t samples)
-{
-  size_t i;
-
-  for (i = 0; i < samples; i++)
-  {
-    *buf++ ^= 1 << 23;
-  }
-}
-
-static inline void change_sign_32(uint32_t *buf, const size_t samples)
-{
-  size_t i;
-
-  for (i = 0; i < samples; i++)
-  {
-    *buf++ ^= 1 << 31;
-  }
-}
 
 /* Change the signs of samples in format *fmt.  Also changes fmt to the new
  * format. */
@@ -644,51 +337,27 @@ static void change_sign(char *buf, const size_t size, long *fmt)
   {
     case SFMT_S8:
     case SFMT_U8:
-      change_sign_8(reinterpret_cast<uint8_t *>(buf), size);
-      if (*fmt & SFMT_S8)
-      {
-        *fmt = sfmt_set_fmt(*fmt, SFMT_U8);
-      }
-      else
-      {
-        *fmt = sfmt_set_fmt(*fmt, SFMT_S8);
-      }
+      change_sign_impl<uint8_t>(buf, size);
+      if (*fmt & SFMT_S8) { *fmt = sfmt_set_fmt(*fmt, SFMT_U8); }
+      else { *fmt = sfmt_set_fmt(*fmt, SFMT_S8); }
       break;
     case SFMT_S16:
     case SFMT_U16:
-      change_sign_16(reinterpret_cast<uint16_t *>(buf), size / 2);
-      if (*fmt & SFMT_S16)
-      {
-        *fmt = sfmt_set_fmt(*fmt, SFMT_U16);
-      }
-      else
-      {
-        *fmt = sfmt_set_fmt(*fmt, SFMT_S16);
-      }
+      change_sign_impl<uint16_t>(buf, size / 2);
+      if (*fmt & SFMT_S16) { *fmt = sfmt_set_fmt(*fmt, SFMT_U16); }
+      else { *fmt = sfmt_set_fmt(*fmt, SFMT_S16); }
       break;
     case SFMT_S24:
     case SFMT_U24:
-      change_sign_24(reinterpret_cast<uint32_t *>(buf), size / 4);
-      if (*fmt & SFMT_S24)
-      {
-        *fmt = sfmt_set_fmt(*fmt, SFMT_U24);
-      }
-      else
-      {
-        *fmt = sfmt_set_fmt(*fmt, SFMT_S24);
-      }
+      change_sign_impl<uint32_t>(buf, size / 4);
+      if (*fmt & SFMT_S24) { *fmt = sfmt_set_fmt(*fmt, SFMT_U24); }
+      else { *fmt = sfmt_set_fmt(*fmt, SFMT_S24); }
       break;
     case SFMT_S32:
     case SFMT_U32:
-      change_sign_32(reinterpret_cast<uint32_t *>(buf), size / 4);
-      if (*fmt & SFMT_S32)
-      {
-        *fmt = sfmt_set_fmt(*fmt, SFMT_U32);
-      }
-      else
-      {
-        *fmt = sfmt_set_fmt(*fmt, SFMT_S32);
-      }
+      change_sign_impl<uint32_t>(buf, size / 4);
+      if (*fmt & SFMT_S32) { *fmt = sfmt_set_fmt(*fmt, SFMT_U32); }
+      else { *fmt = sfmt_set_fmt(*fmt, SFMT_S32); }
       break;
     default:
       error("Request for changing sign of unknown format: %s",
