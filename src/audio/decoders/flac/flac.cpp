@@ -592,9 +592,9 @@ public:
     }
   }
 
-  void get_name(const char *unused ATTR_UNUSED, char buf[4]) override
+  std::string get_name(const char *unused ATTR_UNUSED) override
   {
-    std::memcpy(buf, "FLC", sizeof("FLC"));
+    return "FLC";
   }
 
   int our_format_ext(const char *ext) override

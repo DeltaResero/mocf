@@ -96,9 +96,9 @@ class AudioDecoder;
 
     /** Get a 3-chars format name for a file.
      * \param file File for which we want the format name.
-     * \param buf Buffer where the nul-terminated format name may be put.
+     * \return The format name, or an empty string if unknown.
      */
-    virtual void get_name(const char *file, char buf[4]) { buf[0] = '\0'; }
+    virtual std::string get_name(const char *file) { return ""; }
   };
 
   /** @class AudioDecoder

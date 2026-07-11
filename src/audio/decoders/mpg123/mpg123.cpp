@@ -516,9 +516,9 @@ static struct io_stream *mpg123_get_stream(void *prv_data)
   return data->stream.get();
 }
 
-static void mpg123_get_name(const char *file ATTR_UNUSED, char buf[4])
+static std::string mpg123_get_name(const char *unused ATTR_UNUSED)
 {
-  std::memcpy(buf, "123", sizeof("123"));
+  return "123";
 }
 
 static int mpg123_our_format_ext(const char *ext)
@@ -600,8 +600,8 @@ public:
         return mpg123_our_mime(mime);
     }
 
-    void get_name(const char *file, char buf[4]) override {
-        mpg123_get_name(file, buf);
+    std::string get_name(const char *file) override {
+        return mpg123_get_name(file);
     }
 };
 

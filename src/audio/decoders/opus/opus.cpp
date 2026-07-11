@@ -395,9 +395,9 @@ static struct io_stream *opus_get_stream(void *prv_data)
   return data->stream.get();
 }
 
-static void opus_get_name(const char *file ATTR_UNUSED, char buf[4])
+static std::string opus_get_name(const char *unused ATTR_UNUSED)
 {
-  std::memcpy(buf, "OPS", sizeof("OPS"));
+  return "OPS";
 }
 
 static int opus_our_format_ext(const char *ext)
@@ -479,8 +479,8 @@ public:
         return opus_our_mime(mime);
     }
 
-    void get_name(const char *file, char buf[4]) override {
-        opus_get_name(file, buf);
+    std::string get_name(const char *file) override {
+        return opus_get_name(file);
     }
 };
 

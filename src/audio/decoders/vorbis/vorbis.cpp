@@ -461,9 +461,9 @@ static struct io_stream *vorbis_get_stream(void *prv_data)
   return data->stream.get();
 }
 
-static void vorbis_get_name(const char *unused ATTR_UNUSED, char buf[4])
+static std::string vorbis_get_name(const char *unused ATTR_UNUSED)
 {
-  std::memcpy(buf, "OGG", sizeof("OGG"));
+  return "OGG";
 }
 
 static int vorbis_our_format_ext(const char *ext)
@@ -547,8 +547,8 @@ public:
         return vorbis_our_mime(mime);
     }
 
-    void get_name(const char *file, char buf[4]) override {
-        vorbis_get_name(file, buf);
+    std::string get_name(const char *file) override {
+        return vorbis_get_name(file);
     }
 };
 

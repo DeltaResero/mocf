@@ -462,9 +462,9 @@ static struct io_stream *musepack_get_stream(void *prv_data)
   return data->stream.get();
 }
 
-static void musepack_get_name(const char *unused ATTR_UNUSED, char buf[4])
+static std::string musepack_get_name(const char *unused ATTR_UNUSED)
 {
-  std::memcpy(buf, "MPC", sizeof("MPC"));
+  return "MPC";
 }
 
 static int musepack_our_format_ext(const char *ext)
@@ -532,8 +532,8 @@ public:
         return musepack_our_format_ext(ext);
     }
 
-    void get_name(const char *file, char buf[4]) override {
-        musepack_get_name(file, buf);
+    std::string get_name(const char *file) override {
+        return musepack_get_name(file);
     }
 };
 

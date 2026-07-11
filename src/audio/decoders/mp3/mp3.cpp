@@ -722,32 +722,32 @@ static int mp3_get_duration(void *void_data)
   return data->duration;
 }
 
-static void mp3_get_name(const char *file, char buf[4])
+static std::string mp3_get_name(const char *file)
 {
   char *ext;
-
-  std::memcpy(buf, "MPx", sizeof("MPx"));
 
   ext = ext_pos(file);
   if (ext)
   {
     if (!strcasecmp(ext, "mp3"))
     {
-      std::memcpy(buf, "MP3", sizeof("MP3"));
+      return "MP3";
     }
     else if (!strcasecmp(ext, "mp2"))
     {
-      std::memcpy(buf, "MP2", sizeof("MP2"));
+      return "MP2";
     }
     else if (!strcasecmp(ext, "mp1"))
     {
-      std::memcpy(buf, "MP1", sizeof("MP1"));
+      return "MP1";
     }
     else if (!strcasecmp(ext, "mpga"))
     {
-      std::memcpy(buf, "MPG", sizeof("MPG"));
+      return "MPG";
     }
   }
+
+  return "MPx";
 }
 
 static int mp3_our_format_ext(const char *ext)
@@ -858,8 +858,8 @@ public:
         return mp3_our_mime(mime);
     }
 
-    void get_name(const char *file, char buf[4]) override {
-        mp3_get_name(file, buf);
+    std::string get_name(const char *file) override {
+        return mp3_get_name(file);
     }
 };
 

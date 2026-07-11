@@ -268,7 +268,7 @@ int is_sound_file(const char *name) { return find_type(name) != -1 ? 1 : 0; }
 std::string file_type_name(const char *file)
 {
   int i;
-  char buf[4];
+  std::string name;
 
   i = find_type(file);
   if (i == -1)
@@ -276,11 +276,10 @@ std::string file_type_name(const char *file)
     return "";
   }
 
-  memset(buf, 0, sizeof(buf));
-  plugins[i].decoder->get_name(file, buf);
+  name = plugins[i].decoder->get_name(file);
 
   /* Attempt a default name if we have nothing else. */
-  if (!buf[0])
+  if (name.empty())
   {
     char *ext;
 
@@ -294,15 +293,15 @@ std::string file_type_name(const char *file)
       {
         if (ix > 1)
         {
-          buf[2] = toupper(ext[len - 1]);
+          name += static_cast<char>(toupper(ext[len - 1]));
           break;
         }
-        buf[ix] = toupper(ext[ix]);
+        name += static_cast<char>(toupper(ext[ix]));
       }
     }
   }
 
-  return buf;
+  return name;
 }
 
 AudioPlugin *get_decoder(const char *file)

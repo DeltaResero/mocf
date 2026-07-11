@@ -647,9 +647,9 @@ static int aac_get_duration(void *prv_data)
   return data->duration;
 }
 
-static void aac_get_name(const char *unused ATTR_UNUSED, char buf[4])
+static std::string aac_get_name(const char *unused ATTR_UNUSED)
 {
-  std::memcpy(buf, "AAC", sizeof("AAC"));
+  return "AAC";
 }
 
 static int aac_our_format_ext(const char *ext)
@@ -725,8 +725,8 @@ public:
         return aac_our_mime(mime);
     }
 
-    void get_name(const char *file, char buf[4]) override {
-        aac_get_name(file, buf);
+    std::string get_name(const char *file) override {
+        return aac_get_name(file);
     }
 };
 

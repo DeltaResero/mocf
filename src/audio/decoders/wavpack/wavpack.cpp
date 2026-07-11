@@ -289,9 +289,9 @@ static int wav_our_mime(const char *mime ATTR_UNUSED)
   return 0;
 }
 
-static void wav_get_name(const char *unused ATTR_UNUSED, char buf[4])
+static std::string wav_get_name(const char *unused ATTR_UNUSED)
 {
-  std::memcpy(buf, "WV", sizeof("WV"));
+  return "WV";
 }
 
 static int wav_our_format_ext(const char *ext)
@@ -352,8 +352,8 @@ public:
         return wav_our_mime(mime);
     }
 
-    void get_name(const char *file, char buf[4]) override {
-        wav_get_name(file, buf);
+    std::string get_name(const char *file) override {
+        return wav_get_name(file);
     }
 };
 

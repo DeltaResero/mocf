@@ -384,7 +384,7 @@ static int sndfile_get_duration(void *void_data)
   return result;
 }
 
-static void sndfile_get_name(const char *file, char buf[4])
+static std::string sndfile_get_name(const char *file)
 {
   char *ext;
 
@@ -393,25 +393,27 @@ static void sndfile_get_name(const char *file, char buf[4])
   {
     if (!strcasecmp(ext, "snd"))
     {
-      std::memcpy(buf, "AU", sizeof("AU"));
+      return "AU";
     }
     else if (!strcasecmp(ext, "8svx"))
     {
-      std::memcpy(buf, "SVX", sizeof("SVX"));
+      return "SVX";
     }
     else if (!strcasecmp(ext, "oga"))
     {
-      std::memcpy(buf, "OGG", sizeof("OGG"));
+      return "OGG";
     }
     else if (!strcasecmp(ext, "sf") || !strcasecmp(ext, "icram"))
     {
-      std::memcpy(buf, "IRC", sizeof("IRC"));
+      return "IRC";
     }
     else if (!strcasecmp(ext, "mat4") || !strcasecmp(ext, "mat5"))
     {
-      std::memcpy(buf, "MAT", sizeof("MAT"));
+      return "MAT";
     }
   }
+
+  return "";
 }
 
 static int sndfile_our_format_ext(const char *ext)
@@ -479,8 +481,8 @@ public:
         return sndfile_our_format_ext(ext);
     }
 
-    void get_name(const char *file, char buf[4]) override {
-        sndfile_get_name(file, buf);
+    std::string get_name(const char *file) override {
+        return sndfile_get_name(file);
     }
 };
 
