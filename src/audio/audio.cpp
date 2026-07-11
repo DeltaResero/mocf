@@ -210,282 +210,41 @@ static long sfmt_best_matching(const long formats_with_endian,
   {
     best = req;
   }
-  else if (req == SFMT_S8 || req == SFMT_U8)
+  else
   {
-    if (formats & SFMT_S8)
+    std::vector<long> prefs;
+    if (req == SFMT_S8 || req == SFMT_U8)
     {
-      best = SFMT_S8;
+      prefs = {SFMT_S8, SFMT_U8, SFMT_S16, SFMT_U16, SFMT_S24_3, SFMT_U24_3, SFMT_S24, SFMT_U24, SFMT_S32, SFMT_U32, SFMT_FLOAT};
     }
-    else if (formats & SFMT_U8)
+    else if (req == SFMT_S16 || req == SFMT_U16)
     {
-      best = SFMT_U8;
+      prefs = {SFMT_S16, SFMT_U16, SFMT_S24_3, SFMT_U24_3, SFMT_S24, SFMT_U24, SFMT_S32, SFMT_U32, SFMT_FLOAT, SFMT_S8, SFMT_U8};
     }
-    else if (formats & SFMT_S16)
+    else if (req == SFMT_S24 || req == SFMT_U24)
     {
-      best = SFMT_S16;
+      prefs = {SFMT_S24, SFMT_U24, SFMT_S24_3, SFMT_U24_3, SFMT_S32, SFMT_U32, SFMT_FLOAT, SFMT_S16, SFMT_U16, SFMT_S8, SFMT_U8};
     }
-    else if (formats & SFMT_U16)
+    else if (req == SFMT_S24_3 || req == SFMT_U24_3)
     {
-      best = SFMT_U16;
+      prefs = {SFMT_S24_3, SFMT_U24_3, SFMT_S24, SFMT_U24, SFMT_S32, SFMT_U32, SFMT_FLOAT, SFMT_S16, SFMT_U16, SFMT_S8, SFMT_U8};
     }
-    else if (formats & SFMT_S24_3)
+    else if (req == SFMT_S32 || req == SFMT_U32)
     {
-      best = SFMT_S24_3;
+      prefs = {SFMT_S32, SFMT_U32, SFMT_FLOAT, SFMT_S24_3, SFMT_U24_3, SFMT_S24, SFMT_U24, SFMT_S16, SFMT_U16, SFMT_S8, SFMT_U8};
     }
-    else if (formats & SFMT_U24_3)
+    else if (req == SFMT_FLOAT)
     {
-      best = SFMT_U24_3;
+      prefs = {SFMT_S32, SFMT_U32, SFMT_S24_3, SFMT_U24_3, SFMT_S24, SFMT_U24, SFMT_S16, SFMT_U16, SFMT_S8, SFMT_U8};
     }
-    else if (formats & SFMT_S24)
+
+    for (long pref : prefs)
     {
-      best = SFMT_S24;
-    }
-    else if (formats & SFMT_U24)
-    {
-      best = SFMT_U24;
-    }
-    else if (formats & SFMT_S32)
-    {
-      best = SFMT_S32;
-    }
-    else if (formats & SFMT_U32)
-    {
-      best = SFMT_U32;
-    }
-    else if (formats & SFMT_FLOAT)
-    {
-      best = SFMT_FLOAT;
-    }
-  }
-  else if (req == SFMT_S16 || req == SFMT_U16)
-  {
-    if (formats & SFMT_S16)
-    {
-      best = SFMT_S16;
-    }
-    else if (formats & SFMT_U16)
-    {
-      best = SFMT_U16;
-    }
-    else if (formats & SFMT_S24_3)
-    {
-      best = SFMT_S24_3;
-    }
-    else if (formats & SFMT_U24_3)
-    {
-      best = SFMT_U24_3;
-    }
-    else if (formats & SFMT_S24)
-    {
-      best = SFMT_S24;
-    }
-    else if (formats & SFMT_U24)
-    {
-      best = SFMT_U24;
-    }
-    else if (formats & SFMT_S32)
-    {
-      best = SFMT_S32;
-    }
-    else if (formats & SFMT_U32)
-    {
-      best = SFMT_U32;
-    }
-    else if (formats & SFMT_FLOAT)
-    {
-      best = SFMT_FLOAT;
-    }
-    else if (formats & SFMT_S8)
-    {
-      best = SFMT_S8;
-    }
-    else if (formats & SFMT_U8)
-    {
-      best = SFMT_U8;
-    }
-  }
-  else if (req == SFMT_S24 || req == SFMT_U24)
-  {
-    if (formats & SFMT_S24)
-    {
-      best = SFMT_S24;
-    }
-    else if (formats & SFMT_U24)
-    {
-      best = SFMT_U24;
-    }
-    else if (formats & SFMT_S24_3)
-    {
-      best = SFMT_S24_3;
-    }
-    else if (formats & SFMT_U24_3)
-    {
-      best = SFMT_U24_3;
-    }
-    else if (formats & SFMT_S32)
-    {
-      best = SFMT_S32;
-    }
-    else if (formats & SFMT_U32)
-    {
-      best = SFMT_U32;
-    }
-    else if (formats & SFMT_FLOAT)
-    {
-      best = SFMT_FLOAT;
-    }
-    else if (formats & SFMT_S16)
-    {
-      best = SFMT_S16;
-    }
-    else if (formats & SFMT_U16)
-    {
-      best = SFMT_U16;
-    }
-    else if (formats & SFMT_S8)
-    {
-      best = SFMT_S8;
-    }
-    else if (formats & SFMT_U8)
-    {
-      best = SFMT_U8;
-    }
-  }
-  else if (req == SFMT_S24_3 || req == SFMT_U24_3)
-  {
-    if (formats & SFMT_S24_3)
-    {
-      best = SFMT_S24_3;
-    }
-    else if (formats & SFMT_U24_3)
-    {
-      best = SFMT_U24_3;
-    }
-    else if (formats & SFMT_S24)
-    {
-      best = SFMT_S24;
-    }
-    else if (formats & SFMT_U24)
-    {
-      best = SFMT_U24;
-    }
-    else if (formats & SFMT_S32)
-    {
-      best = SFMT_S32;
-    }
-    else if (formats & SFMT_U32)
-    {
-      best = SFMT_U32;
-    }
-    else if (formats & SFMT_FLOAT)
-    {
-      best = SFMT_FLOAT;
-    }
-    else if (formats & SFMT_S16)
-    {
-      best = SFMT_S16;
-    }
-    else if (formats & SFMT_U16)
-    {
-      best = SFMT_U16;
-    }
-    else if (formats & SFMT_S8)
-    {
-      best = SFMT_S8;
-    }
-    else if (formats & SFMT_U8)
-    {
-      best = SFMT_U8;
-    }
-  }
-  else if (req == SFMT_S32 || req == SFMT_U32)
-  {
-    if (formats & SFMT_S32)
-    {
-      best = SFMT_S32;
-    }
-    else if (formats & SFMT_U32)
-    {
-      best = SFMT_U32;
-    }
-    else if (formats & SFMT_FLOAT)
-    {
-      best = SFMT_FLOAT;
-    }
-    else if (formats & SFMT_S24_3)
-    {
-      best = SFMT_S24_3;
-    }
-    else if (formats & SFMT_U24_3)
-    {
-      best = SFMT_U24_3;
-    }
-    else if (formats & SFMT_S24)
-    {
-      best = SFMT_S24;
-    }
-    else if (formats & SFMT_U24)
-    {
-      best = SFMT_U24;
-    }
-    else if (formats & SFMT_S16)
-    {
-      best = SFMT_S16;
-    }
-    else if (formats & SFMT_U16)
-    {
-      best = SFMT_U16;
-    }
-    else if (formats & SFMT_S8)
-    {
-      best = SFMT_S8;
-    }
-    else if (formats & SFMT_U8)
-    {
-      best = SFMT_U8;
-    }
-  }
-  else if (req == SFMT_FLOAT)
-  {
-    if (formats & SFMT_S32)
-    {
-      best = SFMT_S32;
-    }
-    else if (formats & SFMT_U32)
-    {
-      best = SFMT_U32;
-    }
-    else if (formats & SFMT_S24_3)
-    {
-      best = SFMT_S24_3;
-    }
-    else if (formats & SFMT_U24_3)
-    {
-      best = SFMT_U24_3;
-    }
-    else if (formats & SFMT_S24)
-    {
-      best = SFMT_S24;
-    }
-    else if (formats & SFMT_U24)
-    {
-      best = SFMT_U24;
-    }
-    else if (formats & SFMT_S16)
-    {
-      best = SFMT_S16;
-    }
-    else if (formats & SFMT_U16)
-    {
-      best = SFMT_U16;
-    }
-    else if (formats & SFMT_S8)
-    {
-      best = SFMT_S8;
-    }
-    else if (formats & SFMT_U8)
-    {
-      best = SFMT_U8;
+      if (formats & pref)
+      {
+        best = pref;
+        break;
+      }
     }
   }
 
