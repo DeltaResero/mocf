@@ -71,7 +71,11 @@ endif()
 # the same way the MP3 (libmad) block above does.
 if(WITH_AC3)
   check_library_exists(a52 a52_init "" HAVE_LIBA52)
-  check_include_file(a52dec/a52.h HAVE_A52DEC_A52_H)
+  # a52.h uses uint8_t/int8_t/etc. without including <stdint.h> itself,
+  # so a bare check_include_file() on it fails to compile (and thus
+  # reports "not found") even when the header is genuinely present.
+  # check_include_files() (plural) chains stdint.h in ahead of it.
+  check_include_files("stdint.h;a52dec/a52.h" HAVE_A52DEC_A52_H)
 
   if(HAVE_LIBA52 AND HAVE_A52DEC_A52_H)
     add_decoder_plugin(

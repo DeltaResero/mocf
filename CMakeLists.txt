@@ -90,6 +90,7 @@ option(WITH_AC3 "Enable AC-3 support (liba52)" ON)
 
 # Dependencies
 include(CheckIncludeFile)
+include(CheckIncludeFiles)
 include(CheckFunctionExists)
 include(CheckSymbolExists)
 include(CheckLibraryExists)
