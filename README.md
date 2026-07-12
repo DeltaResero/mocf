@@ -41,10 +41,10 @@ This project uses the **CMake** build system.
 * POSIX.1-2001 compatible system
 * **Required Libraries:** libpopt, ncurses, pthreads
 * **Optional Libraries:** PulseAudio, ALSA, JACK, OSS, SNDIO,
-    libsamplerate, libmagic, BerkeleyDB.
+    libsamplerate, libmagic, BerkeleyDB, ffmpeg/libav.
 * **Decoder Libraries:** libmad, libmpg123, libfaad2, libvorbis, opusfile,
-    libflac, libmpcdec, libwavpack, libsndfile, libmodplug, ffmpeg/libav,
-    libspeex, libsidplayfp (>= 3.0, for the lightweight SIDLite builder).
+    libflac, libmpcdec, libwavpack, libsndfile, libmodplug, libspeex,
+    libsidplayfp (>= 3.0, for the lightweight SIDLite builder).
 
 ### Quick Start
 
@@ -62,41 +62,41 @@ You can configure the build by passing `-DOPTION=ON/OFF` to cmake.
 
 #### General Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `ENABLE_DEBUG` | Enable debugging code | `OFF` |
-| `ENABLE_CACHE` | Enable tags caching code (requires BerkeleyDB) | `ON` |
-| `ENABLE_INTERNAL_FLOAT` | Use float for internal processing | `ON` |
-| `ENABLE_SAMPLERATE` | Enable libsamplerate | `ON` |
-| `ENABLE_MAGIC` | Enable MIME magic support | `ON` |
+| Option              | Description                  | Default                  |
+|---------------------|------------------------------|--------------------------|
+| `ENABLE_DEBUG`      | Enable debugging code        | `OFF`                    |
+| `ENABLE_CACHE`      | Enable tags caching code (requires BerkeleyDB) | `ON`   |
+| `ENABLE_INTERNAL_FLOAT` | Use float for internal processing | `ON`            |
+| `ENABLE_SAMPLERATE` | Enable libsamplerate         | `ON`                     |
+| `ENABLE_MAGIC`      | Enable MIME magic support    | `ON`                     |
 
 #### Sound Output Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `WITH_PULSE` | Enable PulseAudio support | `ON` (Linux) |
-| `WITH_ALSA` | Enable ALSA support | `ON` (Linux) |
-| `WITH_JACK` | Enable JACK support | `OFF` |
-| `WITH_OSS` | Enable OSS support | `ON` (FreeBSD/NetBSD) |
-| `WITH_SNDIO` | Enable SNDIO support | `ON` (OpenBSD) |
+| Option              | Description                  | Default                  |
+|---------------------|------------------------------|--------------------------|
+| `WITH_JACK`         | Enable JACK support          | `OFF`                    |
+| `WITH_PULSE`        | Enable PulseAudio support    | `ON` (Linux)             |
+| `WITH_ALSA`         | Enable ALSA support          | `ON` (Linux)             |
+| `WITH_OSS`          | Enable OSS support           | `ON` (FreeBSD/NetBSD)    |
+| `WITH_SNDIO`        | Enable SNDIO support         | `ON` (OpenBSD)           |
 
 #### Decoder Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `WITH_MP3` | Enable MP3 support (libmad) | `ON` |
-| `WITH_MPG123` | Enable MPG123 support | `ON` |
-| `WITH_AAC` | Enable AAC support | `ON` |
-| `WITH_VORBIS` | Enable Ogg Vorbis support | `ON` |
-| `WITH_OPUS` | Enable Opus support | `ON` |
-| `WITH_FLAC` | Enable FLAC support | `ON` |
-| `WITH_MUSEPACK` | Enable Musepack support | `ON` |
-| `WITH_WAVPACK` | Enable WavPack support | `ON` |
-| `WITH_SNDFILE` | Enable libsndfile support | `ON` |
-| `WITH_MODPLUG` | Enable libmodplug support | `ON` |
-| `WITH_FFMPEG` | Enable ffmpeg/libav support | `ON` |
-| `WITH_SPEEX` | Enable Speex support | `ON` |
-| `WITH_SIDPLAYFP` | Enable libsidplayfp support | `ON` |
+| Option              | Description                  | Default                  |
+|---------------------|------------------------------|--------------------------|
+| `WITH_FFMPEG`       | Enable ffmpeg/libav support  | `OFF`                    |
+| `WITH_MP3`          | Enable MP3 support (libmad)  | `ON`                     |
+| `WITH_MPG123`       | Enable MPG123 support        | `ON`                     |
+| `WITH_AAC`          | Enable AAC support           | `ON`                     |
+| `WITH_VORBIS`       | Enable Ogg Vorbis support    | `ON`                     |
+| `WITH_OPUS`         | Enable Opus support          | `ON`                     |
+| `WITH_FLAC`         | Enable FLAC support          | `ON`                     |
+| `WITH_MUSEPACK`     | Enable Musepack support      | `ON`                     |
+| `WITH_WAVPACK`      | Enable WavPack support       | `ON`                     |
+| `WITH_SNDFILE`      | Enable libsndfile support    | `ON`                     |
+| `WITH_MODPLUG`      | Enable libmodplug support    | `ON`                     |
+| `WITH_SPEEX`        | Enable Speex support         | `ON`                     |
+| `WITH_SIDPLAYFP`    | Enable libsidplayfp support  | `ON`                     |
 
 ### Installation Directories
 

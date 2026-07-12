@@ -78,7 +78,12 @@ option(WITH_MUSEPACK "Enable Musepack support" ON)
 option(WITH_WAVPACK "Enable WavPack support" ON)
 option(WITH_SNDFILE "Enable libsndfile support" ON)
 option(WITH_MODPLUG "Enable libmodplug support" ON)
-option(WITH_FFMPEG "Enable ffmpeg/libav support" ON)
+# Off by default: on typical distro builds, FFmpeg's shared libraries drag in
+# video codecs, network/streaming protocols, and TLS that mocf never needs,
+# adding tens of MB of RSS on startup regardless of what's actually played.
+# Still fully supported as an opt-in for formats without a lighter alternative
+# (WMA Pro/Lossless, DTS, RealAudio, general video-file audio extraction).
+option(WITH_FFMPEG "Enable ffmpeg/libav support" OFF)
 option(WITH_SPEEX "Enable Speex support" ON)
 option(WITH_SIDPLAYFP "Enable libsidplayfp support" ON)
 
