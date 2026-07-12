@@ -87,6 +87,24 @@ if(WITH_AC3)
   endif()
 endif()
 
+# Chiptune decoder (libgme / Game_Music_Emu): NSF/NSFE, GBS, GYM, HES,
+# KSS, SAP, SPC, VGM/VGZ, AY.
+if(WITH_GME)
+  pkg_check_modules(GME libgme>=0.6.0)
+
+  if(GME_FOUND)
+    add_decoder_plugin(
+      gme
+      SOURCES
+      gme/gme.cpp
+      gme/gme.h
+      LIBRARIES
+      ${GME_LIBRARIES}
+      INCLUDE_DIRS
+      ${GME_INCLUDE_DIRS})
+  endif()
+endif()
+
 # MPG123 decoder
 if(WITH_MPG123)
   pkg_check_modules(MPG123 libmpg123>=1.14)

@@ -551,6 +551,9 @@ void options_init()
   add_bool("SidPlayFP_PlaySubTunes", true);
   add_int("SidPlayFP_SIDModel", 0, check_range, {0, 2});
 
+  add_int("GME_Frequency", 44100, check_range, {4000, 48000});
+  add_bool("GME_PlaySubTunes", false);
+
   add_bool("AAC_HEAACUpsampling", true);
 
   add_path("OnEngineStart", nullptr, check_true);

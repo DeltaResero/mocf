@@ -584,6 +584,19 @@
 # Play sub-tunes.
 #SidPlayFP_PlaySubTunes = yes
 
+# Sample rate for chiptune playback (NSF, GBS, GYM, HES, KSS, SAP, SPC,
+# VGM/VGZ, AY) via libgme.
+#GME_Frequency = 44100
+
+# Play sub-tunes back-to-back as one continuous track, the same way
+# SidPlayFP_PlaySubTunes does for SID files. Defaults to 'no' here,
+# unlike SidPlayFP_PlaySubTunes's default of 'yes' - chiptune formats
+# like NSF commonly have dozens of subtunes (one per game level/area),
+# where auto-playing through all of them is much more surprising than
+# it is for SID files (which typically have just a handful of
+# subtunes, all variations on one piece).
+#GME_PlaySubTunes = no
+
 # Run the OnStop command (full path, no arguments) when MOCF changes state
 # to stopped (i.e., when user stopped playing or changes a song).
 #
