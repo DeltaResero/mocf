@@ -67,6 +67,22 @@ if(WITH_MP3)
   endif()
 endif()
 
+# AC-3 decoder (liba52). No .pc file is shipped upstream, so detect it
+# the same way the MP3 (libmad) block above does.
+if(WITH_AC3)
+  check_library_exists(a52 a52_init "" HAVE_LIBA52)
+  check_include_file(a52dec/a52.h HAVE_A52DEC_A52_H)
+
+  if(HAVE_LIBA52 AND HAVE_A52DEC_A52_H)
+    add_decoder_plugin(
+      ac3
+      SOURCES
+      ac3/ac3.cpp
+      LIBRARIES
+      a52)
+  endif()
+endif()
+
 # MPG123 decoder
 if(WITH_MPG123)
   pkg_check_modules(MPG123 libmpg123>=1.14)
