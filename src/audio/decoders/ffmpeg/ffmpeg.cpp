@@ -263,20 +263,20 @@ static void load_audio_extns(std::vector<std::string> &list)
   /* When adding an entry to this list, tests need to be performed to
    * determine whether or not FFmpeg/LibAV handles durations and seeking
    * correctly.  If not, then the appropriate additions should be made
-   * in is_timing_broken() and is_seek_broken(). */
+   * in is_timing_broken() and is_seek_broken().
+   *
+   * Entries not listed here ideally should already be covered by a
+   * dedicated decoder registered ahead of FFmpeg in decoder_table[] */
   const struct extn_list audio_extns[] = {
-      {"aac", "aac"},      {"ac3", "ac3"},     {"ape", "ape"},
-      {"au", "au"},        {"ay", "libgme"},   {"dff", "dsf"},
-      {"dsf", "dsf"},      {"dts", "dts"},     {"eac3", "eac3"},
-      {"fla", "flac"},     {"flac", "flac"},   {"gbs", "libgme"},
-      {"gym", "libgme"},   {"hes", "libgme"},  {"kss", "libgme"},
-      {"mka", "matroska"}, {"mp2", "mpeg"},    {"mp3", "mp3"},
-      {"mpc", "mpc"},      {"mpc8", "mpc8"},   {"m4a", "m4a"},
-      {"nsf", "libgme"},   {"nsfe", "libgme"}, {"ra", "rm"},
-      {"sap", "libgme"},   {"spc", "libgme"},  {"tak", "tak"},
-      {"tta", "tta"},      {"vgm", "libgme"},  {"vgz", "libgme"},
-      {"vqf", "vqf"},      {"wav", "wav"},     {"w64", "w64"},
-      {"wma", "asf"},      {"wv", "wv"},       {nullptr, nullptr}};
+      {"ac3", "ac3"},      {"ape", "ape"},     {"ay", "libgme"},
+      {"dff", "dsf"},      {"dsf", "dsf"},     {"dts", "dts"},
+      {"eac3", "eac3"},    {"gbs", "libgme"},  {"gym", "libgme"},
+      {"hes", "libgme"},   {"kss", "libgme"},  {"mka", "matroska"},
+      {"mpc8", "mpc8"},    {"m4a", "m4a"},     {"nsf", "libgme"},
+      {"nsfe", "libgme"},  {"ra", "rm"},       {"sap", "libgme"},
+      {"spc", "libgme"},   {"tak", "tak"},     {"tta", "tta"},
+      {"vgm", "libgme"},   {"vgz", "libgme"},  {"vqf", "vqf"},
+      {"wma", "asf"},      {nullptr, nullptr}};
 
   for (ix = 0; audio_extns[ix].extn; ix += 1)
   {
