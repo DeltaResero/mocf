@@ -268,15 +268,11 @@ static void load_audio_extns(std::vector<std::string> &list)
    * Entries not listed here ideally should already be covered by a
    * dedicated decoder registered ahead of FFmpeg in decoder_table[] */
   const struct extn_list audio_extns[] = {
-      {"ape", "ape"},      {"ay", "libgme"},   {"dff", "dsf"},
-      {"dsf", "dsf"},      {"dts", "dts"},     {"eac3", "eac3"},
-      {"gbs", "libgme"},   {"gym", "libgme"},  {"hes", "libgme"},
-      {"kss", "libgme"},   {"mka", "matroska"},{"mpc8", "mpc8"},
-      {"m4a", "m4a"},      {"nsf", "libgme"},  {"nsfe", "libgme"},
-      {"ra", "rm"},        {"sap", "libgme"},  {"spc", "libgme"},
-      {"tak", "tak"},      {"tta", "tta"},     {"vgm", "libgme"},
-      {"vgz", "libgme"},   {"vqf", "vqf"},     {"wma", "asf"},
-      {nullptr, nullptr}};
+      {"ape", "ape"},      {"dff", "dsf"},     {"dsf", "dsf"},
+      {"dts", "dts"},      {"eac3", "eac3"},   {"mka", "matroska"},
+      {"mpc8", "mpc8"},    {"m4a", "m4a"},     {"ra", "rm"},
+      {"tak", "tak"},      {"tta", "tta"},     {"vqf", "vqf"},
+      {"wma", "asf"},      {nullptr, nullptr}};
 
   for (ix = 0; audio_extns[ix].extn; ix += 1)
   {
@@ -377,42 +373,7 @@ static int locking_cb(void **mutex, enum AVLockOp op)
  */
 static bool is_timing_broken(AVFormatContext *ic)
 {
-  if (ic->duration < 0 || ic->bit_rate < 0)
-  {
-    return true;
-  }
-
-  /* If and when FFmpeg uses the right field for its calculation this
-   * should be self-correcting. */
-  if (ic->duration < AV_TIME_BASE && !strcmp(ic->iformat->name, "libgme"))
-  {
-    return true;
-  }
-
-  /* AAC timing is inaccurate. */
-  if (!strcmp(ic->iformat->name, "aac"))
-  {
-    return true;
-  }
-
-  /* Formats less than 4 GiB should be okay, except those excluded above. */
-  if (avio_size(ic->pb) < UINT32_MAX)
-  {
-    return false;
-  }
-
-  /* WAV files are limited to 4 GiB but that doesn't stop some encoders. */
-  if (!strcmp(ic->iformat->name, "wav"))
-  {
-    return true;
-  }
-
-  if (!strcmp(ic->iformat->name, "au"))
-  {
-    return true;
-  }
-
-  return false;
+  return ic->duration < 0 || ic->bit_rate < 0;
 }
 
 static void ffmpeg_init()
