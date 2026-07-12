@@ -268,15 +268,15 @@ static void load_audio_extns(std::vector<std::string> &list)
    * Entries not listed here ideally should already be covered by a
    * dedicated decoder registered ahead of FFmpeg in decoder_table[] */
   const struct extn_list audio_extns[] = {
-      {"ac3", "ac3"},      {"ape", "ape"},     {"ay", "libgme"},
-      {"dff", "dsf"},      {"dsf", "dsf"},     {"dts", "dts"},
-      {"eac3", "eac3"},    {"gbs", "libgme"},  {"gym", "libgme"},
-      {"hes", "libgme"},   {"kss", "libgme"},  {"mka", "matroska"},
-      {"mpc8", "mpc8"},    {"m4a", "m4a"},     {"nsf", "libgme"},
-      {"nsfe", "libgme"},  {"ra", "rm"},       {"sap", "libgme"},
-      {"spc", "libgme"},   {"tak", "tak"},     {"tta", "tta"},
-      {"vgm", "libgme"},   {"vgz", "libgme"},  {"vqf", "vqf"},
-      {"wma", "asf"},      {nullptr, nullptr}};
+      {"ape", "ape"},      {"ay", "libgme"},   {"dff", "dsf"},
+      {"dsf", "dsf"},      {"dts", "dts"},     {"eac3", "eac3"},
+      {"gbs", "libgme"},   {"gym", "libgme"},  {"hes", "libgme"},
+      {"kss", "libgme"},   {"mka", "matroska"},{"mpc8", "mpc8"},
+      {"m4a", "m4a"},      {"nsf", "libgme"},  {"nsfe", "libgme"},
+      {"ra", "rm"},        {"sap", "libgme"},  {"spc", "libgme"},
+      {"tak", "tak"},      {"tta", "tta"},     {"vgm", "libgme"},
+      {"vgz", "libgme"},   {"vqf", "vqf"},     {"wma", "asf"},
+      {nullptr, nullptr}};
 
   for (ix = 0; audio_extns[ix].extn; ix += 1)
   {
