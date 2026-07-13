@@ -88,6 +88,7 @@ option(WITH_SPEEX "Enable Speex support" ON)
 option(WITH_SIDPLAYFP "Enable libsidplayfp support" ON)
 option(WITH_AC3 "Enable AC-3 support (liba52)" ON)
 option(WITH_GME "Enable chiptune support (libgme)" ON)
+option(WITH_APE "Enable Monkey's Audio (APE) support" ON)
 
 # Dependencies
 include(CheckIncludeFile)

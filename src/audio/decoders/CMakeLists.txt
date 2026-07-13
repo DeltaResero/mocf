@@ -105,6 +105,16 @@ if(WITH_GME)
   endif()
 endif()
 
+# Monkey's Audio (APE) decoder. No external library: this is a
+# self-contained port of FFmpeg's apedec.c/ape.c (LGPLv2.1+), avoiding
+# MACLib entirely (see comment at the top of ape.cpp for why).
+if(WITH_APE)
+  add_decoder_plugin(
+    ape
+    SOURCES
+    ape/ape.cpp)
+endif()
+
 # MPG123 decoder
 if(WITH_MPG123)
   pkg_check_modules(MPG123 libmpg123>=1.14)
