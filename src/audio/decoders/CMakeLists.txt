@@ -115,6 +115,19 @@ if(WITH_APE)
     ape/ape.cpp)
 endif()
 
+# Quite OK Audio (QOA) decoder. No external library: the upstream
+# single-header reference decoder (qoa/qoa.h, MIT) is vendored and
+# compiled directly. The format spec is frozen at v1.0, so the header
+# needs no ongoing maintenance.
+if(WITH_QOA)
+  add_decoder_plugin(
+    qoa
+    SOURCES
+    qoa/qoa.cpp
+    qoa/qoa_impl.c
+    qoa/qoa.h)
+endif()
+
 # MPG123 decoder
 if(WITH_MPG123)
   pkg_check_modules(MPG123 libmpg123>=1.14)
