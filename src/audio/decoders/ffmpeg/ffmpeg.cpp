@@ -268,7 +268,7 @@ static void load_audio_extns(std::vector<std::string> &list)
    * Entries not listed here ideally should already be covered by a
    * dedicated decoder registered ahead of FFmpeg in decoder_table[] */
   const struct extn_list audio_extns[] = {
-      {"ape", "ape"},      {"dff", "dsf"},     {"dsf", "dsf"},
+      {"dff", "dsf"},     {"dsf", "dsf"},
       {"dts", "dts"},      {"eac3", "eac3"},   {"mka", "matroska"},
       {"mpc8", "mpc8"},    {"m4a", "m4a"},     {"ra", "rm"},
       {"tak", "tak"},      {"tta", "tta"},     {"vqf", "vqf"},
