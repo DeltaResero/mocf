@@ -2003,6 +2003,7 @@ static int ape_get_bitrate(void *) { return -1; }
 static int ape_seek(void *prv_data, int sec)
 {
   auto *data = static_cast<struct ape_data *>(prv_data);
+  ApeCtx *ctx = data->ctx.get();
 
   if (sec < 0 || data->duration_sec <= 0 || sec >= data->duration_sec ||
       data->samplerate == 0)
@@ -2022,7 +2023,6 @@ static int ape_seek(void *prv_data, int sec)
   }
   if (frame_idx >= data->totalframes) return -1;
 
-  data->currentframe = frame_idx;
   data->frame_loaded = false;
 
   if (!ape_load_frame(data, frame_idx))
@@ -2031,7 +2031,33 @@ static int ape_seek(void *prv_data, int sec)
     return -1;
   }
 
-  return static_cast<int>(block_acc / data->samplerate);
+  /* currentframe is the NEXT frame ape_decode() will load once this one
+   * is exhausted; must point past frame_idx, not at it. */
+  data->currentframe = frame_idx + 1;
+
+  /* Advance within the frame toward target_block by decoding and
+   * discarding whole blocks_per_loop chunks, same granularity as
+   * ape_decode()'s normal playback path (never a partial chunk, which
+   * would corrupt decoder state - see predictor_decode_stereo_3950()).
+   * Only for fileversion >= 3930: older frames decode all-or-nothing
+   * (ape_decode_blocks() forces blockstodecode = samples), so there's
+   * no partial-frame position to advance to. */
+  int64_t discarded = 0;
+  if (ctx->fileversion >= 3930)
+  {
+    int64_t remainder = target_block - block_acc;
+    int64_t to_discard = (remainder / ctx->blocks_per_loop) * ctx->blocks_per_loop;
+    while (discarded < to_discard && data->frame_loaded)
+    {
+      int chunk =
+          static_cast<int>(std::min<int64_t>(to_discard - discarded, ctx->blocks_per_loop));
+      int got = ape_decode_blocks(data, chunk);
+      if (got <= 0) break;
+      discarded += got;
+    }
+  }
+
+  return static_cast<int>((block_acc + discarded) / data->samplerate);
 }
 
 static int ape_decode(void *prv_data, char *buf, int buf_len,
