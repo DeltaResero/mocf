@@ -239,7 +239,6 @@ static int wav_decode(void *prv_data, char *buf, int buf_len,
   }
   else
   {
-    debug("iBps %d", iBps);
     switch (Bps)
     {
       case 4:
