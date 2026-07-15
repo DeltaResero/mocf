@@ -128,6 +128,15 @@ if(WITH_QOA)
     qoa/qoa.h)
 endif()
 
+# True Audio (TTA) decoder. No external library: this is a self-contained
+# port of FFmpeg's tta.c/ttadata.c/ttadsp.c and its demuxer (LGPLv2.1+).
+if(WITH_TTA)
+  add_decoder_plugin(
+    tta
+    SOURCES
+    tta/tta.cpp)
+endif()
+
 # MPG123 decoder
 if(WITH_MPG123)
   pkg_check_modules(MPG123 libmpg123>=1.14)

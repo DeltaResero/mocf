@@ -90,6 +90,7 @@ option(WITH_AC3 "Enable AC-3 support (liba52)" ON)
 option(WITH_GME "Enable chiptune support (libgme)" ON)
 option(WITH_APE "Enable Monkey's Audio (APE) support" ON)
 option(WITH_QOA "Enable Quite OK Audio (QOA) support" ON)
+option(WITH_TTA "Enable True Audio (TTA) support" ON)
 
 # Dependencies
 include(CheckIncludeFile)
