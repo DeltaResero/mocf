@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
+// Copyright (C) 2026 DeltaResero <deltaresero@zoho.com>
+//
 // Enables mocf to play chiptune formats via libgme (Game_Music_Emu),
 // as a lighter alternative to FFmpeg for these formats.
 //

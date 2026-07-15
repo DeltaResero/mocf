@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
+// Copyright (C) 2026 DeltaResero <deltaresero@zoho.com>
+//
 // Enables mocf to play raw AC-3 (ATSC A/52) elementary streams via
 // liba52 (a52dec), as a lighter alternative to FFmpeg for this format.
 // liba52 decodes classic AC-3 only, not E-AC-3 (Dolby Digital Plus) -

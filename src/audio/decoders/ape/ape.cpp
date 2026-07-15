@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // mocf - Music on Console Framebuffer
-// Monkey's Audio (APE) decoder, ported from FFmpeg's libavcodec/apedec.c
-// and libavformat/ape.c as a lighter alternative to FFmpeg for this format.
+// Copyright (C) 2026 DeltaResero <deltaresero@zoho.com>
 //
-// Based on FFmpeg's APE demuxer and lossless audio decoder:
+// Monkey's Audio (APE) decoder, ported from FFmpeg's libavcodec/apedec.c
+// and libavformat/ape.c based upon libdemac from Dave Chapman.
 // Copyright (c) 2007 Benjamin Zores <ben@geexbox.org>
-// based upon libdemac from Dave Chapman.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by

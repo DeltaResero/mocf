@@ -3,10 +3,6 @@
 //
 // mocf - Music on Console Framebuffer
 // Based on FFplay Copyright (c) 2003 Fabrice Bellard
-// "The main problem is that external projects who want to
-// support both FFmpeg and LibAV are just fucked, and this
-// only because LibAV doesn't care a second about their users."
-// -- http://blog.pkh.me/p/13-the-ffmpeg-libav-situation.html
 // Copyright (C) 2005, 2006 Damian Pietras <daper@daper.net>
 //
 // This program is free software: you can redistribute it and/or modify
