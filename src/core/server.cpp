@@ -314,7 +314,11 @@ static void run_extern_cmd(const char *event)
 
 static void add_event_all(const int event, const void *data)
 {
-  void *data_copy = nullptr;
+  /* Owns the payload until it is handed to the queue; if anything below
+   * throws, or there is no queue to hand it to, it is freed on scope
+   * exit by the deleter for this event type. */
+  std::unique_ptr<void, void (*)(void *)> data_copy(nullptr,
+                                                    event_deleter(event));
 
   if (event == EV_STATE)
   {
@@ -332,29 +336,31 @@ static void add_event_all(const int event, const void *data)
   {
     if (event == EV_QUEUE_ADD)
     {
-      data_copy = new plist_item{};
-      plist_item_copy(static_cast<plist_item *>(data_copy),
-                      static_cast<const plist_item *>(data));
+      auto item = std::make_unique<plist_item>();
+      plist_item_copy(item.get(), static_cast<const plist_item *>(data));
+      data_copy.reset(item.release());
     }
     else if (event == EV_QUEUE_DEL || event == EV_STATUS_MSG)
     {
-      data_copy = new std::string(static_cast<const char *>(data));
+      data_copy.reset(new std::string(static_cast<const char *>(data)));
     }
     else if (event == EV_SRV_ERROR)
     {
-      data_copy = new srv_error_ev(*static_cast<const srv_error_ev *>(data));
+      data_copy.reset(
+          new srv_error_ev(*static_cast<const srv_error_ev *>(data)));
     }
     else if (event == EV_QUEUE_MOVE)
     {
-      data_copy = new move_ev_data(*static_cast<const move_ev_data *>(data));
+      data_copy.reset(
+          new move_ev_data(*static_cast<const move_ev_data *>(data)));
     }
     else if (event == EV_FILE_TAGS)
     {
       const auto *src = static_cast<const tag_ev_response *>(data);
-      auto *n = new tag_ev_response;
+      auto n = std::make_unique<tag_ev_response>();
       n->file = src->file;
       n->tags = src->tags ? std::make_unique<file_tags>(*src->tags) : nullptr;
-      data_copy = n;
+      data_copy.reset(n.release());
     }
     else
     {
@@ -363,9 +369,7 @@ static void add_event_all(const int event, const void *data)
   }
 
   if (g_eq)
-    eq_push(g_eq, event, data_copy);
-  else if (data_copy)
-    free_event_data(event, data_copy);
+    eq_push(g_eq, event, data_copy.release());
 }
 
 /* -----------------------------------------------------------------------
@@ -475,10 +479,10 @@ void tags_response(const char *file, const struct file_tags *tags)
 
   if (!g_eq) return;
 
-  auto *data = new tag_ev_response;
+  auto data = std::make_unique<tag_ev_response>();
   data->file = file;
   data->tags = std::make_unique<file_tags>(*tags);
-  eq_push(g_eq, EV_FILE_TAGS, data);
+  eq_push(g_eq, EV_FILE_TAGS, data.release());
 }
 
 void ev_audio_start(void) { add_event_all(EV_AUDIO_START, nullptr); }
