@@ -337,12 +337,12 @@ static int wma_decode(void *prv_data, char *buf, int buf_len,
   }
 }
 
-/* ASF carries its own tag objects (Content Description and friends); reading
- * them is a separate job from playback, so only the duration is reported here. */
+/* Metadata lives in the ASF header, so this only reads far enough to parse it
+ * and never touches the data packets. */
 static void wma_info(const char *file_name, struct file_tags *info,
                      const int tags_sel)
 {
-  if (!(tags_sel & TAGS_TIME))
+  if (!(tags_sel & (TAGS_COMMENTS | TAGS_TIME)))
   {
     return;
   }
@@ -359,8 +359,41 @@ static void wma_info(const char *file_name, struct file_tags *info,
     return;
   }
 
-  info->time = static_cast<int>(asf.duration_sec());
-  info->filled |= TAGS_TIME;
+  const AsfAudioInfo &ai = asf.info();
+
+  if (tags_sel & TAGS_TIME)
+  {
+    info->time = static_cast<int>(asf.duration_sec());
+    info->filled |= TAGS_TIME;
+  }
+
+  if (tags_sel & TAGS_COMMENTS)
+  {
+    /* Any one of these may be absent; mark the tags filled if we found
+     * something, so the cache does not keep asking. */
+    if (!ai.title.empty())
+    {
+      info->title = ai.title;
+    }
+    if (!ai.artist.empty())
+    {
+      info->artist = ai.artist;
+    }
+    if (!ai.album.empty())
+    {
+      info->album = ai.album;
+    }
+    if (ai.track >= 0)
+    {
+      info->track = ai.track;
+    }
+
+    if (!ai.title.empty() || !ai.artist.empty() || !ai.album.empty() ||
+        ai.track >= 0)
+    {
+      info->filled |= TAGS_COMMENTS;
+    }
+  }
 }
 
 static int wma_our_format_ext(const char *ext)

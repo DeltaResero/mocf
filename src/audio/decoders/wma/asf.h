@@ -42,6 +42,12 @@ struct AsfAudioInfo
   int stream_number = 0;
   std::vector<uint8_t> extradata;
 
+  /* Metadata, decoded to UTF-8. Empty / -1 when the file does not carry it. */
+  std::string title;
+  std::string artist;
+  std::string album;
+  int track = -1;
+
   int64_t play_duration_100ns = 0;  ///< File Properties play duration
   int64_t preroll_ms = 0;
   uint32_t packet_size = 0;
@@ -76,6 +82,10 @@ private:
   bool parse_header(uint64_t header_size, uint32_t nb_objects);
   bool parse_stream_properties(const uint8_t *p, size_t len);
   bool parse_file_properties(const uint8_t *p, size_t len);
+  /// Title/author/etc: five length-prefixed strings in a fixed order.
+  void parse_content_description(const uint8_t *p, size_t len);
+  /// Named descriptors (WM/AlbumTitle, WM/TrackNumber, ...).
+  void parse_extended_content_description(const uint8_t *p, size_t len);
   /// Reads one data packet and appends any payloads for our stream.
   int read_data_packet();
 

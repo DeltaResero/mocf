@@ -30,6 +30,10 @@ const uint8_t GUID_STREAM_PROPERTIES[16] = {
   0x91,0x07,0xDC,0xB7,0xB7,0xA9,0xCF,0x11,0x8E,0xE6,0x00,0xC0,0x0C,0x20,0x53,0x65};
 const uint8_t GUID_AUDIO_MEDIA[16] = {
   0x40,0x9E,0x69,0xF8,0x4D,0x5B,0xCF,0x11,0xA8,0xFD,0x00,0x80,0x5F,0x5C,0x44,0x2B};
+const uint8_t GUID_CONTENT_DESCRIPTION[16] = {
+  0x33,0x26,0xB2,0x75,0x8E,0x66,0xCF,0x11,0xA6,0xD9,0x00,0xAA,0x00,0x62,0xCE,0x6C};
+const uint8_t GUID_EXTENDED_CONTENT_DESCRIPTION[16] = {
+  0x40,0xA4,0xD0,0xD2,0x07,0xE3,0xD2,0x11,0x97,0xF0,0x00,0xA0,0xC9,0x5E,0xA8,0x50};
 
 inline bool guid_eq(const uint8_t *a, const uint8_t *b)
 {
@@ -74,6 +78,72 @@ inline bool read_var(const uint8_t *p, size_t len, size_t &off, int type,
     default: return false;
   }
 }
+
+/**
+ * Decodes an ASF metadata string (always UTF-16LE) to UTF-8.
+ *
+ * mocf has no UTF-16 support of its own and iconv is only optionally available
+ * (HAVE_ICONV), so the conversion is done here. Unpaired surrogates and a
+ * trailing odd byte are attacker-reachable, so both are dropped rather than
+ * trusted; a trailing NUL terminator is stripped.
+ */
+std::string utf16le_to_utf8(const uint8_t *p, size_t bytes)
+{
+  std::string out;
+  out.reserve(bytes / 2);
+
+  for (size_t i = 0; i + 1 < bytes; i += 2)
+  {
+    uint32_t cp = rl16(p + i);
+
+    if (cp == 0)
+      break;  // NUL terminator
+
+    if (cp >= 0xD800 && cp <= 0xDBFF)
+    {
+      // High surrogate: needs a low surrogate to follow.
+      if (i + 3 >= bytes)
+        break;
+      const uint32_t lo = rl16(p + i + 2);
+      if (lo < 0xDC00 || lo > 0xDFFF)
+        continue;  // unpaired; skip
+      cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
+      i += 2;
+    }
+    else if (cp >= 0xDC00 && cp <= 0xDFFF)
+    {
+      continue;  // stray low surrogate
+    }
+
+    if (cp < 0x80)
+    {
+      out += static_cast<char>(cp);
+    }
+    else if (cp < 0x800)
+    {
+      out += static_cast<char>(0xC0 | (cp >> 6));
+      out += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+    else if (cp < 0x10000)
+    {
+      out += static_cast<char>(0xE0 | (cp >> 12));
+      out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+      out += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+    else
+    {
+      out += static_cast<char>(0xF0 | (cp >> 18));
+      out += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+      out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+      out += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+  }
+  return out;
+}
+
+// A tag longer than this is ignored: the fields are attacker-controlled and
+// nothing legitimate needs more.
+const uint32_t ASF_MAX_TAG_BYTES = 1 << 16;
 
 // A media object larger than this is rejected rather than trusted: WMA's
 // block_align is a few KB, and the field is attacker-controlled.
@@ -145,6 +215,15 @@ bool AsfReader::parse_header(uint64_t header_size, uint32_t nb_objects)
     {
       // Ignore failures: a file may carry streams we do not care about.
       parse_stream_properties(buf.data() + p, static_cast<size_t>(osize));
+    }
+    else if (guid_eq(guid, GUID_CONTENT_DESCRIPTION))
+    {
+      parse_content_description(buf.data() + p, static_cast<size_t>(osize));
+    }
+    else if (guid_eq(guid, GUID_EXTENDED_CONTENT_DESCRIPTION))
+    {
+      parse_extended_content_description(buf.data() + p,
+                                         static_cast<size_t>(osize));
     }
     p += static_cast<size_t>(osize);
   }
@@ -247,6 +326,121 @@ bool AsfReader::parse_stream_properties(const uint8_t *p, size_t len)
     return false;
   }
   return true;
+}
+
+/**
+ * Content Description Object: five UTF-16LE strings stored back to back, each
+ * with its byte length declared up front, in a fixed order. Only title and
+ * author map onto anything mocf shows; the rest are skipped over.
+ *
+ * Tag parsing never fails the open: a file with unreadable metadata should
+ * still play.
+ */
+void AsfReader::parse_content_description(const uint8_t *p, size_t len)
+{
+  // GUID(16) size(8) then five uint16 lengths.
+  if (len < 34)
+    return;
+
+  uint16_t lengths[5];
+  for (int i = 0; i < 5; i++)
+    lengths[i] = rl16(p + 24 + i * 2);
+
+  size_t off = 34;
+  for (int i = 0; i < 5; i++)
+  {
+    const uint16_t n = lengths[i];
+    if (n == 0)
+      continue;
+    if (off + n > len)
+      return;  // truncated object
+
+    /* 0 = title, 1 = author, 2 = copyright, 3 = description, 4 = rating. */
+    if (i == 0)
+      info_.title = utf16le_to_utf8(p + off, n);
+    else if (i == 1)
+      info_.artist = utf16le_to_utf8(p + off, n);
+
+    off += n;
+  }
+}
+
+/**
+ * Extended Content Description Object: a count followed by named descriptors,
+ * each carrying its own type. This is where WM/AlbumTitle and WM/TrackNumber
+ * live -- the base Content Description object has no album or track field.
+ */
+void AsfReader::parse_extended_content_description(const uint8_t *p, size_t len)
+{
+  // GUID(16) size(8) descriptor count(2).
+  if (len < 26)
+    return;
+
+  const uint16_t count = rl16(p + 24);
+  size_t off = 26;
+
+  for (uint16_t i = 0; i < count; i++)
+  {
+    if (off + 2 > len) return;
+    const uint16_t name_len = rl16(p + off);
+    off += 2;
+    if (off + name_len > len) return;
+    const std::string name = utf16le_to_utf8(p + off, name_len);
+    off += name_len;
+
+    if (off + 4 > len) return;
+    const uint16_t type = rl16(p + off);
+    const uint16_t value_len = rl16(p + off + 2);
+    off += 4;
+    if (off + value_len > len) return;
+
+    const uint8_t *value = p + off;
+    off += value_len;
+
+    if (value_len > ASF_MAX_TAG_BYTES)
+      continue;
+
+    /* Type 0 is a UTF-16LE string; 3 is a DWORD. Track number shows up as
+     * either depending on the encoder, so both are accepted. */
+    if (name == "WM/AlbumTitle" && type == 0)
+    {
+      info_.album = utf16le_to_utf8(value, value_len);
+    }
+    else if ((name == "WM/TrackNumber" || name == "WM/Track") &&
+             info_.track < 0)
+    {
+      if (type == 0)
+      {
+        const std::string s = utf16le_to_utf8(value, value_len);
+        /* May be "5" or "5/12"; take the leading number. */
+        int n = 0;
+        bool any = false;
+        for (char c : s)
+        {
+          if (c < '0' || c > '9')
+            break;
+          n = n * 10 + (c - '0');
+          any = true;
+          if (n > 9999) break;
+        }
+        if (any)
+          info_.track = n;
+      }
+      else if (type == 3 && value_len == 4)
+      {
+        const uint32_t n = rl32(value);
+        if (n <= 9999)
+          info_.track = static_cast<int>(n);
+      }
+      /* WM/Track is 0-based, WM/TrackNumber is 1-based. */
+      if (name == "WM/Track" && info_.track >= 0)
+        info_.track += 1;
+    }
+    else if (name == "WM/AlbumArtist" && type == 0 && info_.artist.empty())
+    {
+      info_.artist = utf16le_to_utf8(value, value_len);
+    }
+  }
 }
 
 int AsfReader::read_data_packet()
