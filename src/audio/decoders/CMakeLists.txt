@@ -137,6 +137,21 @@ if(WITH_TTA)
     tta/tta.cpp)
 endif()
 
+# Windows Media Audio (WMA v1/v2) decoder. No external library: wmadec.cpp is a
+# self-contained port of FFmpeg's wma.c/wmadec.c and the FFT/MDCT and VLC code
+# it depends on (LGPLv2.1+), and asf.cpp is an audio-only ASF container reader.
+if(WITH_WMA)
+  add_decoder_plugin(
+    wma
+    SOURCES
+    wma/wma.cpp
+    wma/asf.cpp
+    wma/asf.h
+    wma/wmadec.cpp
+    wma/wmadec.h
+    wma/wmadata.h)
+endif()
+
 # MPG123 decoder
 if(WITH_MPG123)
   pkg_check_modules(MPG123 libmpg123>=1.14)

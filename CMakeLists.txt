@@ -91,6 +91,7 @@ option(WITH_GME "Enable chiptune support (libgme)" ON)
 option(WITH_APE "Enable Monkey's Audio (APE) support" ON)
 option(WITH_QOA "Enable Quite OK Audio (QOA) support" ON)
 option(WITH_TTA "Enable True Audio (TTA) support" ON)
+option(WITH_WMA "Enable Windows Media Audio (WMA v1/v2) support" ON)
 
 # Dependencies
 include(CheckIncludeFile)
