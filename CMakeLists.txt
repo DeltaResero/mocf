@@ -90,6 +90,7 @@ option(WITH_AC3 "Enable AC-3 support (liba52)" ON)
 option(WITH_GME "Enable chiptune support (libgme)" ON)
 option(WITH_APE "Enable Monkey's Audio (APE) support" ON)
 option(WITH_QOA "Enable Quite OK Audio (QOA) support" ON)
+option(WITH_MLP "Enable MLP/TrueHD support" ON)
 option(WITH_TTA "Enable True Audio (TTA) support" ON)
 option(WITH_WMA "Enable Windows Media Audio (WMA v1/v2) support" ON)
 

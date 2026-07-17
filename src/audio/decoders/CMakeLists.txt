@@ -128,6 +128,18 @@ if(WITH_QOA)
     qoa/qoa.h)
 endif()
 
+# MLP/TrueHD decoder. No external library: mlpdec.cpp is a self-contained port
+# of FFmpeg's mlpdec.c and the mlp.c/mlp_parse.c/mlpdsp.c code it depends on
+# (LGPLv2.1+), and mlp.cpp walks the raw access unit chain.
+if(WITH_MLP)
+  add_decoder_plugin(
+    mlp
+    SOURCES
+    mlp/mlp.cpp
+    mlp/mlpdec.cpp
+    mlp/mlpdec.h)
+endif()
+
 # True Audio (TTA) decoder. No external library: this is a self-contained
 # port of FFmpeg's tta.c/ttadata.c/ttadsp.c and its demuxer (LGPLv2.1+).
 if(WITH_TTA)
