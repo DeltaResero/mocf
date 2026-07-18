@@ -343,6 +343,15 @@ public:
     int our_format_ext(const char *ext) override {
         return modplug_our_format_ext(ext);
     }
+
+    std::string get_name(const char *file) override {
+        const char *ext = ext_pos(file);
+        /* .amf0 is just an older AMF variant. */
+        if (ext && !strcasecmp(ext, "amf0")) {
+            return "AMF";
+        }
+        return "";  /* uppercased extension via file_type_name() */
+    }
 };
 
 extern "C" class AudioPlugin *modplug_plugin_init() {

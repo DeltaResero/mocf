@@ -397,7 +397,7 @@ static struct io_stream *opus_get_stream(void *prv_data)
 
 static std::string opus_get_name(const char *unused ATTR_UNUSED)
 {
-  return "OPS";
+  return "OPUS";
 }
 
 static int opus_our_format_ext(const char *ext)

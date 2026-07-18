@@ -403,7 +403,7 @@ static std::string sndfile_get_name(const char *file)
     {
       return "OGG";
     }
-    else if (!strcasecmp(ext, "sf") || !strcasecmp(ext, "icram"))
+    else if (!strcasecmp(ext, "sf") || !strcasecmp(ext, "ircam"))
     {
       return "IRC";
     }

@@ -286,16 +286,8 @@ std::string file_type_name(const char *file)
     ext = ext_pos(file);
     if (ext)
     {
-      size_t len;
-
-      len = strlen(ext);
-      for (size_t ix = 0; ix < len; ix += 1)
+      for (size_t ix = 0; ext[ix] != '\0'; ix += 1)
       {
-        if (ix > 1)
-        {
-          name += static_cast<char>(toupper(ext[len - 1]));
-          break;
-        }
         name += static_cast<char>(toupper(ext[ix]));
       }
     }

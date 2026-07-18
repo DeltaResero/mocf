@@ -604,7 +604,7 @@ public:
 
   std::string get_name(const char *unused ATTR_UNUSED) override
   {
-    return "FLC";
+    return "FLAC";
   }
 
   int our_format_ext(const char *ext) override

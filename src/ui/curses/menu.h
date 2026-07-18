@@ -47,7 +47,7 @@
   };
 
 #define FILE_TIME_STR_SZ 6
-#define FILE_FORMAT_SZ 4
+#define FILE_FORMAT_SZ 5
 
   struct menu_item
   {

@@ -21,6 +21,7 @@
 #include <memory>
 
 #include "core/common.h"
+#include "library/files.h"
 #include "audio/decoders/gme/gme.h"
 #include "core/log.h"
 #include "core/options.h"
@@ -409,6 +410,15 @@ public:
 
     int our_format_ext(const char *ext) override {
         return gme_decoder_our_format_ext(ext);
+    }
+
+    std::string get_name(const char *file) override {
+        const char *ext = ext_pos(file);
+        /* A .vgz is a gzipped VGM; label the encoding, not the wrapper. */
+        if (ext && !strcasecmp(ext, "vgz")) {
+            return "VGM";
+        }
+        return "";  /* uppercased extension via file_type_name() */
     }
 };
 

@@ -1560,6 +1560,21 @@ public:
         return ffmpeg_our_format_ext(ext);
     }
 
+    std::string get_name(const char *file) override {
+        const char *ext = ext_pos(file);
+        if (ext) {
+            /* Both DSDIFF (.dff) and Sony (.dsf) hold DSD audio. */
+            if (!strcasecmp(ext, "dff") || !strcasecmp(ext, "dsf")) {
+                return "DSD";
+            }
+            /* Musepack SV8. */
+            if (!strcasecmp(ext, "mpc8")) {
+                return "MPC";
+            }
+        }
+        return "";  /* uppercased extension via file_type_name() */
+    }
+
     int our_format_mime(const char *mime) override {
         return ffmpeg_our_format_mime(mime);
     }

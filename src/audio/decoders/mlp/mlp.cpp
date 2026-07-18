@@ -481,7 +481,7 @@ int mlp_our_format_ext(const char *ext)
 std::string mlp_get_name(const char *file)
 {
   const char *ext = ext_pos(file);
-  if (ext && !strcasecmp(ext, "thd")) return "TRUEHD";
+  if (ext && !strcasecmp(ext, "thd")) return "THD";
   return "MLP";
 }
 
