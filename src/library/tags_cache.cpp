@@ -49,6 +49,7 @@ typedef unsigned long int u_long;
 #include "core/server.h"
 #include "library/playlist.h"
 
+#include "audio/decoder.h"
 #include "library/files.h"
 #include "library/tags_cache.h"
 #include "core/log.h"
@@ -522,6 +523,24 @@ static std::unique_ptr<file_tags> read_missing_tags(
       tags->time = time;
       tags->filled |= TAGS_TIME;
       tags_sel &= ~TAGS_TIME;
+
+      /* This time was measured by playback, not read by the extension's
+       * decoder, so nothing has verified the extension yet. A misnamed
+       * file that was played would otherwise slip into the cache here
+       * unflagged and shed its mismatch mark on the next run. Check the
+       * content directly (a single small read). */
+      if (tags->real_format.empty())
+      {
+        const char *real_fmt = nullptr;
+        AudioPlugin *by_content = get_decoder_by_content(file, &real_fmt);
+
+        if (by_content && real_fmt && by_content != get_decoder(file))
+        {
+          tags->real_format = real_fmt;
+          logit("Extension mismatch: %s is really %s (time from server)",
+                file, real_fmt);
+        }
+      }
     }
   }
 
