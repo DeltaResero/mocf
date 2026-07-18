@@ -2177,6 +2177,13 @@ public:
         return ape_our_format_ext(ext);
     }
 
+    const char *our_format_data(const char *buf, size_t len) override {
+        if (len >= 4 && !memcmp(buf, "MAC ", 4)) {
+            return "APE";
+        }
+        return nullptr;
+    }
+
     std::string get_name(const char *) override {
         return "APE";
     }

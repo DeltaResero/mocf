@@ -543,6 +543,18 @@ public:
         return vorbis_our_format_ext(ext);
     }
 
+    const char *our_format_data(const char *buf, size_t len) override {
+        /* Ogg capture pattern, then the Vorbis id header in the first page. */
+        if (len >= 4 && !memcmp(buf, "OggS", 4)) {
+            for (size_t i = 28; i + 7 <= len; i++) {
+                if (!memcmp(buf + i, "\x01vorbis", 7)) {
+                    return "OGG";
+                }
+            }
+        }
+        return nullptr;
+    }
+
     int our_format_mime(const char *mime) override {
         return vorbis_our_mime(mime);
     }

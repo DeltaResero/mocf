@@ -382,6 +382,13 @@ public:
         return qoa_dec_our_format_ext(ext);
     }
 
+    const char *our_format_data(const char *buf, size_t len) override {
+        if (len >= 4 && !memcmp(buf, "qoaf", 4)) {
+            return "QOA";
+        }
+        return nullptr;
+    }
+
     std::string get_name(const char *file) override {
         return qoa_dec_get_name(file);
     }

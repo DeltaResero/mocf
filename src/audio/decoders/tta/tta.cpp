@@ -929,6 +929,13 @@ public:
         return tta_our_format_ext(ext);
     }
 
+    const char *our_format_data(const char *buf, size_t len) override {
+        if (len >= 4 && !memcmp(buf, "TTA1", 4)) {
+            return "TTA";
+        }
+        return nullptr;
+    }
+
     std::string get_name(const char *file) override {
         return tta_get_name(file);
     }

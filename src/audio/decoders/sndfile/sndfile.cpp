@@ -481,6 +481,20 @@ public:
         return sndfile_our_format_ext(ext);
     }
 
+    const char *our_format_data(const char *buf, size_t len) override {
+        if (len >= 12 && !memcmp(buf, "RIFF", 4) && !memcmp(buf + 8, "WAVE", 4)) {
+            return "WAV";
+        }
+        if (len >= 12 && !memcmp(buf, "FORM", 4) &&
+            (!memcmp(buf + 8, "AIFF", 4) || !memcmp(buf + 8, "AIFC", 4))) {
+            return "AIFF";
+        }
+        if (len >= 4 && !memcmp(buf, ".snd", 4)) {
+            return "AU";
+        }
+        return nullptr;
+    }
+
     std::string get_name(const char *file) override {
         return sndfile_get_name(file);
     }

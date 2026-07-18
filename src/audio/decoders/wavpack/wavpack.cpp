@@ -347,6 +347,13 @@ public:
         return wav_our_format_ext(ext);
     }
 
+    const char *our_format_data(const char *buf, size_t len) override {
+        if (len >= 4 && !memcmp(buf, "wvpk", 4)) {
+            return "WV";
+        }
+        return nullptr;
+    }
+
     int our_format_mime(const char *mime) override {
         return wav_our_mime(mime);
     }

@@ -612,6 +612,15 @@ public:
     return !strcasecmp(ext, "flac") || !strcasecmp(ext, "fla");
   }
 
+  const char *our_format_data(const char *buf, size_t len) override
+  {
+    if (len >= 4 && !memcmp(buf, "fLaC", 4))
+    {
+      return "FLAC";
+    }
+    return nullptr;
+  }
+
   int our_format_mime(const char *mime) override
   {
     return !strcasecmp(mime, "audio/flac") ||

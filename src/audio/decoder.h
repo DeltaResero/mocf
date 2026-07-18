@@ -94,6 +94,18 @@ class AudioDecoder;
      */
     virtual int our_format_mime(const char *mime_type) { return 0; }
 
+    /** Check if a buffer holding the first bytes of a file is in this
+     * decoder's format, regardless of the file's name. Used as a fallback
+     * when the decoder chosen by extension cannot open the file. Optional.
+     * \param buf First bytes of the file.
+     * \param len Number of valid bytes in buf.
+     * \return The format's display name (static storage), or nullptr if
+     * the data is not recognized. */
+    virtual const char *our_format_data(const char *buf, size_t len)
+    {
+      return nullptr;
+    }
+
     /** Get a 3-chars format name for a file.
      * \param file File for which we want the format name.
      * \return The format name, or an empty string if unknown.
@@ -174,6 +186,7 @@ class AudioDecoder;
 
   int is_sound_file(const char *name);
   AudioPlugin *get_decoder(const char *file);
+  AudioPlugin *get_decoder_by_content(const char *file, const char **label);
   const char *get_decoder_name(const AudioPlugin *decoder);
   void decoder_init(int debug_info);
   void decoder_cleanup();

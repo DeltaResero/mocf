@@ -344,6 +344,19 @@ public:
         return modplug_our_format_ext(ext);
     }
 
+    const char *our_format_data(const char *buf, size_t len) override {
+        if (len >= 4 && !memcmp(buf, "IMPM", 4)) {
+            return "IT";
+        }
+        if (len >= 17 && !memcmp(buf, "Extended Module: ", 17)) {
+            return "XM";
+        }
+        if (len >= 48 && !memcmp(buf + 44, "SCRM", 4)) {
+            return "S3M";
+        }
+        return nullptr;
+    }
+
     std::string get_name(const char *file) override {
         const char *ext = ext_pos(file);
         /* .amf0 is just an older AMF variant. */

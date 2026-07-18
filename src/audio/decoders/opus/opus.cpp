@@ -475,6 +475,18 @@ public:
         return opus_our_format_ext(ext);
     }
 
+    const char *our_format_data(const char *buf, size_t len) override {
+        /* Ogg capture pattern, then the Opus id header in the first page. */
+        if (len >= 4 && !memcmp(buf, "OggS", 4)) {
+            for (size_t i = 28; i + 8 <= len; i++) {
+                if (!memcmp(buf + i, "OpusHead", 8)) {
+                    return "OPUS";
+                }
+            }
+        }
+        return nullptr;
+    }
+
     int our_format_mime(const char *mime) override {
         return opus_our_mime(mime);
     }

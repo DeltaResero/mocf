@@ -529,6 +529,26 @@ public:
 
   int our_format_ext(const char *ext) override { return mlp_our_format_ext(ext); }
 
+  const char *our_format_data(const char *buf, size_t len) override
+  {
+    /* Raw MLP/TrueHD: the first access unit's major sync at bytes 4..7.
+     * 0xf8726fba marks TrueHD, 0xf8726fbb MLP. */
+    if (len >= 8 && static_cast<unsigned char>(buf[4]) == 0xf8 &&
+        static_cast<unsigned char>(buf[5]) == 0x72 &&
+        static_cast<unsigned char>(buf[6]) == 0x6f)
+    {
+      if (static_cast<unsigned char>(buf[7]) == 0xba)
+      {
+        return "THD";
+      }
+      if (static_cast<unsigned char>(buf[7]) == 0xbb)
+      {
+        return "MLP";
+      }
+    }
+    return nullptr;
+  }
+
   std::string get_name(const char *file) override { return mlp_get_name(file); }
 };
 

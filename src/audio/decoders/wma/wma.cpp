@@ -453,6 +453,16 @@ public:
         return wma_our_format_ext(ext);
     }
 
+    const char *our_format_data(const char *buf, size_t len) override {
+        static const unsigned char asf_guid[16] = {
+            0x30,0x26,0xB2,0x75,0x8E,0x66,0xCF,0x11,
+            0xA6,0xD9,0x00,0xAA,0x00,0x62,0xCE,0x6C};
+        if (len >= 16 && !memcmp(buf, asf_guid, 16)) {
+            return "WMA";
+        }
+        return nullptr;
+    }
+
     std::string get_name(const char *file) override {
         return wma_get_name(file);
     }

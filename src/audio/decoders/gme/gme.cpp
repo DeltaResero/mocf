@@ -412,6 +412,23 @@ public:
         return gme_decoder_our_format_ext(ext);
     }
 
+    const char *our_format_data(const char *buf, size_t len) override {
+        struct magic { const char *bytes; size_t n; const char *name; };
+        static const magic magics[] = {
+            {"NESM\x1a", 5, "NSF"}, {"NSFE", 4, "NSFE"},
+            {"GBS\x01", 4, "GBS"},  {"KSCC", 4, "KSS"},
+            {"KSSX", 4, "KSS"},      {"SNES-SPC700 Sound File Data", 28, "SPC"},
+            {"Vgm ", 4, "VGM"},      {"HESM", 4, "HES"},
+            {"GYMX", 4, "GYM"},      {"ZXAYEMUL", 8, "AY"},
+        };
+        for (const magic &m : magics) {
+            if (len >= m.n && !memcmp(buf, m.bytes, m.n)) {
+                return m.name;
+            }
+        }
+        return nullptr;
+    }
+
     std::string get_name(const char *file) override {
         const char *ext = ext_pos(file);
         /* A .vgz is a gzipped VGM; label the encoding, not the wrapper. */
