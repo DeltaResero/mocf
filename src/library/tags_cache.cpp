@@ -77,7 +77,7 @@ typedef unsigned long int u_long;
  * temporarily set it to zero to disable cache activity during structural
  * changes which require multiple commits.
  */
-#define CACHE_DB_FORMAT_VERSION 3
+#define CACHE_DB_FORMAT_VERSION 4
 
 /* How frequently to flush the tags database to disk.  A value of zero
  * disables flushing. */
