@@ -2056,7 +2056,7 @@ static int ape_seek(void *prv_data, int sec)
     }
   }
 
-  return static_cast<int>((block_acc + discarded) / data->samplerate);
+  return sec;
 }
 
 static int ape_decode(void *prv_data, char *buf, int buf_len,

@@ -235,7 +235,7 @@ static int qoa_dec_seek(void *prv_data, int sec)
   data->pcm_pos = 0;
   data->eof = false;
 
-  return static_cast<int>((frame_index * QOA_FRAME_LEN) / data->desc.samplerate);
+  return sec;
 }
 
 static int qoa_dec_get_bitrate(void *prv_data)
