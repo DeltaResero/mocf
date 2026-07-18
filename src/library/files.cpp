@@ -378,6 +378,23 @@ std::unique_ptr<struct file_tags> read_file_tags(
 
   df->info(file, tags.get(), needed_tags);
 
+  /* If the extension-chosen decoder produced no duration, the file may not
+   * actually be what its name says. Identify it by content and if that is
+   * a different decoder, read the tags from it instead. This fills in the
+   * time and title for misnamed files and records their true format. */
+  if ((needed_tags & TAGS_TIME) && tags->time == -1)
+  {
+    const char *real_fmt = nullptr;
+    AudioPlugin *by_content = get_decoder_by_content(file, &real_fmt);
+
+    if (by_content && by_content != df && real_fmt)
+    {
+      by_content->info(file, tags.get(), needed_tags);
+      tags->real_format = real_fmt;
+      logit("Extension mismatch: %s is really %s", file, real_fmt);
+    }
+  }
+
   tags->filled |= tags_sel;
 
   return tags;

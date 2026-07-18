@@ -580,7 +580,15 @@ static std::unique_ptr<file_tags> locked_read_add(struct tags_cache *c,
   }
 
   tags = read_missing_tags(file, std::move(tags), tags_sel);
-  tags_cache_add(c, file, key, tags.get());
+
+  /* A file whose real format differs from its extension is not written to
+   * the cache: the detected format is not part of the serialized record,
+   * so caching would drop the mismatch flag on the next run. Re-detecting
+   * costs a single header read and only ever happens for such files. */
+  if (tags->real_format.empty())
+  {
+    tags_cache_add(c, file, key, tags.get());
+  }
 
   return tags;
 }

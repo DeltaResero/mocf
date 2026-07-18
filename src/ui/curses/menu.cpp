@@ -150,7 +150,16 @@ static void draw_item(const struct menu *menu, const struct menu_item *mi,
       {
         xwprintw(menu->win, "|");
       }
-      xwprintw(menu->win, "%*s", FILE_FORMAT_SZ - 1, mi->format);
+      if (mi->format_attr)
+      {
+        wattrset(menu->win, mi->format_attr);
+        xwprintw(menu->win, "%*s", FILE_FORMAT_SZ - 1, mi->format);
+        wattrset(menu->win, info_attr);
+      }
+      else
+      {
+        xwprintw(menu->win, "%*s", FILE_FORMAT_SZ - 1, mi->format);
+      }
     }
     xwprintw(menu->win, "]");
   }
@@ -277,6 +286,7 @@ struct menu_item *menu_add(struct menu *menu, const char *title,
 
   mi->time[0] = 0;
   mi->format[0] = 0;
+  mi->format_attr = 0;
   mi->queue_pos = 0;
 
   menu_item *raw_mi = mi.get();
@@ -308,6 +318,7 @@ static struct menu_item *menu_add_from_item(struct menu *menu,
 
   memcpy(new_item->time, mi->time, sizeof(new_item->time));
   memcpy(new_item->format, mi->format, sizeof(new_item->format));
+  new_item->format_attr = mi->format_attr;
 
   return new_item;
 }
@@ -616,6 +627,13 @@ void menu_item_set_format(struct menu_item *mi, const char *format)
   size_t len = strnlen(format, sizeof(mi->format) - 1);
   memcpy(mi->format, format, len);
   mi->format[len] = '\0';
+}
+
+void menu_item_set_format_attr(struct menu_item *mi, const int attr)
+{
+  assert(mi != nullptr);
+
+  mi->format_attr = attr;
 }
 void menu_item_set_queue_pos(struct menu_item *mi, const int pos)
 {
