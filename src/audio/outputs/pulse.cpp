@@ -78,6 +78,11 @@
 
 #define PULSE_VOLUME_SAVE_FILE "pulse_volume"
 
+/* Upper bound on how much audio may sit ahead of the listener, matching
+ * alsa.cpp. mocf hands the driver at most AUDIO_MAX_PLAY (100ms) per
+ * write regardless, so bounding this costs no extra wakeups. */
+#define BUFFER_MAX_USEC 300000
+
 class PulseOutput : public AudioOutput {
 private:
     pa_threaded_mainloop *mainloop = nullptr;
@@ -274,7 +279,6 @@ int PulseOutput::open(struct sound_params *sound_params)
 
   assert(!stream);
   ba.fragsize = static_cast<uint32_t>(-1);
-  ba.tlength = static_cast<uint32_t>(-1);
   ba.prebuf = static_cast<uint32_t>(-1);
   ba.minreq = static_cast<uint32_t>(-1);
   ba.maxlength = static_cast<uint32_t>(-1);
@@ -293,6 +297,12 @@ int PulseOutput::open(struct sound_params *sound_params)
     case SFMT_S32 | SFMT_BE: ss.format = PA_SAMPLE_S32BE; break;
     default: fatal("pulse: got unrequested format");
   }
+
+  /* With PA_STREAM_ADJUST_LATENCY the target buffer length is the total
+   * latency the server aims for. Left unset, the server default runs to
+   * seconds; bound it as ALSA does so the reported position tracks what
+   * is actually being heard. */
+  ba.tlength = pa_usec_to_bytes(BUFFER_MAX_USEC, &ss);
 
   debug("opening stream");
 
@@ -510,14 +520,19 @@ int PulseOutput::get_buff_fill()
 {
   pa_usec_t buffered_usecs = 0;
   int buffered_bytes = 0;
+  int negative = 0;
 
   pa_threaded_mainloop_lock(mainloop);
 
-  if (stream && pa_stream_get_latency(stream, &buffered_usecs, nullptr) >= 0)
+  if (stream &&
+      pa_stream_get_latency(stream, &buffered_usecs, &negative) >= 0)
   {
-    if (buffered_usecs > 1000000)
+    /* A negative latency means the stream is running behind; nothing of
+     * ours is left queued, so report an empty buffer rather than the
+     * magnitude of the shortfall. */
+    if (negative)
     {
-      buffered_usecs = 1000000;
+      buffered_usecs = 0;
     }
 
     buffered_bytes =
