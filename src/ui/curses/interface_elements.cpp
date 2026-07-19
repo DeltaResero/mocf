@@ -1101,6 +1101,17 @@ static int add_to_menu(struct menu *menu, const struct plist *plist,
   menu_item_set_attr_sel_marked(added,
                                 get_color(CLR_MENU_ITEM_FILE_MARKED_SELECTED));
 
+  if (item->tags && item->tags->unreadable)
+  {
+    /* No decoder can play this file: show it the same way a playback
+     * failure does, without waiting for a play attempt. */
+    menu_item_set_time(added, "ERROR");
+    menu_item_set_attr_normal(added, get_color(CLR_ERROR));
+    menu_item_set_attr_sel(added, get_color(CLR_ERROR) | A_REVERSE);
+    menu_item_set_attr_marked(added, get_color(CLR_ERROR));
+    menu_item_set_attr_sel_marked(added, get_color(CLR_ERROR) | A_REVERSE);
+  }
+
   type_name = file_type_name(item->file.c_str());
   if (item->tags && !item->tags->real_format.empty())
   {
@@ -1453,6 +1464,16 @@ static void update_menu_item(struct menu_item *mi, const struct plist *plist,
   {
     std::string time_str = sec_to_min(item->tags->time);
     menu_item_set_time(mi, time_str.c_str());
+  }
+  else if (item->tags && item->tags->unreadable)
+  {
+    /* No decoder can play this file: show it the same way a playback
+     * failure does, without waiting for a play attempt. */
+    menu_item_set_time(mi, "ERROR");
+    menu_item_set_attr_normal(mi, get_color(CLR_ERROR));
+    menu_item_set_attr_sel(mi, get_color(CLR_ERROR) | A_REVERSE);
+    menu_item_set_attr_marked(mi, get_color(CLR_ERROR));
+    menu_item_set_attr_sel_marked(mi, get_color(CLR_ERROR) | A_REVERSE);
   }
   else
   {

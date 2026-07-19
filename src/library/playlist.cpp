@@ -75,6 +75,10 @@ void tags_update(struct file_tags *dst, struct file_tags *src, int move)
   {
     dst->real_format = src->real_format;
   }
+  if (src->unreadable)
+  {
+    dst->unreadable = true;
+  }
 }
 
 
