@@ -268,7 +268,7 @@ static void load_audio_extns(std::vector<std::string> &list)
       {"dts", "dts"},      {"eac3", "eac3"},   {"mka", "matroska"},
       {"mpc8", "mpc8"},    {"m4a", "m4a"},     {"ra", "rm"},
       {"tak", "tak"},      {"vqf", "vqf"},
-      {"wma", "asf"},      {nullptr, nullptr}};
+      {nullptr, nullptr}};
 
   for (ix = 0; audio_extns[ix].extn; ix += 1)
   {
