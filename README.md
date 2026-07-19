@@ -36,8 +36,9 @@ This project uses the **CMake** build system.
 
 ### Prerequisites
 
-* CMake 3.15 or later
-* C99 and C++17 compatible compilers
+* CMake 3.30 or later
+* A C99 compatible C compiler
+* A C++26 compatible C++ compiler (such as GCC 14 or later)
 * POSIX.1-2001 compatible system
 * **Required Libraries:** libpopt, ncurses, pthreads
 * **Optional Libraries:** PulseAudio, ALSA, JACK, OSS, SNDIO,
