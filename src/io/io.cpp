@@ -393,6 +393,13 @@ static void io_read_thread(struct io_stream *s)
 
     if (read_buf_fill < 0)
     {
+      if (s->after_seek)
+      {
+        /* The error came from a read at the pre-seek position; retry at
+         * the new one. A persistent error is still latched on the next
+         * pass, because after_seek is cleared at the top of the loop. */
+        continue;
+      }
       s->errno_val = errno;
       s->read_error = 1;
       logit("Exiting due to read error.");
@@ -402,6 +409,13 @@ static void io_read_thread(struct io_stream *s)
 
     if (read_buf_fill == 0)
     {
+      if (s->after_seek)
+      {
+        /* Stale EOF: the read finished at the pre-seek position before
+         * the seek moved the stream elsewhere. Read again at the new
+         * position instead of marking the stream ended. */
+        continue;
+      }
       s->eof = 1;
       debug("EOF, waiting");
       s->buf_fill_cond.notify_all();
