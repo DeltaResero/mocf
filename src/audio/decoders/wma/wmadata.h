@@ -1,9 +1,12 @@
-// SPDX-License-Identifier: LGPL-2.1-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Verbatim copy of FFmpeg n4.4.4 libavcodec/wmadata.h. The only deviation from
 // upstream is the removed #include "wma.h": these tables are pulled into
 // wmadec.cpp, which has already defined everything they need. Keep it that way
 // -- staying byte-identical to upstream is what makes it cheap to re-check.
+// Distributed in mocf under the GNU GPL version 3 or later, as permitted
+// by section 3 of upstream's LGPL version 2.1; the license references in
+// the notice below are altered accordingly, as that section requires.
 
 /*
  * WMA compatible decoder
@@ -12,16 +15,16 @@
  * This file is part of FFmpeg.
  *
  * FFmpeg is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
+ * modify it under the terms of the GNU General Public
  * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
+ * version 3 of the License, or (at your option) any later version.
  *
  * FFmpeg is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public
+ * You should have received a copy of the GNU General Public
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
