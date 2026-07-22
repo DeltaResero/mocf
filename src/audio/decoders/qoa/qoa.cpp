@@ -19,11 +19,12 @@
 #include "config.h"
 #endif
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
-#include <cstring>
 #include <memory>
 #include <string>
+#include <strings.h>
 #include <vector>
 
 // Declarations only. The reference implementation is C (its whole-file
@@ -45,7 +46,7 @@ struct qoa_dec_data
 {
   unique_io_stream io_stream;
 
-  qoa_desc desc; /* channels/samplerate/samples, filled at open */
+  qoa_desc desc{}; /* channels/samplerate/samples, filled at open */
 
   /* One encoded frame is read here off the stream. Sized to the fixed
    * full-frame length once the channel count is known. */
@@ -143,7 +144,6 @@ static void *qoa_dec_open(const char *file)
 {
   auto *data = new qoa_dec_data;
   decoder_error_init(&data->error);
-  memset(&data->desc, 0, sizeof(data->desc));
 
   data->io_stream.reset(io_open(file, 1));
 
@@ -279,8 +279,7 @@ static void qoa_dec_info(const char *file_name, struct file_tags *info,
   }
 
   unsigned char head[16];
-  qoa_desc desc;
-  memset(&desc, 0, sizeof(desc));
+  qoa_desc desc{};
 
   if (io_read(io.get(), head, sizeof(head)) < static_cast<ssize_t>(sizeof(head)))
   {
@@ -314,7 +313,9 @@ static int qoa_dec_decode(void *prv_data, char *buf, int buf_len,
   size_t want_shorts = static_cast<size_t>(buf_len) / sizeof(short);
   size_t n = avail_shorts < want_shorts ? avail_shorts : want_shorts;
 
-  memcpy(buf, data->pcm.data() + data->pcm_pos, n * sizeof(short));
+  const size_t n_bytes = n * sizeof(short);
+  const auto *src = reinterpret_cast<const char *>(data->pcm.data() + data->pcm_pos);
+  std::copy_n(src, n_bytes, buf);
   data->pcm_pos += n;
 
   sound_params->channels = static_cast<int>(data->desc.channels);
@@ -337,7 +338,7 @@ static std::string qoa_dec_get_name(const char *unused ATTR_UNUSED)
 class QoaDecoder : public AudioDecoder {
 public:
     std::unique_ptr<void, void(*)(void*)> data;
-    QoaDecoder(void *d) : data(d, qoa_dec_close) {}
+    explicit QoaDecoder(void *d) : data(d, qoa_dec_close) {}
     ~QoaDecoder() override = default;
 
     int decode(char *buf, int buf_len, struct sound_params *sound_params) override {
