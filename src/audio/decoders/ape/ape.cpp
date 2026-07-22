@@ -4,7 +4,7 @@
 // mocf - Music on Console Framebuffer
 // Copyright (C) 2026 DeltaResero <deltaresero@zoho.com>
 //
-// Monkey's Audio (APE) decoder, ported from FFmpeg's libavcodec/apedec.c
+// Monkey's Audio (APE) decoder, ported from FFmpeg's (LGPLv2.1+) libavcodec/apedec.c
 // and libavformat/ape.c based upon libdemac from Dave Chapman.
 // Copyright (c) 2007 Benjamin Zores <ben@geexbox.org>
 //

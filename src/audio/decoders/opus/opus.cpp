@@ -3,6 +3,10 @@
 //
 // mocf - Music on Console Framebuffer
 // Copyright (C) 2002 - 2005 Damian Pietras <daper@daper.net>
+// Copyright (C) 2012 - 2014 Tomasz Golinski <tomaszg@alpha.uwb.edu.pl>
+//
+// Opus support written by Tomasz Golinski for his MOC fork, using the
+// vorbis plugin as its template; portions based on Greg Maxwell's code.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
