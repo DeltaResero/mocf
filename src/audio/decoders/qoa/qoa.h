@@ -126,7 +126,7 @@ extern "C" {
 #define QOA_MAGIC 0x716f6166 /* 'qoaf' */
 
 #define QOA_FRAME_SIZE(channels, slices) \
-	(8 + QOA_LMS_LEN * 4 * channels + 8 * slices * channels)
+	(8 + QOA_LMS_LEN * 4 * (channels) + 8 * (slices) * (channels))
 
 typedef struct {
 	int history[QOA_LMS_LEN];
