@@ -217,7 +217,11 @@ the weights and calculating the prediction. */
 static int qoa_lms_predict(qoa_lms_t *lms) {
 	int prediction = 0;
 	for (int i = 0; i < QOA_LMS_LEN; i++) {
-		prediction += lms->weights[i] * lms->history[i];
+		/* Accumulate in unsigned: a crafted file can drive weight *
+		 * history past INT_MAX, which is undefined for signed ints.
+		 * Unsigned wraparound is defined and the >>13 result matches.
+		 * (Backported from FFmpeg's qoadec.c, oss-fuzz 62285.) */
+		prediction += (unsigned)lms->weights[i] * lms->history[i];
 	}
 	return prediction >> 13;
 }
