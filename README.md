@@ -167,3 +167,7 @@ This project is distributed in the hope that it will be useful, but
 **MERCHANTABILITY** or **FITNESS FOR A PARTICULAR PURPOSE**. See the
 [GNU General Public License](https://www.gnu.org/licenses/gpl-3.0.html)
 for more details.
+
+One exception applies: `src/audio/decoders/qoa/qoa.h`, the QOA decoder
+derived from the format's reference implementation, is MIT-licensed. Its
+terms are in that file and in the [MIT_LICENSE](docs/MIT_LICENSE) file.

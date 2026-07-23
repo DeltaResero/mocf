@@ -5,10 +5,11 @@
 // Decode-only derivative of https://github.com/phoboslab/qoa (spec
 // v1.0, 2023-04-24). The encoder half of the upstream single-file
 // library has been removed: mocf is a player and never encodes.
+// Copyright (c) 2023, Dominic Szablewski - https://phoboslab.org
 //
-// This file is MIT-licensed (mocf as a whole is GPL-3.0-or-later;
-// see qoa.cpp and qoa_impl.c, which use this file). Everything from
-// the next "/*" onward is upstream, with the encoder removed.
+// This file is free software: you can use, copy, modify, and distribute
+// it under the terms of the MIT license. See docs/MIT_LICENSE for the
+// full text.
 
 /*
 
