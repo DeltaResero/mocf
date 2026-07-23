@@ -16,5 +16,4 @@
 // (at your option) any later version.
 
 #define QOA_IMPLEMENTATION
-#define QOA_NO_STDIO
 #include "qoa.h"

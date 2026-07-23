@@ -23,15 +23,6 @@ QOA - The "Quite OK Audio" format for fast, lossy audio compression
 QOA encodes pulse-code modulated (PCM) audio data with up to 255 channels, 
 sample rates from 1 up to 16777215 hertz and a bit depth of 16 bits.
 
-The compression method employed in QOA is lossy; it discards some information
-from the uncompressed PCM data. For many types of audio signals this compression
-is "transparent", i.e. the difference from the original file is often not
-audible.
-
-QOA encodes 20 samples of 16 bit PCM data into slices of 64 bits. A single
-sample therefore requires 3.2 bits of storage space, resulting in a 5x
-compression (16 / 3.2).
-
 A QOA file consists of an 8 byte file header, followed by a number of frames.
 Each frame contains an 8 byte frame header, the current 16 byte en-/decoder
 state per channel and 256 slices per channel. Each slice is 8 bytes wide and
@@ -155,12 +146,6 @@ typedef struct {
 unsigned int qoa_decode_header(const unsigned char *bytes, int size, qoa_desc *qoa);
 unsigned int qoa_decode_frame(const unsigned char *bytes, unsigned int size, qoa_desc *qoa, short *sample_data, unsigned int *frame_len);
 short *qoa_decode(const unsigned char *bytes, int size, qoa_desc *file);
-
-#ifndef QOA_NO_STDIO
-
-void *qoa_read(const char *filename, qoa_desc *qoa);
-
-#endif /* QOA_NO_STDIO */
 
 
 #ifdef __cplusplus
@@ -430,43 +415,4 @@ short *qoa_decode(const unsigned char *bytes, int size, qoa_desc *qoa) {
 
 
 
-/* -----------------------------------------------------------------------------
-	File read/write convenience functions */
-
-#ifndef QOA_NO_STDIO
-#include <stdio.h>
-
-void *qoa_read(const char *filename, qoa_desc *qoa) {
-	FILE *f = fopen(filename, "rb");
-	int size, bytes_read;
-	void *data;
-	short *sample_data;
-
-	if (!f) {
-		return NULL;
-	}
-
-	fseek(f, 0, SEEK_END);
-	size = ftell(f);
-	if (size <= 0) {
-		fclose(f);
-		return NULL;
-	}
-	fseek(f, 0, SEEK_SET);
-
-	data = QOA_MALLOC(size);
-	if (!data) {
-		fclose(f);
-		return NULL;
-	}
-
-	bytes_read = fread(data, 1, size, f);
-	fclose(f);
-
-	sample_data = qoa_decode(data, bytes_read, qoa);
-	QOA_FREE(data);
-	return sample_data;
-}
-
-#endif /* QOA_NO_STDIO */
 #endif /* QOA_IMPLEMENTATION */
