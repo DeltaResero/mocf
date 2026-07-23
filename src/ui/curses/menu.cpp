@@ -231,7 +231,6 @@ void menu_set_cursor(const struct menu *m)
 
 
 
-/* menu_items must be malloc()ed memory! */
 struct menu *menu_new(WINDOW *win, const int posx, const int posy,
                       const int width, const int height)
 {
