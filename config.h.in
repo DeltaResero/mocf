@@ -36,7 +36,6 @@
 #cmakedefine HAVE_LOCALTIME_R 1
 #cmakedefine HAVE_NANOSLEEP 1
 #cmakedefine HAVE_STRCASECMP 1
-#cmakedefine HAVE_STRDUP 1
 #cmakedefine HAVE_STRNCASECMP 1
 #cmakedefine HAVE_WCSWIDTH 1
 #cmakedefine HAVE_SCHED_GET_PRIORITY_MAX 1

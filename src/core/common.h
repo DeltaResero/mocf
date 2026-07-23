@@ -128,10 +128,6 @@ constexpr bool in_closed_range(Lo lo, T val, Hi hi) noexcept {
     error(format ": %s", err##__LINE__.c_str());                               \
   } while (0)
 
-  void *xmalloc(size_t size);
-  void *xcalloc(size_t nmemb, size_t size);
-  void *xrealloc(void *ptr, const size_t size);
-  char *xstrdup(const char *s);
   void xsleep(size_t ticks, size_t ticks_per_sec);
   void xsignal(int signum, void (*func)(int));
 
