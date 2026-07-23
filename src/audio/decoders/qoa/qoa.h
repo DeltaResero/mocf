@@ -221,7 +221,7 @@ static int qoa_lms_predict(qoa_lms_t *lms) {
 		 * history past INT_MAX, which is undefined for signed ints.
 		 * Unsigned wraparound is defined and the >>13 result matches.
 		 * (Backported from FFmpeg's qoadec.c, oss-fuzz 62285.) */
-		prediction += (unsigned)lms->weights[i] * lms->history[i];
+		prediction += ((unsigned)lms->weights[i] * lms->history[i]);
 	}
 	return prediction >> 13;
 }
@@ -323,7 +323,7 @@ unsigned int qoa_decode_frame(const unsigned char *bytes, unsigned int size, qoa
 	unsigned int samples    = (frame_header >> 16) & 0x00ffff;
 	unsigned int frame_size = (frame_header      ) & 0x00ffff;
 
-	unsigned int header_size = 8 + QOA_LMS_LEN * 4 * channels;
+	unsigned int header_size = 8 + (QOA_LMS_LEN * 4 * channels);
 	unsigned int data_size = frame_size - header_size;
 	unsigned int max_total_slices = data_size / 8;
 	unsigned int num_slices = (samples + QOA_SLICE_LEN - 1) / QOA_SLICE_LEN;
@@ -334,7 +334,7 @@ unsigned int qoa_decode_frame(const unsigned char *bytes, unsigned int size, qoa
 		frame_size < header_size ||
 		frame_size > size ||
 		num_slices > QOA_SLICES_PER_FRAME ||
-		num_slices * channels > max_total_slices
+		(num_slices * channels) > max_total_slices
 	) {
 		return 0;
 	}
@@ -361,8 +361,8 @@ unsigned int qoa_decode_frame(const unsigned char *bytes, unsigned int size, qoa
 			int scalefactor = (slice >> 60) & 0xf;
 			slice <<= 4;
 
-			int slice_start = sample_index * channels + c;
-			int slice_end = qoa_clamp(sample_index + QOA_SLICE_LEN, 0, samples) * channels + c;
+			int slice_start = (sample_index * channels) + c;
+			int slice_end = (qoa_clamp(sample_index + QOA_SLICE_LEN, 0, samples) * channels) + c;
 
 			for (int si = slice_start; si < slice_end; si += channels) {
 				int predicted = qoa_lms_predict(&qoa->lms[c]);
