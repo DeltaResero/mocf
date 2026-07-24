@@ -126,8 +126,10 @@ const char *load_error_str(int err)
 }
 
 /* Load a module into a fresh context. Returns nullptr-filled data with
- * error set on failure; the caller always gets a valid xmp_data. */
-struct xmp_data *make_xmp_data(const char *file)
+ * error set on failure; the caller always gets a valid xmp_data.
+ * With skip_samples the sample data is not read at all: enough for the
+ * title and the duration, which come from the pattern scan. */
+struct xmp_data *make_xmp_data(const char *file, bool skip_samples)
 {
   auto *data = new xmp_data;
   decoder_error_init(&data->error);
@@ -144,6 +146,11 @@ struct xmp_data *make_xmp_data(const char *file)
   {
     decoder_error(&data->error, ERROR_FATAL, 0, "Can't create libxmp context");
     return data;
+  }
+
+  if (skip_samples)
+  {
+    xmp_set_player(data->ctx, XMP_PLAYER_SMPCTL, XMP_SMPCTL_SKIP);
   }
 
   int res = xmp_load_module_from_callbacks(data->ctx, s.get(),
@@ -199,7 +206,7 @@ void xmp_dec_close(void *void_data)
 
 void *xmp_dec_open(const char *file)
 {
-  struct xmp_data *data = make_xmp_data(file);
+  struct xmp_data *data = make_xmp_data(file, false);
 
   if (data->playing)
   {
@@ -230,7 +237,8 @@ void xmp_dec_info(const char *file_name, struct file_tags *info,
     return;
   }
 
-  struct xmp_data *data = make_xmp_data(file_name);
+  /* Samples are not needed for the title or the duration. */
+  struct xmp_data *data = make_xmp_data(file_name, true);
 
   if (!data->playing)
   {
