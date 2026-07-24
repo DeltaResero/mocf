@@ -45,6 +45,7 @@ struct xmp_settings
   int format = 0;    /* XMP_FORMAT_* flags */
   int interp = XMP_INTERP_LINEAR;
   int dsp = 0;       /* XMP_DSP_* flags */
+  int amp = 0;       /* 0 = normal, 1 = x2, 2 = x4, 3 = x8 */
   int loop = 0;      /* passed to xmp_play_buffer() */
   int channels = 2;
   int bits = 16;
@@ -175,6 +176,7 @@ struct xmp_data *make_xmp_data(const char *file, bool skip_samples)
 
   xmp_set_player(data->ctx, XMP_PLAYER_INTERP, g_settings.interp);
   xmp_set_player(data->ctx, XMP_PLAYER_DSP, g_settings.dsp);
+  xmp_set_player(data->ctx, XMP_PLAYER_AMP, g_settings.amp);
 
   struct xmp_frame_info fi;
   xmp_get_frame_info(data->ctx, &fi);
@@ -411,12 +413,13 @@ public:
         }
 
         g_settings.dsp = options_get_bool("XMP_LowPassFilter") ? XMP_DSP_ALL : 0;
+        g_settings.amp = options_get_int("XMP_Amplification");
         g_settings.loop = options_get_int("XMP_LoopCount") != 0 ? 1 : 0;
 
-        debug("libxmp %s: %dHz %dch %dbit interp=%d dsp=%d loop=%d",
+        debug("libxmp %s: %dHz %dch %dbit interp=%d dsp=%d amp=%d loop=%d",
               xmp_version, g_settings.frequency, g_settings.channels,
               g_settings.bits, g_settings.interp, g_settings.dsp,
-              g_settings.loop);
+              g_settings.amp, g_settings.loop);
     }
 
     std::unique_ptr<AudioDecoder> open(const char *file) override {

@@ -530,6 +530,7 @@ void options_init()
   add_int("XMP_Bits", 16, check_discrete, {8, 16});
   add_int("XMP_Frequency", 48000, check_discrete, {11025, 22050, 44100, 48000});
   add_bool("XMP_LowPassFilter", false);
+  add_int("XMP_Amplification", 0, check_range, {0, 3});
   add_int("XMP_LoopCount", 0, check_range, {0, 1});
 
   add_int("SidPlayFP_DefaultSongLength", 180, check_range, {0, INT_MAX});
