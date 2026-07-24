@@ -318,19 +318,28 @@ int xmp_dec_get_duration(void *void_data)
 
 int xmp_dec_our_format_ext(const char *ext)
 {
-  /* Formats libxmp loads that have a conventional extension. Kept to the
-   * set the previous libmodplug plugin claimed, minus AMS, DSM, DMF and
-   * MT2, which libxmp does not implement. */
-  return !strcasecmp(ext, "MOD") || !strcasecmp(ext, "S3M") ||
-         !strcasecmp(ext, "XM") || !strcasecmp(ext, "MED") ||
-         !strcasecmp(ext, "MTM") || !strcasecmp(ext, "IT") ||
-         !strcasecmp(ext, "669") || !strcasecmp(ext, "ULT") ||
-         !strcasecmp(ext, "STM") || !strcasecmp(ext, "FAR") ||
-         !strcasecmp(ext, "AMF") || !strcasecmp(ext, "MDL") ||
-         !strcasecmp(ext, "OKT") || !strcasecmp(ext, "PTM") ||
-         !strcasecmp(ext, "DBM") || !strcasecmp(ext, "AMF0") ||
-         !strcasecmp(ext, "PSM") || !strcasecmp(ext, "J2B") ||
-         !strcasecmp(ext, "UMX");
+  /* Extensions libxmp has a registered loader for. Deliberately absent:
+   * DMF, whose loader upstream has retired, and .smp, which is a generic
+   * raw-sample suffix rather than a module one. */
+  static const char *const exts[] = {
+      /* Claimed by the earlier libmodplug plugin. */
+      "MOD", "S3M", "XM", "MED", "MTM", "IT", "669", "ULT", "STM", "FAR",
+      "AMF", "AMF0", "MDL", "OKT", "PTM", "DBM", "PSM", "J2B", "UMX",
+      /* Additionally supported by libxmp. */
+      "ABK", "DIGI", "DTM", "EMOD", "FLX", "FNK", "GDM", "IMF", "LIQ",
+      "M15", "MFP", "MGT", "MMDC", "MTN", "NT", "PS16", "RTM", "SFX",
+      "STIM", "STX", "WOW", "XMF",
+  };
+
+  for (const char *const candidate : exts)
+  {
+    if (!strcasecmp(ext, candidate))
+    {
+      return 1;
+    }
+  }
+
+  return 0;
 }
 
 void xmp_dec_get_error(void *prv_data, struct decoder_error *error)
