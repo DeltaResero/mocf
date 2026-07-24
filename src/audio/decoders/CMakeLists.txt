@@ -336,18 +336,21 @@ if(WITH_SNDFILE)
   endif()
 endif()
 
-# ModPlug decoder
-if(WITH_MODPLUG)
-  pkg_check_modules(MODPLUG libmodplug>=0.7)
-  if(MODPLUG_FOUND)
+# libxmp (tracker module) decoder
+# 4.5 is the first release with the callback-based loaders, which let the
+# module be parsed straight off mocf's own stream instead of a full copy
+# of the file in memory.
+if(WITH_XMP)
+  pkg_check_modules(XMP libxmp>=4.5)
+  if(XMP_FOUND)
     add_decoder_plugin(
-      modplug
+      xmp
       SOURCES
-      modplug/modplug.cpp
+      xmp/xmp.cpp
       LIBRARIES
-      ${MODPLUG_LIBRARIES}
+      ${XMP_LIBRARIES}
       INCLUDE_DIRS
-      ${MODPLUG_INCLUDE_DIRS})
+      ${XMP_INCLUDE_DIRS})
   endif()
 endif()
 

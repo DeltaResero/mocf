@@ -525,23 +525,12 @@ void options_init()
   add_bool("PrefixQueuedMessages", true);
   add_str("ErrorMessagesQueued", "!", check_true);
 
-  add_bool("ModPlug_Oversampling", true);
-  add_bool("ModPlug_NoiseReduction", true);
-  add_bool("ModPlug_Reverb", false);
-  add_bool("ModPlug_MegaBass", false);
-  add_bool("ModPlug_Surround", false);
-  add_symb("ModPlug_ResamplingMode", "FIR", {"FIR", "SPLINE", "LINEAR", "NEAREST"});
-  add_int("ModPlug_Channels", 2, check_discrete, {1, 2});
-  add_int("ModPlug_Bits", 16, check_discrete, {8, 16, 32});
-  add_int("ModPlug_Frequency", 48000, check_discrete, {11025, 22050, 44100, 48000});
-  add_int("ModPlug_ReverbDepth", 0, check_range, {0, 100});
-  add_int("ModPlug_ReverbDelay", 0, check_range, {0, INT_MAX});
-  add_int("ModPlug_BassAmount", 0, check_range, {0, 100});
-  add_int("ModPlug_BassRange", 10, check_range, {10, 100});
-  add_int("ModPlug_SurroundDepth", 0, check_range, {0, 100});
-  add_int("ModPlug_SurroundDelay", 0, check_range, {0, INT_MAX});
-  add_int("ModPlug_LoopCount", 0, check_range, {-1, INT_MAX});
-  add_int("ModPlug_MaxFileSize", 32 * 1024 * 1024, check_range, {1, INT_MAX});
+  add_symb("XMP_ResamplingMode", "LINEAR", {"NEAREST", "LINEAR", "SPLINE"});
+  add_int("XMP_Channels", 2, check_discrete, {1, 2});
+  add_int("XMP_Bits", 16, check_discrete, {8, 16});
+  add_int("XMP_Frequency", 48000, check_discrete, {11025, 22050, 44100, 48000});
+  add_bool("XMP_LowPassFilter", false);
+  add_int("XMP_LoopCount", 0, check_range, {0, 1});
 
   add_int("SidPlayFP_DefaultSongLength", 180, check_range, {0, INT_MAX});
   add_int("SidPlayFP_MinimumSongLength", 0, check_range, {0, INT_MAX});

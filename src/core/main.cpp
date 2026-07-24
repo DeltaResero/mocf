@@ -984,8 +984,8 @@ int main(int argc, const char *argv[])
 #if defined(__GLIBC__)
   /* Keep resident memory tracking the currently-playing file instead of
    * ratcheting up track after track.  glibc's mmap threshold is dynamic by
-   * default: after freeing the large buffers a module decode allocates (the
-   * whole-file read buffer plus libmodplug's sample data), the threshold
+   * default: after freeing the large buffers a module decode allocates (a
+   * module's pattern and sample data), the threshold
    * climbs, so subsequent large allocations are served from the sbrk arena
    * (never returned to the OS) rather than mmap (returned on free).  Pinning
    * the threshold keeps those large, short-lived allocations on mmap; a tight

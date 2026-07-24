@@ -28,7 +28,7 @@ built, saved, and exported as m3u files.
 
 Supported formats include MP3, Ogg Vorbis, FLAC, Musepack, Speex, Opus, WAVE,
 and formats handled by FFmpeg/LibAV (e.g., WMA, AAC, MP4). Additional
-support includes AIFF, AU, SID, wavpack, and modplug.
+support includes AIFF, AU, SID, wavpack, and tracker modules.
 
 ## Building and Installation
 
@@ -44,7 +44,7 @@ This project uses the **CMake** build system.
 * **Optional Libraries:** PulseAudio, ALSA, JACK, OSS, SNDIO,
     libsamplerate, libmagic, BerkeleyDB, ffmpeg/libav.
 * **Decoder Libraries:** libmad, libmpg123, libfaad2, libvorbis, opusfile,
-    libflac, libmpcdec, libwavpack, libsndfile, libmodplug, libspeex,
+    libflac, libmpcdec, libwavpack, libsndfile, libxmp, libspeex,
     libsidplayfp (>= 3.0, for the lightweight SIDLite builder).
 
 ### Quick Start
@@ -95,7 +95,7 @@ You can configure the build by passing `-DOPTION=ON/OFF` to cmake.
 | `WITH_MUSEPACK`     | Enable Musepack support      | `ON`                     |
 | `WITH_WAVPACK`      | Enable WavPack support       | `ON`                     |
 | `WITH_SNDFILE`      | Enable libsndfile support    | `ON`                     |
-| `WITH_MODPLUG`      | Enable libmodplug support    | `ON`                     |
+| `WITH_XMP`          | Enable libxmp module support | `ON`                     |
 | `WITH_SPEEX`        | Enable Speex support         | `ON`                     |
 | `WITH_SIDPLAYFP`    | Enable libsidplayfp support  | `ON`                     |
 

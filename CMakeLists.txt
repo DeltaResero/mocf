@@ -77,7 +77,7 @@ option(WITH_FLAC "Enable FLAC support" ON)
 option(WITH_MUSEPACK "Enable Musepack support" ON)
 option(WITH_WAVPACK "Enable WavPack support" ON)
 option(WITH_SNDFILE "Enable libsndfile support" ON)
-option(WITH_MODPLUG "Enable libmodplug support" ON)
+option(WITH_XMP "Enable libxmp (tracker module) support" ON)
 # Off by default: on typical distro builds, FFmpeg's shared libraries drag in
 # video codecs, network/streaming protocols, and TLS that mocf never needs,
 # adding tens of MB of RSS on startup regardless of what's actually played.
