@@ -106,6 +106,21 @@ class AudioDecoder;
       return nullptr;
     }
 
+    /** Identify a file by opening it, for formats that a leading buffer
+     * cannot settle. Some container-less formats are only recognisable
+     * from the whole file: a Protracker module, for instance, is
+     * confirmed by checking that its declared sample lengths fit the
+     * file, which a truncated header cannot show. Tried only after
+     * our_format_data() has failed, so the cost falls on files nothing
+     * else could claim. Optional.
+     * \param file Path to the file to examine.
+     * \return Short display name of the detected format, or nullptr.
+     */
+    virtual const char *our_format_file(const char *file)
+    {
+      return nullptr;
+    }
+
     /** Get a 3-chars format name for a file.
      * \param file File for which we want the format name.
      * \return The format name, or an empty string if unknown.

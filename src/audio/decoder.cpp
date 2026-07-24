@@ -352,6 +352,22 @@ AudioPlugin *get_decoder_by_content(const char *file, const char **label)
     }
   }
 
+  /* Nothing recognised the leading bytes. Give decoders that need to see
+   * the whole file a chance before giving up. */
+  for (int ix = 0; ix < plugins_num; ix += 1)
+  {
+    const char *name = plugins[ix].decoder->our_format_file(file);
+
+    if (name)
+    {
+      if (label)
+      {
+        *label = name;
+      }
+      return plugins[ix].decoder;
+    }
+  }
+
   return nullptr;
 }
 

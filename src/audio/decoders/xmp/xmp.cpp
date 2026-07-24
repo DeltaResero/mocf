@@ -318,6 +318,83 @@ int xmp_dec_get_duration(void *void_data)
   return data->duration;
 }
 
+/* libxmp names formats after their tracker, so map the ones we claim onto
+ * the conventional suffix for display. Detection itself is libxmp's job;
+ * this is only about what the listing shows. */
+const char *type_label(const char *type)
+{
+  static const struct
+  {
+    const char *type;
+    const char *label;
+  } labels[] = {
+      {"Protracker", "MOD"},
+      {"Soundtracker", "MOD"},
+      {"Soundtracker 2.6/Ice Tracker", "MTN"},
+      {"Impulse Tracker", "IT"},
+      {"Fast Tracker II", "XM"},
+      {"Scream Tracker 3", "S3M"},
+      {"Scream Tracker 2", "STM"},
+      {"STMIK 0.2", "STX"},
+      {"Multitracker", "MTM"},
+      {"Composer 669", "669"},
+      {"Ultra Tracker", "ULT"},
+      {"Farandole Composer", "FAR"},
+      {"DSMI Advanced Module Format", "AMF"},
+      {"Asylum Music Format v1.0", "AMF"},
+      {"Digitrakker", "MDL"},
+      {"Oktalyzer", "OKT"},
+      {"Poly Tracker", "PTM"},
+      {"DigiBooster Pro", "DBM"},
+      {"DIGI Booster", "DIGI"},
+      {"Epic MegaGames MASI", "PSM"},
+      {"Epic MegaGames MASI 16", "PS16"},
+      {"Galaxy Music System 5.0 (J2B)", "J2B"},
+      {"Epic Games UMX", "UMX"},
+      {"Imago Orpheus v1.0", "IMF"},
+      {"Liquid Tracker", "LIQ"},
+      {"Real Tracker", "RTM"},
+      {"General Digital Music", "GDM"},
+      {"Digital Tracker", "DTM"},
+      {"Quadra Composer", "EMOD"},
+      {"Funktracker", "FNK"},
+      {"Megatracker", "MGT"},
+      {"Magnetic Fields Packer", "MFP"},
+      {"Slamtilt", "STIM"},
+      {"Astroidea XMF", "XMF"},
+      {"MED 2.10/OctaMED", "MED"},
+  };
+
+  for (const auto &entry : labels)
+  {
+    if (!strcasecmp(type, entry.type))
+    {
+      return entry.label;
+    }
+  }
+
+  /* Recognised by libxmp but not in the table: still a module, and
+   * saying so beats saying nothing. */
+  return "MOD";
+}
+
+const char *xmp_dec_our_format_file(const char *file)
+{
+  unique_io_stream s(io_open(file, 0));
+  if (!io_ok(s.get()))
+  {
+    return nullptr;
+  }
+
+  struct xmp_test_info ti;
+  if (xmp_test_module_from_callbacks(s.get(), make_callbacks(), &ti) != 0)
+  {
+    return nullptr;
+  }
+
+  return type_label(ti.type);
+}
+
 int xmp_dec_our_format_ext(const char *ext)
 {
   /* Extensions libxmp has a registered loader for. Deliberately absent:
@@ -447,6 +524,10 @@ public:
             return "S3M";
         }
         return nullptr;
+    }
+
+    const char *our_format_file(const char *file) override {
+        return xmp_dec_our_format_file(file);
     }
 
     std::string get_name(const char *file) override {
