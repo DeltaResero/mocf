@@ -286,16 +286,8 @@ std::string file_type_name(const char *file)
     ext = ext_pos(file);
     if (ext)
     {
-      size_t len;
-
-      len = strlen(ext);
-      for (size_t ix = 0; ix < len; ix += 1)
+      for (size_t ix = 0; ext[ix] != '\0'; ix += 1)
       {
-        if (ix > 1)
-        {
-          name += static_cast<char>(toupper(ext[len - 1]));
-          break;
-        }
         name += static_cast<char>(toupper(ext[ix]));
       }
     }
@@ -312,6 +304,68 @@ AudioPlugin *get_decoder(const char *file)
   if (i != -1)
   {
     return plugins[i].decoder;
+  }
+
+  return nullptr;
+}
+
+/* Identify a file's decoder by its content rather than its name. Reads the
+ * first bytes once and asks each plugin whether it recognizes them. Meant
+ * as a fallback for when the extension-chosen decoder can't open the file.
+ * Returns the decoder, or nullptr if no plugin claims the data. If label
+ * is not null, *label receives the recognized format's display name
+ * (static storage). */
+AudioPlugin *get_decoder_by_content(const char *file, const char **label)
+{
+  char buf[512];
+  ssize_t len;
+  FILE *f;
+
+  assert(file != nullptr);
+
+  f = fopen(file, "rb");
+  if (!f)
+  {
+    return nullptr;
+  }
+
+  len = static_cast<ssize_t>(fread(buf, 1, sizeof(buf), f));
+  fclose(f);
+
+  if (len <= 0)
+  {
+    return nullptr;
+  }
+
+  for (int ix = 0; ix < plugins_num; ix += 1)
+  {
+    const char *name =
+        plugins[ix].decoder->our_format_data(buf, static_cast<size_t>(len));
+
+    if (name)
+    {
+      if (label)
+      {
+        *label = name;
+      }
+      return plugins[ix].decoder;
+    }
+  }
+
+  /* Nothing recognised the leading bytes. Give decoders that need to see
+   * the whole file a chance before giving up. */
+  for (int ix = 0; ix < plugins_num; ix += 1)
+  {
+    const char *name = plugins[ix].decoder->our_format_file(file);
+
+    if (name)
+    {
+      if (label)
+      {
+        *label = name;
+      }
+      return plugins[ix].decoder;
+    }
   }
 
   return nullptr;

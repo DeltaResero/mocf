@@ -28,7 +28,7 @@ built, saved, and exported as m3u files.
 
 Supported formats include MP3, Ogg Vorbis, FLAC, Musepack, Speex, Opus, WAVE,
 and formats handled by FFmpeg/LibAV (e.g., WMA, AAC, MP4). Additional
-support includes AIFF, AU, SID, wavpack, and modplug.
+support includes AIFF, AU, SID, wavpack, and tracker modules.
 
 ## Building and Installation
 
@@ -36,15 +36,16 @@ This project uses the **CMake** build system.
 
 ### Prerequisites
 
-* CMake 3.15 or later
-* C99 and C++17 compatible compilers
+* CMake 3.30 or later
+* A C99 compatible C compiler
+* A C++26 compatible C++ compiler (such as GCC 14 or later)
 * POSIX.1-2001 compatible system
 * **Required Libraries:** libpopt, ncurses, pthreads
 * **Optional Libraries:** PulseAudio, ALSA, JACK, OSS, SNDIO,
-    libsamplerate, libmagic, BerkeleyDB.
+    libsamplerate, libmagic, BerkeleyDB, ffmpeg/libav.
 * **Decoder Libraries:** libmad, libmpg123, libfaad2, libvorbis, opusfile,
-    libflac, libmpcdec, libwavpack, libsndfile, libmodplug, ffmpeg/libav,
-    libspeex, libsidplayfp (>= 3.0, for the lightweight SIDLite builder).
+    libflac, libmpcdec, libwavpack, libsndfile, libxmp, libspeex,
+    libsidplayfp (>= 3.0, for the lightweight SIDLite builder).
 
 ### Quick Start
 
@@ -62,41 +63,41 @@ You can configure the build by passing `-DOPTION=ON/OFF` to cmake.
 
 #### General Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `ENABLE_DEBUG` | Enable debugging code | `OFF` |
-| `ENABLE_CACHE` | Enable tags caching code (requires BerkeleyDB) | `ON` |
-| `ENABLE_INTERNAL_FLOAT` | Use float for internal processing | `ON` |
-| `ENABLE_SAMPLERATE` | Enable libsamplerate | `ON` |
-| `ENABLE_MAGIC` | Enable MIME magic support | `ON` |
+| Option              | Description                  | Default                  |
+|---------------------|------------------------------|--------------------------|
+| `ENABLE_DEBUG`      | Enable debugging code        | `OFF`                    |
+| `ENABLE_CACHE`      | Enable tags caching code (requires BerkeleyDB) | `ON`   |
+| `ENABLE_INTERNAL_FLOAT` | Use float for internal processing | `ON`            |
+| `ENABLE_SAMPLERATE` | Enable libsamplerate         | `ON`                     |
+| `ENABLE_MAGIC`      | Enable MIME magic support    | `ON`                     |
 
 #### Sound Output Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `WITH_PULSE` | Enable PulseAudio support | `ON` (Linux) |
-| `WITH_ALSA` | Enable ALSA support | `ON` (Linux) |
-| `WITH_JACK` | Enable JACK support | `OFF` |
-| `WITH_OSS` | Enable OSS support | `ON` (FreeBSD/NetBSD) |
-| `WITH_SNDIO` | Enable SNDIO support | `ON` (OpenBSD) |
+| Option              | Description                  | Default                  |
+|---------------------|------------------------------|--------------------------|
+| `WITH_JACK`         | Enable JACK support          | `OFF`                    |
+| `WITH_PULSE`        | Enable PulseAudio support    | `ON` (Linux)             |
+| `WITH_ALSA`         | Enable ALSA support          | `ON` (Linux)             |
+| `WITH_OSS`          | Enable OSS support           | `ON` (FreeBSD/NetBSD)    |
+| `WITH_SNDIO`        | Enable SNDIO support         | `ON` (OpenBSD)           |
 
 #### Decoder Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `WITH_MP3` | Enable MP3 support (libmad) | `ON` |
-| `WITH_MPG123` | Enable MPG123 support | `ON` |
-| `WITH_AAC` | Enable AAC support | `ON` |
-| `WITH_VORBIS` | Enable Ogg Vorbis support | `ON` |
-| `WITH_OPUS` | Enable Opus support | `ON` |
-| `WITH_FLAC` | Enable FLAC support | `ON` |
-| `WITH_MUSEPACK` | Enable Musepack support | `ON` |
-| `WITH_WAVPACK` | Enable WavPack support | `ON` |
-| `WITH_SNDFILE` | Enable libsndfile support | `ON` |
-| `WITH_MODPLUG` | Enable libmodplug support | `ON` |
-| `WITH_FFMPEG` | Enable ffmpeg/libav support | `ON` |
-| `WITH_SPEEX` | Enable Speex support | `ON` |
-| `WITH_SIDPLAYFP` | Enable libsidplayfp support | `ON` |
+| Option              | Description                  | Default                  |
+|---------------------|------------------------------|--------------------------|
+| `WITH_FFMPEG`       | Enable ffmpeg/libav support  | `OFF`                    |
+| `WITH_MP3`          | Enable MP3 support (libmad)  | `ON`                     |
+| `WITH_MPG123`       | Enable MPG123 support        | `ON`                     |
+| `WITH_AAC`          | Enable AAC support           | `ON`                     |
+| `WITH_VORBIS`       | Enable Ogg Vorbis support    | `ON`                     |
+| `WITH_OPUS`         | Enable Opus support          | `ON`                     |
+| `WITH_FLAC`         | Enable FLAC support          | `ON`                     |
+| `WITH_MUSEPACK`     | Enable Musepack support      | `ON`                     |
+| `WITH_WAVPACK`      | Enable WavPack support       | `ON`                     |
+| `WITH_SNDFILE`      | Enable libsndfile support    | `ON`                     |
+| `WITH_XMP`          | Enable libxmp module support | `ON`                     |
+| `WITH_SPEEX`        | Enable Speex support         | `ON`                     |
+| `WITH_SIDPLAYFP`    | Enable libsidplayfp support  | `ON`                     |
 
 ### Installation Directories
 
@@ -166,3 +167,7 @@ This project is distributed in the hope that it will be useful, but
 **MERCHANTABILITY** or **FITNESS FOR A PARTICULAR PURPOSE**. See the
 [GNU General Public License](https://www.gnu.org/licenses/gpl-3.0.html)
 for more details.
+
+One exception applies: `src/audio/decoders/qoa/qoa.h`, the QOA decoder
+derived from the format's reference implementation, is MIT-licensed. Its
+terms are in that file and in the [MIT_LICENSE](docs/MIT_LICENSE) file.

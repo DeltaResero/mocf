@@ -378,6 +378,43 @@ std::unique_ptr<struct file_tags> read_file_tags(
 
   df->info(file, tags.get(), needed_tags);
 
+  /* If the extension-chosen decoder produced no duration, the file may not
+   * actually be what its name says. Identify it by content and if that is
+   * a different decoder, read the tags from it instead. This fills in the
+   * time and title for misnamed files and records their true format. */
+  if ((needed_tags & TAGS_TIME) && tags->time == -1)
+  {
+    const char *real_fmt = nullptr;
+    AudioPlugin *by_content = get_decoder_by_content(file, &real_fmt);
+
+    if (by_content && by_content != df && real_fmt)
+    {
+      by_content->info(file, tags.get(), needed_tags);
+      tags->real_format = real_fmt;
+      logit("Extension mismatch: %s is really %s", file, real_fmt);
+    }
+    else
+    {
+      /* Either nothing recognizes the content, or only the file's own
+       * format signature matches - which vouches for the container, not
+       * for the codec inside it (e.g. a RIFF/WAVE or ASF file holding a
+       * stream we cannot decode). Confirm with a real open attempt, the
+       * same test playing performs, so a file with merely unknown
+       * duration is not flagged. A broken file fails the open
+       * immediately. */
+      struct decoder_error err;
+      auto probe = df->open(file);
+
+      probe->get_error(&err);
+      if (err.type != ERROR_OK)
+      {
+        tags->unreadable = true;
+        logit("Unreadable file: %s", file);
+      }
+      decoder_error_clear(&err);
+    }
+  }
+
   tags->filled |= tags_sel;
 
   return tags;

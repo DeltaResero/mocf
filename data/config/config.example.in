@@ -512,56 +512,22 @@
 # error messages are still waiting to be displayed.
 #ErrorMessagesQueued = "!"
 
-# Self-describing ModPlug options (with 'yes' or 'no' values).
-#ModPlug_Oversampling = yes
-#ModPlug_NoiseReduction = yes
-#ModPlug_Reverb = no
-#ModPlug_MegaBass = no
-#ModPlug_Surround = no
-
-# ModPlug resampling mode.
-# Valid values are:
+# Tracker module (MOD/XM/IT/S3M etc.) playback options, handled by libxmp.
 #
-#     FIR -      8 tap fir filter (extremely high quality)
+# Resampling mode. Valid values are:
+#
 #     SPLINE -   Cubic spline interpolation (high quality)
 #     LINEAR -   Linear interpolation (fast, good quality)
-#     NEAREST -  No interpolation (very fast, extremely bad sound quality)
+#     NEAREST -  No interpolation (very fast, poor quality)
 #
-#ModPlug_ResamplingMode = FIR
+#XMP_ResamplingMode = LINEAR
 
-# Other self-describing ModPlug audio characteristic options.
-# (Note that the 32 bit sample size seems to be buggy.)
-#ModPlug_Channels = 2               # 1 or 2 channels
-#ModPlug_Bits = 16                  # 8, 16 or 32 bits
-#ModPlug_Frequency = 48000          # 11025, 22050, 44100 or 48000 Hz
-#ModPlug_ReverbDepth = 0            # 0 (quiet) to 100 (loud)
-#ModPlug_ReverbDelay = 0            # Delay in ms (usually 40-200ms)
-#ModPlug_BassAmount = 0             # 0 (quiet) to 100 (loud).
-#ModPlug_BassRange = 10             # Cutoff in Hz (10-100).
-#ModPlug_SurroundDepth = 0          # Surround level 0(quiet)-100(heavy).
-#ModPlug_SurroundDelay = 0          # Surround delay in ms, usually 5-40ms.
-#ModPlug_LoopCount = 0              # 0 (never), n (times) or -1 (forever)
-
-# Maximum size in bytes for loading a module file (MOD/XM/IT/S3M etc.).
-#
-# Module formats have no streaming API - the entire file must be allocated
-# in RAM before playback can begin, meaning file size directly translates to
-# a memory spike at load time on top of the player's normal footprint.
-#
-# Default: 33554432 (32MB) - safe for low-RAM systems
-# Covers virtually all real-world module files. Files over 32MB are extremely
-# rare in practice.
-#
-# If you hit this limit on a modern system with ample RAM, raising to
-# 67108864 (64MB) or higher is fine. On constrained hardware, be aware that
-# the actual RAM spike during load exceeds the file size, as the decoder
-# decompresses and parses samples into internal structures simultaneously.
-#
-# This limit exists to prevent runaway allocation from malformed or
-# intentionally oversized files. Other decoders stream their data and are
-# not affected by this setting.
-#
-#ModPlug_MaxFileSize = 33554432
+#XMP_Channels = 2                   # 1 or 2 channels
+#XMP_Bits = 16                      # 8 or 16 bits
+#XMP_Frequency = 48000              # 11025, 22050, 44100 or 48000 Hz
+#XMP_LowPassFilter = no             # Amiga-style lowpass filter emulation
+#XMP_Amplification = 0              # 0 = normal, 1 = x2, 2 = x4, 3 = x8
+#XMP_LoopCount = 0                  # 0 (play once) or 1 (loop forever)
 
 # Self-describing SidPlayFP audio characteristic options.
 #SidPlayFP_DefaultSongLength = 180   # If not in database (in seconds)
@@ -583,6 +549,19 @@
 
 # Play sub-tunes.
 #SidPlayFP_PlaySubTunes = yes
+
+# Sample rate for chiptune playback (NSF, GBS, GYM, HES, KSS, SAP, SPC,
+# VGM/VGZ, AY) via libgme.
+#GME_Frequency = 44100
+
+# Play sub-tunes back-to-back as one continuous track, the same way
+# SidPlayFP_PlaySubTunes does for SID files. Defaults to 'no' here,
+# unlike SidPlayFP_PlaySubTunes's default of 'yes' - chiptune formats
+# like NSF commonly have dozens of subtunes (one per game level/area),
+# where auto-playing through all of them is much more surprising than
+# it is for SID files (which typically have just a handful of
+# subtunes, all variations on one piece).
+#GME_PlaySubTunes = no
 
 # Run the OnStop command (full path, no arguments) when MOCF changes state
 # to stopped (i.e., when user stopped playing or changes a song).

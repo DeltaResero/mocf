@@ -239,7 +239,6 @@ static int wav_decode(void *prv_data, char *buf, int buf_len,
   }
   else
   {
-    debug("iBps %d", iBps);
     switch (Bps)
     {
       case 4:
@@ -346,6 +345,13 @@ public:
 
     int our_format_ext(const char *ext) override {
         return wav_our_format_ext(ext);
+    }
+
+    const char *our_format_data(const char *buf, size_t len) override {
+        if (len >= 4 && !memcmp(buf, "wvpk", 4)) {
+            return "WV";
+        }
+        return nullptr;
     }
 
     int our_format_mime(const char *mime) override {

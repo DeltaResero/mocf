@@ -33,6 +33,16 @@
     int track  = -1;
     int time   = -1;
     int filled = 0; /* Which tags are filled: TAGS_COMMENTS, TAGS_TIME. */
+    /* If the file's real format differs from what its extension implies
+     * (detected by content), the true format's display name. Empty
+     * otherwise. Not persisted in the tags cache: re-derived each run so
+     * a renamed file is always re-checked. */
+    std::string real_format;
+    /* True when no decoder can play the file: its own decoder cannot
+     * open it and no other format's signature matches the content. Not
+     * persisted in the tags cache, like real_format, so a repaired or
+     * replaced file is always re-checked. */
+    bool unreadable = false;
   };
 
   enum file_type

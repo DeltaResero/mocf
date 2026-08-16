@@ -22,6 +22,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#if defined(__GLIBC__)
+#include <malloc.h>
+#endif
 #include <locale.h>
 #include <algorithm>
 #include <memory>
@@ -978,6 +981,21 @@ static void log_popt_command_line()
 int main(int argc, const char *argv[])
 {
   try {
+#if defined(__GLIBC__)
+  /* Keep resident memory tracking the currently-playing file instead of
+   * ratcheting up track after track.  glibc's mmap threshold is dynamic by
+   * default: after freeing the large buffers a module decode allocates (a
+   * module's pattern and sample data), the threshold
+   * climbs, so subsequent large allocations are served from the sbrk arena
+   * (never returned to the OS) rather than mmap (returned on free).  Pinning
+   * the threshold keeps those large, short-lived allocations on mmap; a tight
+   * trim threshold and a single arena keep the footprint close to what is
+   * actually in use and both of which matter on low RAM targets */
+  mallopt(M_MMAP_THRESHOLD, 128 * 1024);
+  mallopt(M_TRIM_THRESHOLD, 128 * 1024);
+  mallopt(M_ARENA_MAX, 1);
+#endif
+
   std::vector<std::string> deferred_overrides, args;
 
   assert(argc >= 0);

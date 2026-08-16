@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.30)
 project(
   mocf
   VERSION 2.6
@@ -77,13 +77,26 @@ option(WITH_FLAC "Enable FLAC support" ON)
 option(WITH_MUSEPACK "Enable Musepack support" ON)
 option(WITH_WAVPACK "Enable WavPack support" ON)
 option(WITH_SNDFILE "Enable libsndfile support" ON)
-option(WITH_MODPLUG "Enable libmodplug support" ON)
-option(WITH_FFMPEG "Enable ffmpeg/libav support" ON)
+option(WITH_XMP "Enable libxmp (tracker module) support" ON)
+# Off by default: on typical distro builds, FFmpeg's shared libraries drag in
+# video codecs, network/streaming protocols, and TLS that mocf never needs,
+# adding tens of MB of RSS on startup regardless of what's actually played.
+# Still fully supported as an opt-in for formats without a lighter alternative
+# (WMA Pro/Lossless, DTS, RealAudio, general video-file audio extraction).
+option(WITH_FFMPEG "Enable ffmpeg/libav support" OFF)
 option(WITH_SPEEX "Enable Speex support" ON)
 option(WITH_SIDPLAYFP "Enable libsidplayfp support" ON)
+option(WITH_AC3 "Enable AC-3 support (liba52)" ON)
+option(WITH_GME "Enable chiptune support (libgme)" ON)
+option(WITH_APE "Enable Monkey's Audio (APE) support" ON)
+option(WITH_QOA "Enable Quite OK Audio (QOA) support" ON)
+option(WITH_MLP "Enable MLP/TrueHD support" ON)
+option(WITH_TTA "Enable True Audio (TTA) support" ON)
+option(WITH_WMA "Enable Windows Media Audio (WMA v1/v2) support" ON)
 
 # Dependencies
 include(CheckIncludeFile)
+include(CheckIncludeFiles)
 include(CheckFunctionExists)
 include(CheckSymbolExists)
 include(CheckLibraryExists)
@@ -144,7 +157,6 @@ check_function_exists(nl_langinfo HAVE_NL_LANGINFO)
 check_function_exists(localtime_r HAVE_LOCALTIME_R)
 check_function_exists(nanosleep HAVE_NANOSLEEP)
 check_function_exists(strcasecmp HAVE_STRCASECMP)
-check_function_exists(strdup HAVE_STRDUP)
 check_function_exists(strncasecmp HAVE_STRNCASECMP)
 check_function_exists(wcswidth HAVE_WCSWIDTH)
 check_function_exists(sched_get_priority_max HAVE_SCHED_GET_PRIORITY_MAX)

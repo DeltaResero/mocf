@@ -665,6 +665,7 @@ private:
         iface_set_status("Loading playlist...");
         if (plist_load(&playlist, file, cwd.c_str())) {
             if (!default_playlist) toggle_menu();
+            ask_for_tags(&playlist, get_tags_setting());
             iface_set_dir_content(IFACE_MENU_PLIST, &playlist, {}, {});
             iface_update_queue_positions(&queue, &playlist, nullptr, nullptr);
             interface_message("Playlist loaded.");

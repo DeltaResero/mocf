@@ -497,6 +497,17 @@ public:
     int our_format_ext(const char *ext) override {
         return sidplayfp_our_format_ext(ext);
     }
+
+    const char *our_format_data(const char *buf, size_t len) override {
+        if (len >= 4 && (!memcmp(buf, "PSID", 4) || !memcmp(buf, "RSID", 4))) {
+            return "SID";
+        }
+        return nullptr;
+    }
+
+    std::string get_name(const char *) override {
+        return "SID";  /* covers .sid and .mus alike */
+    }
 };
 
 extern "C" class AudioPlugin *sidplayfp_plugin_init() {

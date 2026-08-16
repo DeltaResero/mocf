@@ -3,6 +3,10 @@
 //
 // mocf - Music on Console Framebuffer
 // Copyright (C) 2002 - 2005 Damian Pietras <daper@daper.net>
+// Copyright (C) 2012 - 2014 Tomasz Golinski <tomaszg@alpha.uwb.edu.pl>
+//
+// Opus support written by Tomasz Golinski for his MOC fork, using the
+// vorbis plugin as its template; portions based on Greg Maxwell's code.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -397,7 +401,7 @@ static struct io_stream *opus_get_stream(void *prv_data)
 
 static std::string opus_get_name(const char *unused ATTR_UNUSED)
 {
-  return "OPS";
+  return "OPUS";
 }
 
 static int opus_our_format_ext(const char *ext)
@@ -473,6 +477,18 @@ public:
 
     int our_format_ext(const char *ext) override {
         return opus_our_format_ext(ext);
+    }
+
+    const char *our_format_data(const char *buf, size_t len) override {
+        /* Ogg capture pattern, then the Opus id header in the first page. */
+        if (len >= 4 && !memcmp(buf, "OggS", 4)) {
+            for (size_t i = 28; i + 8 <= len; i++) {
+                if (!memcmp(buf + i, "OpusHead", 8)) {
+                    return "OPUS";
+                }
+            }
+        }
+        return nullptr;
     }
 
     int our_format_mime(const char *mime) override {

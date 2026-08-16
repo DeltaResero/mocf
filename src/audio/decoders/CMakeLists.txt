@@ -67,6 +67,103 @@ if(WITH_MP3)
   endif()
 endif()
 
+# AC-3 decoder (liba52). No .pc file is shipped upstream, so detect it
+# the same way the MP3 (libmad) block above does.
+if(WITH_AC3)
+  check_library_exists(a52 a52_init "" HAVE_LIBA52)
+  # a52.h uses uint8_t/int8_t/etc. without including <stdint.h> itself,
+  # so a bare check_include_file() on it fails to compile (and thus
+  # reports "not found") even when the header is genuinely present.
+  # check_include_files() (plural) chains stdint.h in ahead of it.
+  check_include_files("stdint.h;a52dec/a52.h" HAVE_A52DEC_A52_H)
+
+  if(HAVE_LIBA52 AND HAVE_A52DEC_A52_H)
+    add_decoder_plugin(
+      ac3
+      SOURCES
+      ac3/ac3.cpp
+      LIBRARIES
+      a52)
+  endif()
+endif()
+
+# Chiptune decoder (libgme / Game_Music_Emu): NSF/NSFE, GBS, GYM, HES,
+# KSS, SAP, SPC, VGM/VGZ, AY.
+if(WITH_GME)
+  pkg_check_modules(GME libgme>=0.6.0)
+
+  if(GME_FOUND)
+    add_decoder_plugin(
+      gme
+      SOURCES
+      gme/gme.cpp
+      gme/gme.h
+      LIBRARIES
+      ${GME_LIBRARIES}
+      INCLUDE_DIRS
+      ${GME_INCLUDE_DIRS})
+  endif()
+endif()
+
+# Monkey's Audio (APE) decoder. No external library: this is a
+# self-contained port of FFmpeg's apedec.c/ape.c (LGPLv2.1+), avoiding
+# MACLib entirely (see comment at the top of ape.cpp for why).
+if(WITH_APE)
+  add_decoder_plugin(
+    ape
+    SOURCES
+    ape/ape.cpp)
+endif()
+
+# Quite OK Audio (QOA) decoder. No external library: the upstream
+# single-header reference decoder (qoa/qoa.h, MIT) is vendored and
+# compiled directly. The format spec is frozen at v1.0, so the header
+# needs no ongoing maintenance.
+if(WITH_QOA)
+  add_decoder_plugin(
+    qoa
+    SOURCES
+    qoa/qoa.cpp
+    qoa/qoa_impl.c
+    qoa/qoa.h)
+endif()
+
+# MLP/TrueHD decoder. No external library: mlpdec.cpp is a self-contained port
+# of FFmpeg's mlpdec.c and the mlp.c/mlp_parse.c/mlpdsp.c code it depends on
+# (LGPLv2.1+), and mlp.cpp walks the raw access unit chain.
+if(WITH_MLP)
+  add_decoder_plugin(
+    mlp
+    SOURCES
+    mlp/mlp.cpp
+    mlp/mlpdec.cpp
+    mlp/mlpdec.h)
+endif()
+
+# True Audio (TTA) decoder. No external library: this is a self-contained
+# port of FFmpeg's tta.c/ttadata.c/ttadsp.c and its demuxer (LGPLv2.1+).
+if(WITH_TTA)
+  add_decoder_plugin(
+    tta
+    SOURCES
+    tta/tta.cpp)
+endif()
+
+# Windows Media Audio (WMA v1/v2) decoder. No external library: wmadec.cpp is a
+# self-contained port of FFmpeg's wma.c/wmadec.c and the FFT/MDCT and VLC code
+# it depends on (LGPLv2.1+), and asf.cpp is an audio-only ASF container reader.
+if(WITH_WMA)
+  add_decoder_plugin(
+    wma
+    SOURCES
+    wma/wma.cpp
+    wma/asf.cpp
+    wma/asf.h
+    wma/wmadec.cpp
+    wma/wmadec.h
+    wma/wmadata.h)
+endif()
+
 # MPG123 decoder
 if(WITH_MPG123)
   pkg_check_modules(MPG123 libmpg123>=1.14)
@@ -239,18 +336,21 @@ if(WITH_SNDFILE)
   endif()
 endif()
 
-# ModPlug decoder
-if(WITH_MODPLUG)
-  pkg_check_modules(MODPLUG libmodplug>=0.7)
-  if(MODPLUG_FOUND)
+# libxmp (tracker module) decoder
+# 4.5 is the first release with the callback-based loaders, which let the
+# module be parsed straight off mocf's own stream instead of a full copy
+# of the file in memory.
+if(WITH_XMP)
+  pkg_check_modules(XMP libxmp>=4.5)
+  if(XMP_FOUND)
     add_decoder_plugin(
-      modplug
+      xmp
       SOURCES
-      modplug/modplug.cpp
+      xmp/xmp.cpp
       LIBRARIES
-      ${MODPLUG_LIBRARIES}
+      ${XMP_LIBRARIES}
       INCLUDE_DIRS
-      ${MODPLUG_INCLUDE_DIRS})
+      ${XMP_INCLUDE_DIRS})
   endif()
 endif()
 

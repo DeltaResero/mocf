@@ -3,10 +3,6 @@
 //
 // mocf - Music on Console Framebuffer
 // Based on FFplay Copyright (c) 2003 Fabrice Bellard
-// "The main problem is that external projects who want to
-// support both FFmpeg and LibAV are just fucked, and this
-// only because LibAV doesn't care a second about their users."
-// -- http://blog.pkh.me/p/13-the-ffmpeg-libav-situation.html
 // Copyright (C) 2005, 2006 Damian Pietras <daper@daper.net>
 //
 // This program is free software: you can redistribute it and/or modify
@@ -263,20 +259,16 @@ static void load_audio_extns(std::vector<std::string> &list)
   /* When adding an entry to this list, tests need to be performed to
    * determine whether or not FFmpeg/LibAV handles durations and seeking
    * correctly.  If not, then the appropriate additions should be made
-   * in is_timing_broken() and is_seek_broken(). */
+   * in is_timing_broken() and is_seek_broken().
+   *
+   * Entries not listed here ideally should already be covered by a
+   * dedicated decoder registered ahead of FFmpeg in decoder_table[] */
   const struct extn_list audio_extns[] = {
-      {"aac", "aac"},      {"ac3", "ac3"},     {"ape", "ape"},
-      {"au", "au"},        {"ay", "libgme"},   {"dff", "dsf"},
-      {"dsf", "dsf"},      {"dts", "dts"},     {"eac3", "eac3"},
-      {"fla", "flac"},     {"flac", "flac"},   {"gbs", "libgme"},
-      {"gym", "libgme"},   {"hes", "libgme"},  {"kss", "libgme"},
-      {"mka", "matroska"}, {"mp2", "mpeg"},    {"mp3", "mp3"},
-      {"mpc", "mpc"},      {"mpc8", "mpc8"},   {"m4a", "m4a"},
-      {"nsf", "libgme"},   {"nsfe", "libgme"}, {"ra", "rm"},
-      {"sap", "libgme"},   {"spc", "libgme"},  {"tak", "tak"},
-      {"tta", "tta"},      {"vgm", "libgme"},  {"vgz", "libgme"},
-      {"vqf", "vqf"},      {"wav", "wav"},     {"w64", "w64"},
-      {"wma", "asf"},      {"wv", "wv"},       {nullptr, nullptr}};
+      {"dff", "dsf"},     {"dsf", "dsf"},
+      {"dts", "dts"},      {"eac3", "eac3"},   {"mka", "matroska"},
+      {"mpc8", "mpc8"},    {"m4a", "m4a"},     {"ra", "rm"},
+      {"tak", "tak"},      {"vqf", "vqf"},
+      {nullptr, nullptr}};
 
   for (ix = 0; audio_extns[ix].extn; ix += 1)
   {
@@ -377,42 +369,7 @@ static int locking_cb(void **mutex, enum AVLockOp op)
  */
 static bool is_timing_broken(AVFormatContext *ic)
 {
-  if (ic->duration < 0 || ic->bit_rate < 0)
-  {
-    return true;
-  }
-
-  /* If and when FFmpeg uses the right field for its calculation this
-   * should be self-correcting. */
-  if (ic->duration < AV_TIME_BASE && !strcmp(ic->iformat->name, "libgme"))
-  {
-    return true;
-  }
-
-  /* AAC timing is inaccurate. */
-  if (!strcmp(ic->iformat->name, "aac"))
-  {
-    return true;
-  }
-
-  /* Formats less than 4 GiB should be okay, except those excluded above. */
-  if (avio_size(ic->pb) < UINT32_MAX)
-  {
-    return false;
-  }
-
-  /* WAV files are limited to 4 GiB but that doesn't stop some encoders. */
-  if (!strcmp(ic->iformat->name, "wav"))
-  {
-    return true;
-  }
-
-  if (!strcmp(ic->iformat->name, "au"))
-  {
-    return true;
-  }
-
-  return false;
+  return ic->duration < 0 || ic->bit_rate < 0;
 }
 
 static void ffmpeg_init()
@@ -1601,6 +1558,21 @@ public:
 
     int our_format_ext(const char *ext) override {
         return ffmpeg_our_format_ext(ext);
+    }
+
+    std::string get_name(const char *file) override {
+        const char *ext = ext_pos(file);
+        if (ext) {
+            /* Both DSDIFF (.dff) and Sony (.dsf) hold DSD audio. */
+            if (!strcasecmp(ext, "dff") || !strcasecmp(ext, "dsf")) {
+                return "DSD";
+            }
+            /* Musepack SV8. */
+            if (!strcasecmp(ext, "mpc8")) {
+                return "MPC";
+            }
+        }
+        return "";  /* uppercased extension via file_type_name() */
     }
 
     int our_format_mime(const char *mime) override {

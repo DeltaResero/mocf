@@ -31,7 +31,6 @@
 #include <cerrno>
 #include <string>
 #include <mutex>
-#include <algorithm>
 #include "core/common.h"
 #include "core/server.h"
 #include "ui/curses/interface.h"
@@ -75,61 +74,6 @@ void internal_fatal(const char *file LOGIT_ONLY, int line LOGIT_ONLY,
   log_close();
 
   throw FatalException(msg);
-}
-
-void *xmalloc(size_t size)
-{
-  void *p;
-
-#ifndef HAVE_MALLOC
-  size = std::max<size_t>(1, size);
-#endif
-
-  if ((p = malloc(size)) == nullptr)
-  {
-    fatal("Can't allocate memory!");
-  }
-  return p;
-}
-
-void *xcalloc(size_t nmemb, size_t size)
-{
-  void *p;
-
-  if ((p = calloc(nmemb, size)) == nullptr)
-  {
-    fatal("Can't allocate memory!");
-  }
-  return p;
-}
-
-void *xrealloc(void *ptr, const size_t size)
-{
-  void *p;
-
-  p = realloc(ptr, size);
-  if (!p && size != 0)
-  {
-    fatal("Can't allocate memory!");
-  }
-
-  return p;
-}
-
-char *xstrdup(const char *s)
-{
-  char *n = nullptr;
-
-  if (s)
-  {
-    n = strdup(s);
-    if (n == nullptr)
-    {
-      fatal("Can't allocate memory!");
-    }
-  }
-
-  return n;
 }
 
 /* Sleep for the specified number of 'ticks'. */

@@ -71,6 +71,14 @@ void tags_update(struct file_tags *dst, struct file_tags *src, int move)
     dst->time = src->time;
     dst->filled |= TAGS_TIME;
   }
+  if (dst->real_format.empty() && !src->real_format.empty())
+  {
+    dst->real_format = src->real_format;
+  }
+  if (src->unreadable)
+  {
+    dst->unreadable = true;
+  }
 }
 
 

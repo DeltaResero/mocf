@@ -15,6 +15,7 @@
 
 #include <cassert>
 #include <cerrno>
+#include <climits>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -713,12 +714,36 @@ static void play_file(const char *file, AudioPlugin *f,
     decoder_data->get_error(&err);
     if (err.type != ERROR_OK)
     {
-      decoder_data.reset();
-      status_msg("");
-      engine_error(file, err.err.c_str());
+      /* The decoder chosen by the file's extension can't read it. Check
+       * whether the content is really some other format we know, and if
+       * so play it with the right decoder and tell the user. */
+      const char *real_fmt = nullptr;
+      AudioPlugin *by_content = get_decoder_by_content(file, &real_fmt);
+
+      if (by_content && by_content != f)
+      {
+        decoder_data = by_content->open(file);
+        decoder_data->get_error(&err);
+      }
+
+      if (err.type != ERROR_OK)
+      {
+        decoder_data.reset();
+        status_msg("");
+        engine_error(file, err.err.c_str());
+        decoder_error_clear(&err);
+        logit("Can't open file, exiting");
+        return;
+      }
+
+      char msg[PATH_MAX + 64];
+      snprintf(msg, sizeof(msg), "%s is really %s - playing as %s",
+               file, real_fmt, real_fmt);
+      /* Empty file field: show the message without marking the entry as
+       * failed - it is playing fine. */
+      engine_error("", msg);
+      logit("Extension mismatch: %s decoded as %s", file, real_fmt);
       decoder_error_clear(&err);
-      logit("Can't open file, exiting");
-      return;
     }
 
     already_decoded_time = 0.0;
@@ -762,8 +787,17 @@ void player(const char *file, const char *next_file, OutBuf *out_buf)
 
   if (!f)
   {
-    error("Can't get decoder for %s", file);
-    return;
+    /* No decoder claims this extension; see if the content is a format
+     * we know before giving up. */
+    const char *real_fmt = nullptr;
+
+    f = get_decoder_by_content(file, &real_fmt);
+    if (!f)
+    {
+      error("Can't get decoder for %s", file);
+      return;
+    }
+    logit("Extension mismatch: %s decoded as %s", file, real_fmt);
   }
 
   ev_audio_start();

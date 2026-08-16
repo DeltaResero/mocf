@@ -1101,8 +1101,30 @@ static int add_to_menu(struct menu *menu, const struct plist *plist,
   menu_item_set_attr_sel_marked(added,
                                 get_color(CLR_MENU_ITEM_FILE_MARKED_SELECTED));
 
+  if (item->tags && item->tags->unreadable)
+  {
+    /* No decoder can play this file: show it the same way a playback
+     * failure does, without waiting for a play attempt. */
+    menu_item_set_time(added, "ERROR");
+    menu_item_set_attr_normal(added, get_color(CLR_ERROR));
+    menu_item_set_attr_sel(added, get_color(CLR_ERROR) | A_REVERSE);
+    menu_item_set_attr_marked(added, get_color(CLR_ERROR));
+    menu_item_set_attr_sel_marked(added, get_color(CLR_ERROR) | A_REVERSE);
+  }
+
   type_name = file_type_name(item->file.c_str());
-  menu_item_set_format(added, type_name.c_str());
+  if (item->tags && !item->tags->real_format.empty())
+  {
+    /* The file's content is not what its extension claims.
+     * Show the true format coloured to flag the mismatch. */
+    type_name = item->tags->real_format;
+    menu_item_set_format(added, type_name.c_str());
+    menu_item_set_format_attr(added, get_color(CLR_ERROR));
+  }
+  else
+  {
+    menu_item_set_format(added, type_name.c_str());
+  }
   menu_item_set_queue_pos(added, item->queue_pos);
 
   if (full_paths && !made_from_tags)
@@ -1443,6 +1465,16 @@ static void update_menu_item(struct menu_item *mi, const struct plist *plist,
     std::string time_str = sec_to_min(item->tags->time);
     menu_item_set_time(mi, time_str.c_str());
   }
+  else if (item->tags && item->tags->unreadable)
+  {
+    /* No decoder can play this file: show it the same way a playback
+     * failure does, without waiting for a play attempt. */
+    menu_item_set_time(mi, "ERROR");
+    menu_item_set_attr_normal(mi, get_color(CLR_ERROR));
+    menu_item_set_attr_sel(mi, get_color(CLR_ERROR) | A_REVERSE);
+    menu_item_set_attr_marked(mi, get_color(CLR_ERROR));
+    menu_item_set_attr_sel_marked(mi, get_color(CLR_ERROR) | A_REVERSE);
+  }
   else
   {
     menu_item_set_time(mi, "");
@@ -1468,6 +1500,20 @@ static void update_menu_item(struct menu_item *mi, const struct plist *plist,
   }
 
   menu_item_set_title(mi, title.c_str());
+
+  if (item->tags && !item->tags->real_format.empty())
+  {
+    /* Content does not match the extension: show the true format in the
+     * error colour. */
+    menu_item_set_format(mi, item->tags->real_format.c_str());
+    menu_item_set_format_attr(mi, get_color(CLR_ERROR));
+  }
+  else
+  {
+    std::string type_name = file_type_name(item->file.c_str());
+    menu_item_set_format(mi, type_name.c_str());
+    menu_item_set_format_attr(mi, 0);
+  }
 
   if (full_path && !made_from_tags)
   {

@@ -604,12 +604,21 @@ public:
 
   std::string get_name(const char *unused ATTR_UNUSED) override
   {
-    return "FLC";
+    return "FLAC";
   }
 
   int our_format_ext(const char *ext) override
   {
     return !strcasecmp(ext, "flac") || !strcasecmp(ext, "fla");
+  }
+
+  const char *our_format_data(const char *buf, size_t len) override
+  {
+    if (len >= 4 && !memcmp(buf, "fLaC", 4))
+    {
+      return "FLAC";
+    }
+    return nullptr;
   }
 
   int our_format_mime(const char *mime) override
