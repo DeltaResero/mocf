@@ -21,6 +21,7 @@
 #include <ctime>
 #include <cerrno>
 #include <csignal>
+#include <atomic>
 
 #include <vector>
 
@@ -46,7 +47,7 @@ static struct
 {
   int sig;
   const char *name;
-  volatile uint64_t raised;
+  std::atomic<uint64_t> raised;
   uint64_t logged;
 } sig_info[] = {{SIGINT, "SIGINT", 0, 0},     {SIGHUP, "SIGHUP", 0, 0},
                 {SIGQUIT, "SIGQUIT", 0, 0},   {SIGTERM, "SIGTERM", 0, 0},
@@ -67,7 +68,7 @@ void log_signal(int sig)
     ix += 1;
   }
 
-  sig_info[ix].raised += 1;
+  sig_info[ix].raised.fetch_add(1, std::memory_order_relaxed);
 }
 #endif
 
@@ -157,7 +158,7 @@ static void log_signals_raised(void)
 
   for (ix = 0; ix < std::size(sig_info); ix += 1)
   {
-    while (sig_info[ix].raised > sig_info[ix].logged)
+    while (sig_info[ix].raised.load(std::memory_order_relaxed) > sig_info[ix].logged)
     {
       locked_logit(__FILE__, __LINE__, __func__, sig_info[ix].name);
       sig_info[ix].logged += 1;
