@@ -138,10 +138,10 @@ static void start_moc(const struct parameters *params, const std::vector<std::st
     log_init_stream(nullptr, nullptr);
   }
 
-  if (pthread_create(&server_thread, nullptr, server_thread_func,
-                     th_args.get()) != 0)
+  if (int rc = pthread_create(&server_thread, nullptr, server_thread_func,
+                              th_args.get()); rc != 0)
   {
-    fatal("pthread_create() failed: %s", xstrerror(errno));
+    fatal("pthread_create() failed: %s", xstrerror(rc).c_str());
   }
 
   /* The thread now owns th_args and will delete it when it exits. */
