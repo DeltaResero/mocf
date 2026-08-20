@@ -230,8 +230,11 @@ static void sig_chld(int sig LOGIT_ONLY)
 static void sig_exit(int sig)
 {
   log_signal(sig);
+
+  /* Deliberately no quit_cond.notify_all() here: waking a condition
+   * variable is not async-signal-safe, and server_loop() rechecks
+   * server_quit once a second regardless. */
   server_quit = true;
-  quit_cond.notify_all();
 
   /* pthread_*() is not async-signal-safe, but we only call it when the
    * signal is received in a thread other than the server thread. */
