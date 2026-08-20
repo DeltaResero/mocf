@@ -393,10 +393,10 @@ static int plist_load_pls(struct plist *plist, const char *fname,
             plist->items[last_added].tags->time = time;
             plist->items[last_added].tags->filled |= TAGS_TIME;
           }
+
+          added += 1;
         }
       }
-
-      added += 1;
     }
   }
 
