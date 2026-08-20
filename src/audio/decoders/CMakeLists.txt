@@ -415,6 +415,8 @@ if(WITH_FFMPEG)
                           HAVE_AVCODEC_FREE_CONTEXT)
       check_symbol_exists(avcodec_receive_frame "libavcodec/avcodec.h"
                           HAVE_AVCODEC_RECEIVE_FRAME)
+      check_symbol_exists(avio_context_free "libavformat/avio.h"
+                          HAVE_AVIO_CONTEXT_FREE)
       check_include_file(libavutil/channel_layout.h
                          HAVE_LIBAVUTIL_CHANNEL_LAYOUT_H)
 
@@ -436,6 +438,9 @@ if(WITH_FFMPEG)
       endif()
       if(HAVE_AVCODEC_RECEIVE_FRAME)
         list(APPEND FFMPEG_DEFS HAVE_AVCODEC_RECEIVE_FRAME=1)
+      endif()
+      if(HAVE_AVIO_CONTEXT_FREE)
+        list(APPEND FFMPEG_DEFS HAVE_AVIO_CONTEXT_FREE=1)
       endif()
       if(HAVE_LIBAVUTIL_CHANNEL_LAYOUT_H)
         list(APPEND FFMPEG_DEFS HAVE_LIBAVUTIL_CHANNEL_LAYOUT_H=1)

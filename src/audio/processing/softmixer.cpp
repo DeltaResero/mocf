@@ -267,7 +267,7 @@ void softmixer_process_buffer(char *buf, size_t size,
 
   debug("Processing %zu bytes...", size);
 
-  do_softmix = active && (mixer_real != 100);
+  do_softmix = active && (mixer_real != 1000); /* 1000 is unity gain */
   do_monomix = mix_mono && (sound_params->channels > 1);
 
   if (!do_softmix && !do_monomix)

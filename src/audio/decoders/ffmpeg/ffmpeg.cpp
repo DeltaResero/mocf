@@ -1278,6 +1278,12 @@ static int ffmpeg_decode(void *prv_data, char *buf, int buf_len,
     return 0;
   }
 
+  /* A failed open frees enc but still hands back the handle. */
+  if (!data->okay)
+  {
+    return 0;
+  }
+
   /* FFmpeg claims to always return native endian. */
 #if LIBAVUTIL_VERSION_MAJOR < 58
   int nb_channels = data->enc->channels;
@@ -1392,11 +1398,18 @@ static void ffmpeg_close(void *prv_data)
 
   /* We need to delve into the AVIOContext struct to free the
    * buffer FFmpeg leaked if avformat_open_input() failed.  Do
-   * not be tempted to call avio_close() here; it will segfault. */
+   * not be tempted to call avio_close() here; it will segfault.
+   * avio_context_free() only frees the AVIOContext struct itself,
+   * not its buffer, so the buffer still needs a manual av_freep()
+   * regardless of which one frees the struct. */
   if (data->pb)
   {
     av_freep(&data->pb->buffer);
+#ifdef HAVE_AVIO_CONTEXT_FREE
+    avio_context_free(&data->pb);
+#else
     av_freep(&data->pb);
+#endif
   }
 
   if (data->okay)
