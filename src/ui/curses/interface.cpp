@@ -699,11 +699,10 @@ private:
         else if (!getcwd(path, sizeof(path))) interface_fatal("Can't get CWD: %s", xstrerror(errno).c_str());
 
         resolve_path(path, sizeof(path), file);
-        char *slash = strrchr(path, '/');
-        if (slash) *slash = 0;
+        std::string dir = dir_up(path);
 
         iface_set_status("Loading playlist...");
-        plist_load(&playlist, file, path);
+        plist_load(&playlist, file, dir.c_str());
         iface_set_status("");
     }
 
@@ -729,9 +728,7 @@ private:
             } else if (!dir && is_sound_file(path)) {
                 if (plist_find_fname(&playlist, path) == -1) plist_add(&playlist, path);
             } else if (is_plist_file(path)) {
-                std::string plist_dir = path;
-                size_t slash = plist_dir.rfind('/');
-                if (slash != std::string::npos) plist_dir.erase(slash);
+                std::string plist_dir = dir_up(path);
                 plist_load(&playlist, path, plist_dir.c_str());
             }
         }
