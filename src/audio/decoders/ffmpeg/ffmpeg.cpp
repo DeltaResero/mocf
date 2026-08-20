@@ -1278,6 +1278,12 @@ static int ffmpeg_decode(void *prv_data, char *buf, int buf_len,
     return 0;
   }
 
+  /* A failed open frees enc but still hands back the handle. */
+  if (!data->okay)
+  {
+    return 0;
+  }
+
   /* FFmpeg claims to always return native endian. */
 #if LIBAVUTIL_VERSION_MAJOR < 58
   int nb_channels = data->enc->channels;
