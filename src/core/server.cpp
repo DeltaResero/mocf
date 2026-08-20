@@ -194,13 +194,14 @@ static struct engine_event_queue *g_eq = nullptr;
 /* Thread ID of the engine thread (used in signal handling) */
 static pthread_t server_tid;
 
-/* Information about currently played file. */
+/* Information about currently played file.  Written by the player and
+ * audio threads, read by the UI thread, so the fields are atomic. */
 static struct
 {
-  int avg_bitrate;
-  int bitrate;
-  int rate;
-  int channels;
+  std::atomic<int> avg_bitrate;
+  std::atomic<int> bitrate;
+  std::atomic<int> rate;
+  std::atomic<int> channels;
 } sound_info = {-1, -1, -1, -1};
 
 static unique_tags_cache tags_cache;
