@@ -330,6 +330,30 @@ private:
 };
 #endif
 
+/* A cursor holds read locks of its own, so leaving one open on the way out
+ * of a function reaches the same shutdown wedge as a leaked record lock. */
+#ifdef HAVE_DB_H
+class DbCursorGuard
+{
+public:
+  explicit DbCursorGuard(DBC *cur) : cur_(cur) {}
+  ~DbCursorGuard()
+  {
+    if (!cur_) return;
+#if DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR < 6
+    (void)cur_->c_close(cur_);
+#else
+    (void)cur_->close(cur_);
+#endif
+  }
+  DbCursorGuard(const DbCursorGuard &) = delete;
+  DbCursorGuard &operator=(const DbCursorGuard &) = delete;
+
+private:
+  DBC *cur_;
+};
+#endif
+
 /* This function ensures that a DB function takes place while holding a
  * database record lock.  It also provides an initialised database thang
  * for the key and record.
@@ -416,6 +440,7 @@ static void tags_cache_gc(struct tags_cache *c)
   int nitems = 0;
 
   c->db->cursor(c->db, nullptr, &cur, 0);
+  DbCursorGuard cur_guard(cur);
 
   memset(&key, 0, sizeof(key));
   memset(&serialized_cache_rec, 0, sizeof(serialized_cache_rec));
@@ -459,12 +484,6 @@ static void tags_cache_gc(struct tags_cache *c)
   {
     log_errno("Searching for element to remove failed (cursor)", ret);
   }
-
-#if DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR < 6
-  cur->c_close(cur);
-#else
-  cur->close(cur);
-#endif
 
   debug("Elements in cache: %d (limit %d)", nitems, c->max_items);
 
