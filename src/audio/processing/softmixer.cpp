@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
+#include <atomic>
 
 /* #define DEBUG */
 
@@ -33,12 +34,15 @@
 #include "library/files.h"
 #include "core/log.h"
 
-static int active;
-static int mix_mono;
+/* The audio thread reads these while the server thread changes them. */
+static std::atomic<int> active;
+static std::atomic<int> mix_mono;
+static std::atomic<int> mixer_real;
+static std::atomic<float> mixer_realf;
+
+/* Only ever touched by the server thread. */
 static int mixer_val;
 static int mixer_amp;
-static int mixer_real;
-static float mixer_realf;
 
 static void softmixer_read_config();
 static void softmixer_write_config();
@@ -72,16 +76,17 @@ void softmixer_shutdown()
 void softmixer_set_value(const int val)
 {
   mixer_val = std::clamp(val, 0, 100);
-  mixer_real = exp((mixer_val * mixer_amp) / 100 * 0.06908);
+  int real = exp((mixer_val * mixer_amp) / 100 * 0.06908);
   if (mixer_val < 10)
   {
-    mixer_real = static_cast<int>(mixer_real * mixer_val /
+    real = static_cast<int>(real * mixer_val /
                        10.f); // linear roll-off to zero for low values
   }
-  mixer_real = std::clamp(mixer_real, SOFTMIXER_MIN, SOFTMIXER_MAX);
-  mixer_realf = (static_cast<float>(mixer_real)) / 1000.0f;
+  real = std::clamp(real, SOFTMIXER_MIN, SOFTMIXER_MAX);
+  mixer_real.store(real, std::memory_order_relaxed);
+  mixer_realf.store(static_cast<float>(real) / 1000.0f, std::memory_order_relaxed);
 
-  debug("Softmixer value: %d, gain: %d", mixer_val, mixer_real);
+  debug("Softmixer value: %d, gain: %d", mixer_val, real);
 }
 
 int softmixer_get_value() { return mixer_val; }
@@ -122,10 +127,11 @@ template <typename T, typename AccT, AccT min_val, AccT max_val, AccT offset = 0
 static void process_buffer_impl(T *buf, size_t samples)
 {
   debug("mixing");
+  const AccT gain = mixer_real.load(std::memory_order_relaxed);
   for (size_t i = 0; i < samples; i++)
   {
     AccT tmp = static_cast<AccT>(buf[i]) - offset;
-    tmp *= mixer_real;
+    tmp *= gain;
     tmp /= 1000;
     tmp += offset;
     tmp = std::clamp<AccT>(tmp, min_val, max_val);
@@ -249,10 +255,10 @@ static void softmixer_write_config()
     return;
   }
 
-  fprintf(cf, "%s %i\n", SOFTMIXER_CFG_ACTIVE, active);
+  fprintf(cf, "%s %i\n", SOFTMIXER_CFG_ACTIVE, active.load());
   fprintf(cf, "%s %i\n", SOFTMIXER_CFG_AMP, mixer_amp);
   fprintf(cf, "%s %i\n", SOFTMIXER_CFG_VALUE, mixer_val);
-  fprintf(cf, "%s %i\n", SOFTMIXER_CFG_MONO, mix_mono);
+  fprintf(cf, "%s %i\n", SOFTMIXER_CFG_MONO, mix_mono.load());
 
   fclose(cf);
 
@@ -335,8 +341,9 @@ void softmixer_process_buffer(char *buf, size_t size,
       {
         float *fbuf = reinterpret_cast<float *>(buf);
         size_t n = size / sizeof(float);
+        const float gain = mixer_realf.load(std::memory_order_relaxed);
         for (size_t i = 0; i < n; i++)
-          fbuf[i] = std::clamp(fbuf[i] * mixer_realf, -1.0f, 1.0f);
+          fbuf[i] = std::clamp(fbuf[i] * gain, -1.0f, 1.0f);
       }
       if (do_monomix)
         mix_mono_impl<float, float, -1.0f, 1.0f>(reinterpret_cast<float *>(buf), sound_params->channels, size / sizeof(float));

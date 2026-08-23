@@ -1596,7 +1596,6 @@ public:
         while (!events.empty()) {
             events.pop();
         }
-        log_close();
     }
 
     void show_error(const char *msg) {

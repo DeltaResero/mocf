@@ -194,13 +194,14 @@ static struct engine_event_queue *g_eq = nullptr;
 /* Thread ID of the engine thread (used in signal handling) */
 static pthread_t server_tid;
 
-/* Information about currently played file. */
+/* Information about currently played file.  Written by the player and
+ * audio threads, read by the UI thread, so the fields are atomic. */
 static struct
 {
-  int avg_bitrate;
-  int bitrate;
-  int rate;
-  int channels;
+  std::atomic<int> avg_bitrate;
+  std::atomic<int> bitrate;
+  std::atomic<int> rate;
+  std::atomic<int> channels;
 } sound_info = {-1, -1, -1, -1};
 
 static unique_tags_cache tags_cache;
@@ -229,8 +230,11 @@ static void sig_chld(int sig LOGIT_ONLY)
 static void sig_exit(int sig)
 {
   log_signal(sig);
+
+  /* Deliberately no quit_cond.notify_all() here: waking a condition
+   * variable is not async-signal-safe, and server_loop() rechecks
+   * server_quit once a second regardless. */
   server_quit = true;
-  quit_cond.notify_all();
 
   /* pthread_*() is not async-signal-safe, but we only call it when the
    * signal is received in a thread other than the server thread. */
@@ -416,7 +420,6 @@ static void server_shutdown()
   logit("Running OnEngineStop");
   run_extern_cmd("OnEngineStop");
   logit("Engine exited");
-  log_close();
 }
 
 void server_loop(void)
