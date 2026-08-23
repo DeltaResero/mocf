@@ -297,6 +297,39 @@ private:
 };
 #endif
 
+/* A held record lock has the same hazard as the DBT above, with a worse
+ * consequence.  If fatal() throws past an explicit lock_put(), the locker
+ * keeps the lock for the life of the process, and Berkeley DB then wedges
+ * on shutdown building a report of the locks still held. */
+#ifdef HAVE_DB_H
+class DbLockGuard
+{
+public:
+  DbLockGuard(DB_ENV *env, DB_LOCK &lock) : env_(env), lock_(lock) {}
+  ~DbLockGuard()
+  {
+    /* Must not throw: this can run while an exception is already on its way
+     * out, where throwing again would terminate the process. */
+    if (env_) (void)env_->lock_put(env_, &lock_);
+  }
+
+  /* Release on the normal path, where the caller can still report failure. */
+  int release()
+  {
+    DB_ENV *env = env_;
+    env_ = nullptr;
+    return env->lock_put(env, &lock_);
+  }
+
+  DbLockGuard(const DbLockGuard &) = delete;
+  DbLockGuard &operator=(const DbLockGuard &) = delete;
+
+private:
+  DB_ENV *env_;
+  DB_LOCK &lock_;
+};
+#endif
+
 /* This function ensures that a DB function takes place while holding a
  * database record lock.  It also provides an initialised database thang
  * for the key and record.
@@ -333,10 +366,11 @@ static auto with_db_lock(Fn fn, struct tags_cache *c, const char *file,
   {
     fatal("Can't get DB lock: %s", db_strerror(rc));
   }
+  DbLockGuard lock_guard(c->db_env, lock);
 
   auto result = fn(c, file, tags_sel, notify, &key, &record);
 
-  rc = c->db_env->lock_put(c->db_env, &lock);
+  rc = lock_guard.release();
   if (rc)
   {
     fatal("Can't release DB lock: %s", db_strerror(rc));
