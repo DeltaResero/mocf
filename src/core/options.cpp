@@ -28,6 +28,8 @@
 #include <unordered_map>
 #include <variant>
 #include <optional>
+#include <mutex>
+#include <shared_mutex>
 #include <vector>
 
 #include "core/common.h"
@@ -54,6 +56,12 @@ struct Option {
 };
 
 static std::unordered_map<std::string, Option> options_map;
+
+/* Guards the value of boolean options only.  The map itself gains and
+ * loses entries solely in options_init() and options_free(), so looking an
+ * option up needs no lock; the engine changing Repeat or Shuffle while a
+ * playing thread reads it does. */
+static std::shared_mutex bool_value_mtx;
 
 static std::string to_lower(const std::string& s) {
     std::string res = s;
@@ -239,6 +247,7 @@ void options_set_bool(const char *name, const bool value)
 {
   Option* opt = find_option(name, OPTION_BOOL);
   if (!opt) fatal("Tried to set wrong option '%s'!", name);
+  std::unique_lock<std::shared_mutex> lock(bool_value_mtx);
   opt->value = value;
 }
 
@@ -1032,6 +1041,7 @@ bool options_get_bool(const char *name)
 {
   Option* opt = find_option(name, OPTION_BOOL);
   if (!opt) fatal("Tried to get wrong option '%s'!", name);
+  std::shared_lock<std::shared_mutex> lock(bool_value_mtx);
   return std::get<bool>(opt->value);
 }
 
