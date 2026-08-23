@@ -420,7 +420,6 @@ static void server_shutdown()
   logit("Running OnEngineStop");
   run_extern_cmd("OnEngineStop");
   logit("Engine exited");
-  log_close();
 }
 
 void server_loop(void)

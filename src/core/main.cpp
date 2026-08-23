@@ -160,6 +160,10 @@ static void start_moc(const struct parameters *params, const std::vector<std::st
   pthread_join(server_thread, nullptr);
 
   engine_event_queue_free(eq);
+
+  /* Closed here rather than by either thread, so that whichever of them
+   * finishes second still has somewhere to write. */
+  log_close();
 }
 
 static void show_version()
