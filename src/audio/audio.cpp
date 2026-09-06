@@ -107,6 +107,11 @@ static bool audio_opened = false;
 /* Current sound parameters (with which the device is opened). */
 static struct sound_params driver_sound_params = {0, 0, 0};
 
+/* Published forms of driver_sound_params, which the player thread
+ * rewrites on each open while other threads read it. */
+static std::atomic<int> driver_bpf{0};
+static std::atomic<int> driver_bps{0};
+
 /* Sound parameters requested by the decoder. */
 static struct sound_params req_sound_params = {0, 0, 0};
 
@@ -784,6 +789,12 @@ int audio_open(struct sound_params *sound_params)
         return 0;
       }
     }
+    /* Publish only once the driver has settled every field. */
+    int bpf = driver_sound_params.channels *
+              (driver_sound_params.fmt ? sfmt_Bps(driver_sound_params.fmt) : 0);
+    driver_bpf.store(bpf, std::memory_order_relaxed);
+    driver_bps.store(driver_sound_params.rate * bpf, std::memory_order_relaxed);
+
     audio_opened = true;
 
     logit("Requested sound parameters: %s, %d channels, %dHz",
@@ -816,15 +827,11 @@ int audio_send_buf(const char *buf, const size_t size)
 
 /* Get the current audio format bytes per frame value.
  * May return 0 if the audio device is closed. */
-int audio_get_bpf()
-{
-  return driver_sound_params.channels *
-         (driver_sound_params.fmt ? sfmt_Bps(driver_sound_params.fmt) : 0);
-}
+int audio_get_bpf() { return driver_bpf.load(std::memory_order_relaxed); }
 
 /* Get the current audio format bytes per second value.
  * May return 0 if the audio device is closed. */
-int audio_get_bps() { return driver_sound_params.rate * audio_get_bpf(); }
+int audio_get_bps() { return driver_bps.load(std::memory_order_relaxed); }
 
 int audio_get_buf_fill() { return hw ? hw->get_buff_fill() : 0; }
 
@@ -883,6 +890,8 @@ void audio_close()
   {
     reset_sound_params(&req_sound_params);
     reset_sound_params(&driver_sound_params);
+    driver_bpf.store(0, std::memory_order_relaxed);
+    driver_bps.store(0, std::memory_order_relaxed);
     hw->close();
     if (need_audio_conversion)
     {
