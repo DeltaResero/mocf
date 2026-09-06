@@ -42,6 +42,8 @@
 #include <sstream>
 #include <memory>
 #include <new>
+#include <atomic>
+#include <mutex>
 
 #include "core/common.h"
 #include "audio/audio.h"
@@ -176,13 +178,20 @@ static void mk_biquad(float dbgain, float cf, float srate, float bw,
 
 /* sound processing */
 template <typename T>
-static void equ_process_buffer(T *buf, size_t samples, float min_val, float max_val);
+static void equ_process_buffer(T *buf, size_t samples, float min_val, float max_val,
+                               t_eq_set *set);
 
 /* static global variables */
+
+/* Guards equ_sets, current_equ_idx, sample_rate, equ_channels and the
+ * preamp pair. */
+static std::mutex equ_mtx;
+
 static std::vector<t_eq_set> equ_sets;
 static int current_equ_idx = -1; /* -1: no preset loaded */
 
-/* Currently-selected preset, or nullptr if none is loaded. */
+/* Currently-selected preset, or nullptr if none is loaded. Hold equ_mtx,
+ * and drop the pointer with it: a refresh frees what it points at. */
 static t_eq_set *current_set()
 {
   return (current_equ_idx >= 0 && current_equ_idx < static_cast<int>(equ_sets.size()))
@@ -190,8 +199,10 @@ static t_eq_set *current_set()
 }
 
 static int sample_rate;
-static int equ_active;
 static int equ_channels;
+
+/* Read by the audio thread outside equ_mtx. */
+static std::atomic<int> equ_active;
 
 static float mixin_rate;
 static float r_mixin_rate;
@@ -212,6 +223,8 @@ std::string equalizer_current_eqname()
 {
   if (equ_active)
   {
+    std::lock_guard<std::mutex> lock(equ_mtx);
+
     if (t_eq_set *cur = current_set())
       return cur->name;
   }
@@ -221,6 +234,8 @@ std::string equalizer_current_eqname()
 
 void equalizer_next()
 {
+  std::lock_guard<std::mutex> lock(equ_mtx);
+
   if (!equ_sets.empty())
   {
     current_equ_idx = (current_equ_idx + 1) % static_cast<int>(equ_sets.size());
@@ -231,6 +246,8 @@ void equalizer_next()
 
 void equalizer_prev()
 {
+  std::lock_guard<std::mutex> lock(equ_mtx);
+
   if (!equ_sets.empty())
   {
     int count = static_cast<int>(equ_sets.size());
@@ -331,6 +348,7 @@ static inline void apply_biquads(float *src, float *dst, int channels, int len,
  the equations are not even close to each other in their results...
  - hiben
 */
+/* Caller must hold equ_mtx. */
 static void equalizer_adjust_preamp()
 {
   if (t_eq_set *cur = current_set())
@@ -398,10 +416,21 @@ static void equalizer_write_config()
     return;
   }
 
-  fprintf(cf, "%s %i\n", EQUALIZER_CFG_ACTIVE, equ_active);
-  if (t_eq_set *cur = current_set())
+  std::string preset_name;
+
   {
-    fprintf(cf, "%s %s\n", EQUALIZER_CFG_PRESET, cur->name.c_str());
+    std::lock_guard<std::mutex> lock(equ_mtx);
+
+    if (t_eq_set *cur = current_set())
+    {
+      preset_name = cur->name;
+    }
+  }
+
+  fprintf(cf, "%s %i\n", EQUALIZER_CFG_ACTIVE, equ_active.load());
+  if (!preset_name.empty())
+  {
+    fprintf(cf, "%s %s\n", EQUALIZER_CFG_PRESET, preset_name.c_str());
   }
   fprintf(cf, "%s %f\n", EQUALIZER_CFG_MIXIN, mixin_rate);
 
@@ -414,16 +443,20 @@ void equalizer_init()
 {
   equ_active = 1;
 
-  equ_sets.clear();
-  current_equ_idx = -1;
+  {
+    std::lock_guard<std::mutex> lock(equ_mtx);
 
-  sample_rate = 44100;
+    equ_sets.clear();
+    current_equ_idx = -1;
 
-  equ_channels = 2;
+    sample_rate = 44100;
 
-  preamp = 0.0f;
+    equ_channels = 2;
 
-  preampf = powf(10.0f, preamp / 20.0f);
+    preamp = 0.0f;
+
+    preampf = powf(10.0f, preamp / 20.0f);
+  }
 
   eqsetdir = create_file_name("eqsets");
 
@@ -447,7 +480,12 @@ void equalizer_shutdown()
     equalizer_write_config();
   }
 
-  equ_sets.clear();
+  {
+    std::lock_guard<std::mutex> lock(equ_mtx);
+
+    equ_sets.clear();
+    current_equ_idx = -1;
+  }
 
   logit("Equalizer stopped");
 }
@@ -456,32 +494,33 @@ void equalizer_refresh()
 {
   char buf[1024];
 
+  /* Note what to build against, then build off the lock so the audio
+   * thread keeps playing on the old sets while the disk is read. */
   std::string current_set_name;
+  int build_rate;
+  int build_channels;
 
-  if (t_eq_set *cur = current_set())
   {
-    current_set_name = cur->name;
-  }
-  else
-  {
-    if (!config_preset_name.empty())
+    std::lock_guard<std::mutex> lock(equ_mtx);
+
+    if (t_eq_set *cur = current_set())
+    {
+      current_set_name = cur->name;
+    }
+    else if (!config_preset_name.empty())
     {
       current_set_name = config_preset_name;
     }
+
+    build_rate = sample_rate;
+    build_channels = equ_channels;
   }
 
-  equ_sets.clear();
-
-  current_equ_idx = -1;
+  std::vector<t_eq_set> new_sets;
 
   DIR *d = opendir(eqsetdir.c_str());
 
-  if (!d)
-  {
-    return;
-  }
-
-  struct dirent *de = readdir(d);
+  struct dirent *de = d ? readdir(d) : nullptr;
   struct stat st;
 
   while (de)
@@ -511,25 +550,25 @@ void equalizer_refresh()
         if (r == 0)
         {
           t_eq_set eqset;
-          eqset.b.resize(eqs->bcount * equ_channels);
+          eqset.b.resize(eqs->bcount * build_channels);
 
           eqset.name = eqs->name;
           eqset.preamp = eqs->preamp;
           eqset.bcount = eqs->bcount;
-          eqset.channels = equ_channels;
+          eqset.channels = build_channels;
 
           for (int i = 0; i < eqs->bcount; i++)
           {
-            mk_biquad(eqs->dg[i], eqs->cf[i], sample_rate, eqs->bw[i],
+            mk_biquad(eqs->dg[i], eqs->cf[i], build_rate, eqs->bw[i],
                       eqset.b[i]);
 
-            for (int channel = 1; channel < equ_channels; channel++)
+            for (int channel = 1; channel < build_channels; channel++)
             {
               eqset.b[channel * eqset.bcount + i] = eqset.b[i];
             }
           }
 
-          equ_sets.push_back(std::move(eqset));
+          new_sets.push_back(std::move(eqset));
         }
         else
         {
@@ -558,32 +597,43 @@ void equalizer_refresh()
     de = readdir(d);
   }
 
-  closedir(d);
+  if (d)
+  {
+    closedir(d);
+  }
 
-  current_equ_idx = equ_sets.empty() ? -1 : 0;
+  int new_idx = new_sets.empty() ? -1 : 0;
 
   if (!current_set_name.empty())
   {
-    current_equ_idx = -1;
+    new_idx = -1;
 
-    for (size_t i = 0; i < equ_sets.size(); i++)
+    for (size_t i = 0; i < new_sets.size(); i++)
     {
-      if (current_set_name == equ_sets[i].name)
+      if (current_set_name == new_sets[i].name)
       {
-        current_equ_idx = static_cast<int>(i);
+        new_idx = static_cast<int>(i);
         break;
       }
     }
 
-    if (current_equ_idx == -1)
+    if (new_idx == -1)
     {
       logit("EQ %s not found.", current_set_name.c_str());
       /* equalizer not found, pick the first one (if any) */
-      current_equ_idx = equ_sets.empty() ? -1 : 0;
+      new_idx = new_sets.empty() ? -1 : 0;
     }
   }
 
-  equalizer_adjust_preamp();
+  /* The only part of a rebuild the audio thread can wait on. */
+  {
+    std::lock_guard<std::mutex> lock(equ_mtx);
+
+    equ_sets = std::move(new_sets);
+    current_equ_idx = new_idx;
+
+    equalizer_adjust_preamp();
+  }
 }
 
 /* sound processing code */
@@ -592,31 +642,39 @@ void equalizer_process_buffer(char *buf, size_t size,
 {
   debug("EQ Processing %zu bytes...", size);
 
-  t_eq_set *cur = current_set();
-
-  if (!equ_active || !cur)
+  if (!equ_active)
   {
     return;
   }
 
-  if (sound_params->rate != cur->b[0].israte ||
-      sound_params->channels != equ_channels)
+  /* Checked before the buffer lock: equalizer_refresh() takes equ_mtx
+   * and would deadlock this thread against itself. */
+  bool stale;
+
   {
-    logit("Recreating filters due to sound parameter changes...");
-    sample_rate = sound_params->rate;
-    equ_channels = sound_params->channels;
+    std::lock_guard<std::mutex> lock(equ_mtx);
 
-    equalizer_refresh();
-
-    /* The rebuild replaced every set, so cur points at freed memory now,
-     * and it can finish with nothing usable at all when the eqsets
-     * directory has gone away. Take the selection again. */
-    cur = current_set();
+    t_eq_set *cur = current_set();
 
     if (!cur)
     {
       return;
     }
+
+    stale = (sound_params->rate != cur->b[0].israte ||
+             sound_params->channels != equ_channels);
+
+    if (stale)
+    {
+      sample_rate = sound_params->rate;
+      equ_channels = sound_params->channels;
+    }
+  }
+
+  if (stale)
+  {
+    logit("Recreating filters due to sound parameter changes...");
+    equalizer_refresh();
   }
 
   long sound_format = sound_params->fmt & SFMT_MASK_FORMAT;
@@ -624,40 +682,52 @@ void equalizer_process_buffer(char *buf, size_t size,
 
   assert(size % (samplewidth * sound_params->channels) == 0);
 
+  /* Held for the whole buffer; the rebuild above may have left none. */
+  std::lock_guard<std::mutex> lock(equ_mtx);
+
+  t_eq_set *cur = current_set();
+
+  if (!cur)
+  {
+    return;
+  }
+
   switch (sound_format)
   {
     case SFMT_U8:
-      equ_process_buffer(reinterpret_cast<uint8_t *>(buf), size, 0.0f, static_cast<float>(UINT8_MAX));
+      equ_process_buffer(reinterpret_cast<uint8_t *>(buf), size, 0.0f, static_cast<float>(UINT8_MAX), cur);
       break;
     case SFMT_S8:
-      equ_process_buffer(reinterpret_cast<int8_t *>(buf), size, static_cast<float>(INT8_MIN), static_cast<float>(INT8_MAX));
+      equ_process_buffer(reinterpret_cast<int8_t *>(buf), size, static_cast<float>(INT8_MIN), static_cast<float>(INT8_MAX), cur);
       break;
     case SFMT_U16:
-      equ_process_buffer(reinterpret_cast<uint16_t *>(buf), size / sizeof(uint16_t), 0.0f, static_cast<float>(UINT16_MAX));
+      equ_process_buffer(reinterpret_cast<uint16_t *>(buf), size / sizeof(uint16_t), 0.0f, static_cast<float>(UINT16_MAX), cur);
       break;
     case SFMT_S16:
-      equ_process_buffer(reinterpret_cast<int16_t *>(buf), size / sizeof(int16_t), static_cast<float>(INT16_MIN), static_cast<float>(INT16_MAX));
+      equ_process_buffer(reinterpret_cast<int16_t *>(buf), size / sizeof(int16_t), static_cast<float>(INT16_MIN), static_cast<float>(INT16_MAX), cur);
       break;
     case SFMT_U24:
-      equ_process_buffer(reinterpret_cast<uint32_t *>(buf), size / sizeof(uint32_t), 0.0f, static_cast<float>(U24_MAX));
+      equ_process_buffer(reinterpret_cast<uint32_t *>(buf), size / sizeof(uint32_t), 0.0f, static_cast<float>(U24_MAX), cur);
       break;
     case SFMT_S24:
-      equ_process_buffer(reinterpret_cast<int32_t *>(buf), size / sizeof(int32_t), static_cast<float>(S24_MIN), static_cast<float>(S24_MAX));
+      equ_process_buffer(reinterpret_cast<int32_t *>(buf), size / sizeof(int32_t), static_cast<float>(S24_MIN), static_cast<float>(S24_MAX), cur);
       break;
     case SFMT_U32:
-      equ_process_buffer(reinterpret_cast<uint32_t *>(buf), size / sizeof(uint32_t), 0.0f, static_cast<float>(UINT32_MAX));
+      equ_process_buffer(reinterpret_cast<uint32_t *>(buf), size / sizeof(uint32_t), 0.0f, static_cast<float>(UINT32_MAX), cur);
       break;
     case SFMT_S32:
-      equ_process_buffer(reinterpret_cast<int32_t *>(buf), size / sizeof(int32_t), static_cast<float>(INT32_MIN), static_cast<float>(INT32_MAX));
+      equ_process_buffer(reinterpret_cast<int32_t *>(buf), size / sizeof(int32_t), static_cast<float>(INT32_MIN), static_cast<float>(INT32_MAX), cur);
       break;
     case SFMT_FLOAT:
-      equ_process_buffer(std::launder(reinterpret_cast<float *>(buf)), size / sizeof(float), -1.0f, 1.0f);
+      equ_process_buffer(std::launder(reinterpret_cast<float *>(buf)), size / sizeof(float), -1.0f, 1.0f, cur);
       break;
   }
 }
 
+/* Hold equ_mtx: writes filter state through set->b. */
 template <typename T>
-static void equ_process_buffer(T *buf, size_t samples, float min_val, float max_val)
+static void equ_process_buffer(T *buf, size_t samples, float min_val, float max_val,
+                               t_eq_set *set)
 {
   size_t i;
   std::vector<float> tmp(samples);
@@ -669,8 +739,8 @@ static void equ_process_buffer(T *buf, size_t samples, float min_val, float max_
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, current_set()->b.data(),
-                current_set()->bcount);
+  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, set->b.data(),
+                set->bcount);
 
   for (i = 0; i < samples; i++)
   {
