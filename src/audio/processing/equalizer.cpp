@@ -183,8 +183,8 @@ static void equ_process_buffer(T *buf, size_t samples, float min_val, float max_
 
 /* static global variables */
 
-/* Guards equ_sets, current_equ_idx, sample_rate, equ_channels and the
- * preamp pair. */
+/* Guards equ_sets, current_equ_idx, sample_rate, equ_channels, the
+ * preamp pair and equ_scratch. */
 static std::mutex equ_mtx;
 
 static std::vector<t_eq_set> equ_sets;
@@ -209,6 +209,9 @@ static float r_mixin_rate;
 
 static float preamp;
 static float preampf;
+
+/* Scratch for equ_process_buffer, kept between buffers. */
+static std::vector<float> equ_scratch;
 
 static std::string eqsetdir;
 
@@ -485,6 +488,8 @@ void equalizer_shutdown()
 
     equ_sets.clear();
     current_equ_idx = -1;
+    equ_scratch.clear();
+    equ_scratch.shrink_to_fit();
   }
 
   logit("Equalizer stopped");
@@ -730,7 +735,13 @@ static void equ_process_buffer(T *buf, size_t samples, float min_val, float max_
                                t_eq_set *set)
 {
   size_t i;
-  std::vector<float> tmp(samples);
+
+  if (equ_scratch.size() < samples)
+  {
+    equ_scratch.resize(samples);
+  }
+
+  float *tmp = equ_scratch.data();
 
   debug("equalizing");
 
@@ -739,7 +750,7 @@ static void equ_process_buffer(T *buf, size_t samples, float min_val, float max_
     tmp[i] = preampf * static_cast<float>(buf[i]);
   }
 
-  apply_biquads(tmp.data(), tmp.data(), equ_channels, samples, set->b.data(),
+  apply_biquads(tmp, tmp, equ_channels, samples, set->b.data(),
                 set->bcount);
 
   for (i = 0; i < samples; i++)
