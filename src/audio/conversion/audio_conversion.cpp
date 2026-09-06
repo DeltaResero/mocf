@@ -205,9 +205,11 @@ static void u24_3_to_float(const char *in, float *out, const size_t samples)
 
 
 /* Convert fixed point samples in format fmt (size in bytes) to float. */
-static std::vector<float> fixed_to_float(const char *buf, const size_t size, const long fmt)
+/* Fills out, which the caller keeps between buffers so the resize below
+ * stops short of the allocator once it has grown. */
+static void fixed_to_float(const char *buf, const size_t size, const long fmt,
+                           std::vector<float> &out)
 {
-  std::vector<float> out;
   char fmt_name[SFMT_STR_MAX];
 
   assert((fmt & SFMT_MASK_FORMAT) != SFMT_FLOAT);
@@ -259,8 +261,6 @@ static std::vector<float> fixed_to_float(const char *buf, const size_t size, con
             sfmt_str(fmt, fmt_name, sizeof(fmt_name)));
       abort();
   }
-
-  return out;
 }
 
 /* Convert float samples to fixed point format fmt. */
@@ -893,8 +893,8 @@ std::vector<char> AudioConversion::process(const char *buf, const size_t size)
        !sfmt_same_bps(to_params.fmt, curr_sfmt)) &&
       (curr_sfmt & SFMT_MASK_FORMAT) != SFMT_FLOAT)
   {
-    auto float_sound = fixed_to_float(curr_sound.data(), curr_sound.size(), curr_sfmt);
-    curr_sound.assign(reinterpret_cast<char*>(float_sound.data()), reinterpret_cast<char*>(float_sound.data() + float_sound.size()));
+    fixed_to_float(curr_sound.data(), curr_sound.size(), curr_sfmt, float_buf);
+    curr_sound.assign(reinterpret_cast<char*>(float_buf.data()), reinterpret_cast<char*>(float_buf.data() + float_buf.size()));
     curr_sfmt = sfmt_set_fmt(curr_sfmt, SFMT_FLOAT);
   }
 

@@ -41,6 +41,9 @@ private:
     sound_params from_params;
     sound_params to_params;
 
+    /* Kept between buffers so the conversion path stops allocating. */
+    std::vector<float> float_buf;
+
 #ifdef HAVE_SAMPLERATE
     SRC_STATE *src_state = nullptr;
     std::vector<float> resample_buf;
