@@ -851,21 +851,30 @@ void audio_hw_unpause()
 
 int audio_send_pcm(const char *buf, const size_t size)
 {
-  std::vector<char> equalized;
-  std::vector<char> softmixed;
+  /* The driver may accept only part of the buffer, and the caller then
+   * re-sends the rest from the same source, so the source has to stay
+   * untouched. One copy is taken and both processors work on it in
+   * turn. The buffer is kept between calls to stay off the allocator. */
+  static thread_local std::vector<char> processed;
 
-  if (equalizer_is_active())
-  {
-    equalized.assign(buf, buf + size);
-    equalizer_process_buffer(equalized.data(), size, &driver_sound_params);
-    buf = equalized.data();
-  }
+  const bool use_eq = equalizer_is_active();
+  const bool use_mixer = softmixer_is_active() || softmixer_is_mono();
 
-  if (softmixer_is_active() || softmixer_is_mono())
+  if (use_eq || use_mixer)
   {
-    softmixed.assign(buf, buf + size);
-    softmixer_process_buffer(softmixed.data(), size, &driver_sound_params);
-    buf = softmixed.data();
+    processed.assign(buf, buf + size);
+
+    if (use_eq)
+    {
+      equalizer_process_buffer(processed.data(), size, &driver_sound_params);
+    }
+
+    if (use_mixer)
+    {
+      softmixer_process_buffer(processed.data(), size, &driver_sound_params);
+    }
+
+    buf = processed.data();
   }
 
   int played = hw->play(buf, size);
