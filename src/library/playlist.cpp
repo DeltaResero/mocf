@@ -83,7 +83,7 @@ void tags_update(struct file_tags *dst, struct file_tags *src, int move)
 
 
 /* Return 1 if an item has 'deleted' flag. */
-inline int plist_deleted(const struct plist *plist, const int num)
+int plist_deleted(const struct plist *plist, const int num)
 {
   assert(in_range(num, plist->items.size()));
 
