@@ -607,6 +607,16 @@ void equalizer_process_buffer(char *buf, size_t size,
     equ_channels = sound_params->channels;
 
     equalizer_refresh();
+
+    /* The rebuild replaced every set, so cur points at freed memory now,
+     * and it can finish with nothing usable at all when the eqsets
+     * directory has gone away. Take the selection again. */
+    cur = current_set();
+
+    if (!cur)
+    {
+      return;
+    }
   }
 
   long sound_format = sound_params->fmt & SFMT_MASK_FORMAT;
