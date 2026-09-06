@@ -22,6 +22,7 @@
 #include <sys/file.h>
 #include <unistd.h>
 #include <algorithm>
+#include <map>
 
 #define DEBUG
 
@@ -215,21 +216,34 @@ static int is_blank_line(const char *l)
   return 1;
 }
 
-/* Read a value from the given section from .INI file.  File should be opened
- * and seeking will be performed on it.  Return the value or std::nullopt
- * if not present or error occurred. */
-static std::optional<std::string> read_ini_value(FILE *file, const char *section, const char *key)
+/* Fold an .INI option name for lookup, which is case insensitive. */
+static std::string ini_fold(const std::string &name)
 {
+  std::string out = name;
+
+  for (char &c : out)
+  {
+    c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+  }
+
+  return out;
+}
+
+/* Read one section of an .INI file into a map keyed by the folded option
+ * name. File should be opened and seeking will be performed on it. The
+ * whole section is taken in one pass, so a caller after many values does
+ * not seek back to the start for each one. */
+static std::map<std::string, std::string> read_ini_section(FILE *file,
+                                                           const char *section)
+{
+  std::map<std::string, std::string> values;
   int in_section = 0;
-  int key_len;
 
   if (fseek(file, 0, SEEK_SET))
   {
     error_errno("File fseek() error", errno);
-    return std::nullopt;
+    return values;
   }
-
-  key_len = strlen(key);
 
   while (auto line_opt = read_line(file))
   {
@@ -259,57 +273,62 @@ static std::optional<std::string> read_ini_value(FILE *file, const char *section
     }
     else if (in_section && line[0] != '#' && !is_blank_line(line.c_str()))
     {
-      char *t, *t2;
+      size_t eq = line.find('=');
 
-      t2 = t = strchr(line.data(), '=');
-
-      if (!t)
+      if (eq == std::string::npos)
       {
         error("Parse error in the INI file");
         break;
       }
 
-      /* go back to the last char in the name */
-      while (t2 >= t && (isblank(*t2) || *t2 == '='))
+      /* trim blanks from both ends of the name */
+      size_t end = eq;
+      while (end > 0 && isblank(static_cast<unsigned char>(line[end - 1])))
       {
-        t2--;
+        end--;
       }
 
-      if (t2 == t)
+      size_t start = 0;
+      while (start < end && isblank(static_cast<unsigned char>(line[start])))
+      {
+        start++;
+      }
+
+      if (start == end)
       {
         error("Parse error in the INI file");
         break;
       }
 
-      if (!strncasecmp(line.data(), key, std::max<size_t>(t2 - line.data() + 1, key_len)))
+      size_t vstart = eq + 1;
+      while (vstart < line.size() &&
+             isblank(static_cast<unsigned char>(line[vstart])))
       {
-        char *value = t + 1;
-
-        while (isblank(value[0]))
-        {
-          value++;
-        }
-
-        if (value[0] == '"')
-        {
-          char *q = strchr(value + 1, '"');
-
-          if (!q)
-          {
-            error("Parse error in the INI file");
-            break;
-          }
-
-          *q = 0;
-        }
-
-        return std::string(value);
+        vstart++;
       }
+
+      std::string value = line.substr(vstart);
+
+      if (!value.empty() && value[0] == '"')
+      {
+        size_t q = value.find('"', 1);
+
+        if (q == std::string::npos)
+        {
+          error("Parse error in the INI file");
+          break;
+        }
+
+        value = value.substr(1, q - 1);
+      }
+
+      /* first occurrence wins, as the old sequential search did */
+      values.emplace(ini_fold(line.substr(start, end - start)), std::move(value));
     }
 
   }
 
-  return std::nullopt;
+  return values;
 }
 
 /* Load PLS file into plist. Return the number of items read. */
@@ -327,7 +346,15 @@ static int plist_load_pls(struct plist *plist, const char *fname,
     return 0;
   }
 
-  auto number_entries = read_ini_value(file, "playlist", "NumberOfEntries");
+  /* One pass over the file, rather than one pass per value wanted. */
+  std::map<std::string, std::string> values = read_ini_section(file, "playlist");
+
+  auto lookup = [&values](const char *name) -> const std::string * {
+    auto it = values.find(ini_fold(name));
+    return it == values.end() ? nullptr : &it->second;
+  };
+
+  const std::string *number_entries = lookup("NumberOfEntries");
   if (!number_entries)
   {
     /* Assume that it is a pls file version 1 - plist_load_m3u()
@@ -349,7 +376,7 @@ static int plist_load_pls(struct plist *plist, const char *fname,
       char key[32], path[2 * PATH_MAX];
 
       snprintf(key, sizeof(key), "File%ld", i);
-      auto pls_file = read_ini_value(file, "playlist", key);
+      const std::string *pls_file = lookup(key);
       if (!pls_file)
       {
         error("Broken PLS file");
@@ -357,10 +384,10 @@ static int plist_load_pls(struct plist *plist, const char *fname,
       }
 
       snprintf(key, sizeof(key), "Title%ld", i);
-      auto pls_title = read_ini_value(file, "playlist", key);
+      const std::string *pls_title = lookup(key);
 
       snprintf(key, sizeof(key), "Length%ld", i);
-      auto pls_length = read_ini_value(file, "playlist", key);
+      const std::string *pls_length = lookup(key);
 
       if (pls_length)
       {
