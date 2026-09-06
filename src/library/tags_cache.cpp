@@ -99,6 +99,9 @@ struct tags_cache
 #endif
 
   int max_items; /* maximum number of items in the cache. */
+  int nitems;    /* items in the cache, or -1 when not yet known. Only
+                    ever an upper bound, because updating an existing key
+                    inflates it and the next scan puts it right. */
   std::deque<TagRequest> queue; /* pending tag requests */
   int stop_reader_thread;      /* request for stopping read thread (if
                 non-zero) */
@@ -431,6 +434,14 @@ static void tags_cache_remove_rec(struct tags_cache *c, const char *fname)
 #ifdef HAVE_DB_H
 static void tags_cache_gc(struct tags_cache *c)
 {
+  /* Called on every add, so do nothing at all while the cache is known
+   * to be under the limit. Only once it reaches the limit is the walk
+   * below worth paying for, and that walk re-establishes the count. */
+  if (c->nitems >= 0 && c->nitems < c->max_items)
+  {
+    return;
+  }
+
   DBC *cur;
   DBT key;
   DBT serialized_cache_rec;
@@ -487,11 +498,14 @@ static void tags_cache_gc(struct tags_cache *c)
 
   debug("Elements in cache: %d (limit %d)", nitems, c->max_items);
 
+  c->nitems = nitems;
+
   if (last_referenced)
   {
     if (nitems >= c->max_items)
     {
       tags_cache_remove_rec(c, last_referenced->c_str());
+      c->nitems--;
     }
   }
   else
@@ -549,6 +563,10 @@ static void tags_cache_add(struct tags_cache *c, const char *file, DBT *key,
   if (ret)
   {
     error_errno("DB put error", ret);
+  }
+  else if (c->nitems >= 0)
+  {
+    c->nitems++;
   }
 
   tags_cache_sync(c);
@@ -744,6 +762,8 @@ struct tags_cache *tags_cache_new(size_t max_size)
   result->db = nullptr;
 #endif
 
+
+  result->nitems = -1;
 
 #if CACHE_DB_FORMAT_VERSION
   result->max_items = max_size;
