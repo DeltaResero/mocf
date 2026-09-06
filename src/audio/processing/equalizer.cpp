@@ -544,6 +544,9 @@ void equalizer_refresh()
             case -3:
               logit("Error while parsing settings from EQSET: %s", filename.c_str());
               break;
+            case -4:
+              logit("Not an EQSET (no filter bands): %s", filename.c_str());
+              break;
             default:
               logit("Unknown error while parsing EQSET: %s", filename.c_str());
               break;
@@ -759,6 +762,15 @@ static int read_setup(const char *name, char *desc, std::unique_ptr<t_eq_setup> 
     {
       s->preamp = bw_val;
     }
+  }
+
+  /* A file holding only a header, or only a preamp line, parses cleanly
+   * but describes no filters. The processing code reads b[0] to find the
+   * rate the set was built for, so an empty set is indexed out of
+   * bounds. Refuse it here instead. */
+  if (s->bcount == 0)
+  {
+    return -4;
   }
 
   return 0;
