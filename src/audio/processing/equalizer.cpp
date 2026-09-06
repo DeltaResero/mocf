@@ -213,6 +213,9 @@ static float preampf;
 /* Scratch for equ_process_buffer, kept between buffers. */
 static std::vector<float> equ_scratch;
 
+/* Sample format the filter history belongs to. */
+static long equ_last_fmt = 0;
+
 static std::string eqsetdir;
 
 static std::string config_preset_name;
@@ -695,6 +698,24 @@ void equalizer_process_buffer(char *buf, size_t size,
   if (!cur)
   {
     return;
+  }
+
+  /* Filter history is held in the sample domain, so it only means
+   * anything for the format it was built up in. Carrying 16-bit history
+   * into float samples leaves the filters holding values thousands of
+   * times too large, and they saturate until they settle. Start them
+   * clean whenever the format changes under us. */
+  if (sound_format != equ_last_fmt)
+  {
+    equ_last_fmt = sound_format;
+
+    for (t_biquad &q : cur->b)
+    {
+      q.x1 = 0.0f;
+      q.x2 = 0.0f;
+      q.y1 = 0.0f;
+      q.y2 = 0.0f;
+    }
   }
 
   switch (sound_format)
