@@ -370,8 +370,8 @@ static std::string do_title_expn(size_t max_len, const char *fmt,
        */
       if (*fmt == '(')
       {
-        char separator, expr[256];
-        int expr_pos = 0;
+        char separator;
+        std::string expr;
 
         check_zero(++fmt);
         h = title_expn_subs(*fmt, tags);
@@ -387,11 +387,7 @@ static std::string do_title_expn(size_t max_len, const char *fmt,
           /* copy the expression */
           while (escape || *fmt != separator)
           {
-            if (expr_pos == sizeof(expr) - 2)
-            {
-              fatal("Nested ternary expression too long!");
-            }
-            expr[expr_pos++] = *fmt;
+            expr += *fmt;
             if (*fmt == '\\')
             {
               escape = 1;
@@ -402,7 +398,6 @@ static std::string do_title_expn(size_t max_len, const char *fmt,
             }
             check_zero(++fmt);
           }
-          expr[expr_pos] = '\0';
 
           /* eat the rest */
           while (escape || *fmt != ')')
@@ -440,11 +435,7 @@ static std::string do_title_expn(size_t max_len, const char *fmt,
           /* copy the expression */
           while (escape || *fmt != ')')
           {
-            if (expr_pos == sizeof(expr) - 2)
-            {
-              fatal("Ternary expression too long!");
-            }
-            expr[expr_pos++] = *fmt;
+            expr += *fmt;
             if (*fmt == '\\')
             {
               escape = 1;
@@ -455,10 +446,9 @@ static std::string do_title_expn(size_t max_len, const char *fmt,
             }
             check_zero(++fmt);
           }
-          expr[expr_pos] = '\0';
         }
 
-        dest += do_title_expn(max_len - dest.size(), expr, tags);
+        dest += do_title_expn(max_len - dest.size(), expr.c_str(), tags);
       }
       else
       {
