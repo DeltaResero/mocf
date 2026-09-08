@@ -17,6 +17,7 @@
 #include "config.h"
 #endif
 
+#include <atomic>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
@@ -311,6 +312,12 @@ const char *plist_get_next_dead_entry(const struct plist *plist,
   return nullptr;
 }
 
+/* Thrown on a malformed FormatString and caught in build_title_with_format,
+ * which unwinds the nested parse loops without ending the program. */
+struct BadTitleFormat
+{
+};
+
 static std::optional<std::string> title_expn_subs(char fmt,
                                                    const struct file_tags *tags)
 {
@@ -335,7 +342,7 @@ static std::optional<std::string> title_expn_subs(char fmt,
                  ? std::optional<std::string>(tags->title)
                  : std::nullopt;
     default:
-      fatal("Error parsing format string!");
+      throw BadTitleFormat();
   }
 
   return std::nullopt;
@@ -345,7 +352,7 @@ static inline void check_zero(const char *x)
 {
   if (*x == '\0')
   {
-    fatal("Unexpected end of title expression!");
+    throw BadTitleFormat();
   }
 }
 
@@ -483,7 +490,22 @@ std::string build_title_with_format(const struct file_tags *tags, const char *fm
    * std::string needs no extra slot for a terminator). */
   constexpr size_t kMaxTitleLen = 511;
 
-  return do_title_expn(kMaxTitleLen, fmt, tags);
+  try
+  {
+    return do_title_expn(kMaxTitleLen, fmt, tags);
+  }
+  catch (const BadTitleFormat &)
+  {
+    /* Warn once, FormatString cannot change while running. */
+    static std::atomic<bool> warned{false};
+
+    if (!warned.exchange(true))
+    {
+      error("Malformed FormatString, falling back to the plain title.");
+    }
+
+    return tags ? tags->title : std::string();
+  }
 }
 
 /* Build file title from struct file_tags. */
