@@ -236,10 +236,19 @@ void plist_sort_fname(struct plist *plist)
 
   n = static_cast<int>(sorted.size());
   plist->search_tree.clear();
+  plist->total_time = 0;
+  plist->items_with_time = 0;
+
   for (int i = 0; i < n; i++)
   {
     plist->items[i] = std::move(sorted[i]);
     plist->search_tree[plist->items[i].file] = i;
+
+    if (plist->items[i].tags && plist->items[i].tags->time != -1)
+    {
+      plist->total_time += plist->items[i].tags->time;
+      plist->items_with_time++;
+    }
   }
   plist->items.resize(n);
 
