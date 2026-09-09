@@ -104,6 +104,7 @@ private:
     static void flush_callback(pa_stream *s, int success, void *userdata);
     static void sink_name_cb(pa_context *c, const pa_sink_info *i, int eol, void *userdata);
     static void cork_callback(pa_stream *s, int success, void *userdata);
+    static void context_success_callback(pa_context *c, int success, void *userdata);
 
     struct VolumeCbData {
         PulseOutput *self;
@@ -488,18 +489,21 @@ int PulseOutput::read_mixer()
 void PulseOutput::set_mixer(int vol)
 {
   pa_cvolume v;
-  pa_operation *op;
+  pa_operation *op = nullptr;
+  int result = 0;
 
   pa_cvolume_set(&v, 1, vol * PA_VOLUME_NORM / 100);
 
   pa_threaded_mainloop_lock(mainloop);
+
+  IntCbData data = {this, &result};
 
   if (showing_sink_volume)
   {
     op = pa_context_set_sink_volume_by_index(
         context,
         stream ? pa_stream_get_device_index(stream) : pa_default_sink_index, &v,
-        nullptr, nullptr);
+        context_success_callback, &data);
   }
   else
   {
@@ -508,9 +512,21 @@ void PulseOutput::set_mixer(int vol)
     if (stream)
     {
       op = pa_context_set_sink_input_volume(context, pa_stream_get_index(stream),
-                                            &v, nullptr, nullptr);
-      pa_operation_unref(op);
+                                            &v, context_success_callback, &data);
     }
+  }
+
+  /* Wait for the server to apply this. read_mixer() asks the server for the
+   * volume and the interface calls it right after us, so returning while the
+   * change is still in flight has it read back the old value and draw that. */
+  if (op)
+  {
+    while (pa_operation_get_state(op) == PA_OPERATION_RUNNING)
+    {
+      pa_threaded_mainloop_wait(mainloop);
+    }
+
+    pa_operation_unref(op);
   }
 
   pa_threaded_mainloop_unlock(mainloop);
@@ -667,6 +683,16 @@ std::string PulseOutput::get_mixer_channel_name()
 
 void PulseOutput::cork_callback(pa_stream *s ATTR_UNUSED, int success,
                                 void *userdata)
+{
+  IntCbData *data = static_cast<IntCbData *>(userdata);
+
+  *data->result = success;
+
+  pa_threaded_mainloop_signal(data->self->mainloop, 0);
+}
+
+void PulseOutput::context_success_callback(pa_context *c ATTR_UNUSED, int success,
+                                           void *userdata)
 {
   IntCbData *data = static_cast<IntCbData *>(userdata);
 
