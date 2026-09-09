@@ -42,6 +42,7 @@
 #include <sstream>
 #include <memory>
 #include <new>
+#include <stdexcept>
 #include <atomic>
 #include <mutex>
 
@@ -385,14 +386,14 @@ static void equalizer_read_config()
       try {
         int tmp = std::stoi(linebuffer->substr(sizeof(EQUALIZER_CFG_ACTIVE) - 1));
         equ_active = (tmp > 0) ? 1 : 0;
-      } catch (const std::exception&) { /* Ignore malformed values */ }
+      } catch (const std::logic_error&) { /* Ignore malformed values */ }
     }
     else if (strncasecmp(linebuffer->c_str(), EQUALIZER_CFG_MIXIN, sizeof(EQUALIZER_CFG_MIXIN) - 1) == 0)
     {
       try {
         float ftmp = std::stof(linebuffer->substr(sizeof(EQUALIZER_CFG_MIXIN) - 1));
         if (in_closed_range(0.0f, ftmp, 1.0f)) mixin_rate = ftmp;
-      } catch (const std::exception&) { /* Ignore malformed values */ }
+      } catch (const std::logic_error&) { /* Ignore malformed values */ }
     }
     else if (strncasecmp(linebuffer->c_str(), EQUALIZER_CFG_PRESET, sizeof(EQUALIZER_CFG_PRESET) - 1) == 0)
     {
