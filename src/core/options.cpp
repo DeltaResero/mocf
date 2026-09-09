@@ -707,13 +707,10 @@ static std::string substitute_variable(const char *name_in, const std::string &v
     }
     else if (find_option(name.c_str(), OPTION_ANY) != nullptr)
     {
-      char buf[16];
-
       switch (options_get_type(name.c_str()))
       {
         case OPTION_INT:
-          snprintf(buf, sizeof(buf), "%d", options_get_int(name.c_str()));
-          value = buf;
+          value = std::to_string(options_get_int(name.c_str()));
           has_value = true;
           break;
         case OPTION_BOOL:
