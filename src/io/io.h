@@ -12,6 +12,7 @@
 #define IO_H
 
 #include <sys/types.h>
+#include <atomic>
 #include <mutex>
 #include <condition_variable>
 #include <thread>
@@ -59,8 +60,8 @@
              buffer */
     std::condition_variable buf_fill_cond; /* the buffer was filled with some data */
     std::thread read_thread;
-    int stop_read_thread; /* request for stopping the read
-             thread */
+    std::atomic<int> stop_read_thread; /* request for stopping the read
+             thread, read without buf_mtx */
 
     /* callbacks */
     buf_fill_callback_t buf_fill_callback;
