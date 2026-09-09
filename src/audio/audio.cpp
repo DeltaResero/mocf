@@ -311,8 +311,7 @@ static void go_to_another_file()
   bool go_next = (play_next || options_get_bool("AutoNext"));
   int curr_playing_curr_pos;
 
-  std::lock_guard<std::mutex> lock1(curr_playing_mtx);
-  std::lock_guard<std::mutex> lock2(plist_mtx);
+  std::scoped_lock lock(curr_playing_mtx, plist_mtx);
 
   /* If we move forward in the playlist and there are some songs in
    * the queue, then play them. */
@@ -467,8 +466,7 @@ static void play_thread_func()
       std::string next_file;
 
       {
-          std::lock_guard<std::mutex> lock1(curr_playing_mtx);
-          std::lock_guard<std::mutex> lock2(plist_mtx);
+          std::scoped_lock lock(curr_playing_mtx, plist_mtx);
           logit("Playing item %d: %s", curr_playing, file.c_str());
 
           curr_playing_fname = file;
@@ -554,8 +552,7 @@ void audio_play(const char *fname)
   player_reset();
 
   {
-      std::lock_guard<std::mutex> lock1(curr_playing_mtx);
-      std::lock_guard<std::mutex> lock2(plist_mtx);
+      std::scoped_lock lock(curr_playing_mtx, plist_mtx);
 
       /* If we have songs in the queue and fname is empty string, start
        * playing file from the queue. */
@@ -635,8 +632,7 @@ void audio_prev()
 
 void audio_pause()
 {
-  std::lock_guard<std::mutex> lock1(curr_playing_mtx);
-  std::lock_guard<std::mutex> lock2(plist_mtx);
+  std::scoped_lock lock(curr_playing_mtx, plist_mtx);
 
   if (curr_playing != -1)
   {
