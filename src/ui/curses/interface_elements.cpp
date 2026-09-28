@@ -2770,6 +2770,16 @@ static void set_startup_message(struct info_win *w)
   }
 }
 
+/* Width of the mixer bar, which is the configured width once the terminal is
+ * wide enough for it.  The bar is drawn MIXER_BAR_RIGHT_SPACE from the right
+ * edge, so a narrow terminal has to have a narrower bar or it would start left
+ * of the window frame. */
+static int mixer_bar_width()
+{
+  return std::min(options_get_int("MixerBarWidth"),
+                  COLS - MIXER_BAR_RIGHT_SPACE - 2);
+}
+
 static void info_win_init(struct info_win *w)
 {
   assert(w != nullptr);
@@ -2808,7 +2818,7 @@ static void info_win_init(struct info_win *w)
 
   set_startup_message(w);
 
-  bar_init(&w->mixer_bar, options_get_int("MixerBarWidth"), "", 1, 1,
+  bar_init(&w->mixer_bar, mixer_bar_width(), "", 1, 1,
            get_color(CLR_MIXER_BAR_FILL), get_color(CLR_MIXER_BAR_EMPTY));
   bar_init(&w->time_bar, COLS - 4, "", 1,
            options_get_bool("ShowTimePercent") ? 1 : 0,
@@ -3779,7 +3789,7 @@ static void info_win_resize(struct info_win *w)
   mvwin(w->win, LINES - 4, 0);
   werase(w->win);
 
-  bar_resize(&w->mixer_bar, w->mixer_bar.width);
+  bar_resize(&w->mixer_bar, mixer_bar_width());
   bar_resize(&w->time_bar, COLS - 4);
   info_win_set_block_title(w);
 
