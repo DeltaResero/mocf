@@ -9,11 +9,6 @@ This file does not list all bugs which:
 It also does not contain many "To Do" items as these are often quite fluid
 and can evolve rapidly over time.
 
-The MOC Maintainer does hold a master list containing bugs, feature requests,
-program change requests and future requirements, and once it is possible to
-generate this file from that list automatically it may be updated more
-frequently so it is current and comprehensive.
-
 
 Known Bugs:
 
