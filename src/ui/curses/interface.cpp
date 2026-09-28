@@ -1569,7 +1569,10 @@ public:
                 handle_interrupt();
             }
 
-            if (want_quit_flag == NO_QUIT) update_mixer_name();
+            /* Only the value needs polling.  The channel name changes
+             * solely when the mixer channel or the softmixer is toggled, and
+             * both of those already send EV_MIXER_CHANGE. */
+            if (want_quit_flag == NO_QUIT) update_mixer_value();
         }
 
         log_circular_log();
