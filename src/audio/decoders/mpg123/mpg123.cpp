@@ -91,6 +91,14 @@ static void get_tags(mpg123_handle *mf, struct file_tags *info)
         info->album = v2->album->p;
         debug("TG: album v2 %s.", info->album.c_str());
       }
+      if (v2->year && v2->year->p)
+      {
+        if (const auto year = parse_year(v2->year->p))
+        {
+          info->year = *year;
+          debug("TG: year v2 %d.", info->year);
+        }
+      }
 
       size_t i, j;
       for (i = 0; i < v2->texts; ++i)
@@ -122,6 +130,17 @@ static void get_tags(mpg123_handle *mf, struct file_tags *info)
             debug("TG: track v2 %d.", info->track);
           }
         }
+        /* mpg123 fills v2->year from the ID3v2.3 TYER frame only; 2.4
+         * replaced it with these, so they are the fallback. */
+        else if (info->year == -1 &&
+                 (strcmp(tag_id, "TDRC") == 0 || strcmp(tag_id, "TDRL") == 0))
+        {
+          if (const auto year = parse_year(v2->text[i].text.p))
+          {
+            info->year = *year;
+            debug("TG: year v2 %d.", info->year);
+          }
+        }
       }
     }
 
@@ -148,6 +167,16 @@ static void get_tags(mpg123_handle *mf, struct file_tags *info)
       {
         info->track = static_cast<int>(v1->comment[29]);
         debug("TG: track v1 %d.", info->track);
+      }
+      if (info->year == -1)
+      {
+        /* Fixed-width and not terminated. */
+        const std::string year_text(v1->year, sizeof(v1->year));
+        if (const auto year = parse_year(year_text))
+        {
+          info->year = *year;
+          debug("TG: year v1 %d.", info->year);
+        }
       }
     }
     mpg123_meta_free(mf);

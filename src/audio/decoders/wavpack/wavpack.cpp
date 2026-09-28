@@ -200,6 +200,16 @@ static void wav_info(const char *file_name, struct file_tags *info,
       info->track = static_cast<int>(strtol(buf.data(), nullptr, 10));
     }
 
+    if ((tag_len = WavpackGetTagItem(wpc, "year", nullptr, 0)) > 0)
+    {
+      std::vector<char> buf(++tag_len);
+      WavpackGetTagItem(wpc, "year", buf.data(), tag_len);
+      if (const auto year = parse_year(buf.data()))
+      {
+        info->year = *year;
+      }
+    }
+
     info->filled |= TAGS_COMMENTS;
   }
 

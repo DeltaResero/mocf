@@ -489,6 +489,14 @@ static void ffmpeg_info(const char *file_name, struct file_tags *info,
   {
     info->album = entry->value;
   }
+  entry = av_dict_get(md, "date", nullptr, 0);
+  if (entry && entry->value && entry->value[0])
+  {
+    if (const auto year = parse_year(entry->value))
+    {
+      info->year = *year;
+    }
+  }
 
 end:
   avformat_close_input(&ic);

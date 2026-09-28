@@ -112,6 +112,7 @@
 #   %a - Artist
 #   %A - Album
 #   %t - Title
+#   %y - Release year
 #   %(X:TRUE:FALSE) - Ternary expression: if X exists, do TRUE,
 #                     otherwise FALSE.  The escape character must
 #                     be doubled (i.e., '\\').  (See zshmisc

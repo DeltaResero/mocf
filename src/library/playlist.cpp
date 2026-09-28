@@ -51,6 +51,7 @@ void tags_update(struct file_tags *dst, struct file_tags *src, int move)
     assert(dst->title.empty() && dst->artist.empty() && dst->album.empty());
 
     dst->track = src->track;
+    dst->year = src->year;
 
     if (move)
     {
@@ -338,6 +339,12 @@ static std::optional<std::string> title_expn_subs(char fmt,
         break;
       }
       return std::to_string(tags->track);
+    case 'y':
+      if (!tags || tags->year == -1)
+      {
+        break;
+      }
+      return std::to_string(tags->year);
     case 'a':
       return (tags && !tags->artist.empty())
                  ? std::optional<std::string>(tags->artist)

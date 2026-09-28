@@ -263,6 +263,14 @@ static void musepack_info(const char *file_name, struct file_tags *info,
         {
           info->track = -1;
         }
+
+        /* TagLib reports a missing year as zero. */
+        info->year = static_cast<int>(taglib_tag_year(tt));
+
+        if (info->year == 0)
+        {
+          info->year = -1;
+        }
       }
 
       taglib_file_free(tf);

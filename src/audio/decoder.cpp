@@ -16,12 +16,15 @@
 #include <cassert>
 #include <cctype>
 #include <cerrno>
+#include <charconv>
 #include <cstdarg>
 #include <algorithm>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <memory>
 
@@ -739,6 +742,49 @@ void decoder_error_copy(struct decoder_error *dst,
 const char *decoder_error_text(const struct decoder_error *error)
 {
   return error->err.c_str();
+}
+
+/* Extract a release year from the raw text of a date tag. */
+std::optional<int> parse_year(std::string_view value)
+{
+  /* Scan for the first run of exactly four digits.  The year is not
+   * always at the front: taggers wrap it ("[1997]"), spell the month
+   * ("May 1997") and prefix junk ("20th Century Masters 1997").  A run
+   * of some other length is not a year, so step over it and keep
+   * looking rather than reading a prefix of it. */
+  size_t i = 0;
+  while (i < value.size())
+  {
+    if (!isdigit(static_cast<unsigned char>(value[i])))
+    {
+      ++i;
+      continue;
+    }
+
+    const size_t start = i;
+    while (i < value.size() && isdigit(static_cast<unsigned char>(value[i])))
+    {
+      ++i;
+    }
+
+    if (i - start != 4)
+    {
+      continue;
+    }
+
+    int year = 0;
+    const auto res =
+        std::from_chars(value.data() + start, value.data() + i, year);
+
+    /* Year zero means the tag was never set, which is also how TagLib
+     * reports a missing year. */
+    if (res.ec == std::errc() && year != 0)
+    {
+      return year;
+    }
+  }
+
+  return std::nullopt;
 }
 
 // EOF

@@ -31,6 +31,7 @@
     std::string artist;
     std::string album;
     int track  = -1;
+    int year   = -1; /* Four-digit release year, -1 when unknown. */
     int time   = -1;
     int filled = 0; /* Which tags are filled: TAGS_COMMENTS, TAGS_TIME. */
     /* If the file's real format differs from what its extension implies

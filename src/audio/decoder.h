@@ -16,7 +16,9 @@
 #include "io/io.h"
 
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
 
 /** Version of the decoder API.
  *
@@ -208,6 +210,17 @@ class AudioDecoder;
   /* Return short type name for the given file, or an empty string if
    * the type could not be determined. */
   std::string file_type_name(const char *file);
+
+  /* Extract a release year from the raw text of a date tag.
+   *
+   * Date tags are not years.  Vorbis comments define DATE as an ISO 8601
+   * date, libid3tag hands back TDRC, and compilations often carry a
+   * range, so "1997", "1997-05-12", "2011-2012" and "[1997]" all reach
+   * us.  The first run of exactly four digits is taken as the year; a
+   * run of any other length is not one, so "97" and the packed
+   * "19970512" are refused.  Returns no value when the text holds no
+   * year we can read. */
+  std::optional<int> parse_year(std::string_view value);
 
 
 /** @defgroup decoder_error_funcs Decoder error functions

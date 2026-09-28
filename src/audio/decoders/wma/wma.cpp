@@ -387,9 +387,13 @@ static void wma_info(const char *file_name, struct file_tags *info,
     {
       info->track = ai.track;
     }
+    if (const auto year = parse_year(ai.date))
+    {
+      info->year = *year;
+    }
 
     if (!ai.title.empty() || !ai.artist.empty() || !ai.album.empty() ||
-        ai.track >= 0)
+        ai.track >= 0 || info->year >= 0)
     {
       info->filled |= TAGS_COMMENTS;
     }

@@ -77,7 +77,7 @@ typedef unsigned long int u_long;
  * temporarily set it to zero to disable cache activity during structural
  * changes which require multiple commits.
  */
-#define CACHE_DB_FORMAT_VERSION 5
+#define CACHE_DB_FORMAT_VERSION 6
 
 /* How frequently to flush the tags database to disk.  A value of zero
  * disables flushing. */
@@ -153,7 +153,7 @@ static std::vector<char> cache_record_serialize(time_t mod_time, time_t atime,
   len = sizeof(mod_time) + sizeof(atime) +
         sizeof(size_t) * 3 /* lengths of title, artist, time. */
         + artist_len + album_len + title_len + sizeof(tags.track)
-        + sizeof(tags.time);
+        + sizeof(tags.year) + sizeof(tags.time);
 
   std::vector<char> buf(len);
   char *p = buf.data();
@@ -190,6 +190,9 @@ static std::vector<char> cache_record_serialize(time_t mod_time, time_t atime,
 
   memcpy(p, &tags.track, sizeof(tags.track));
   p += sizeof(tags.track);
+
+  memcpy(p, &tags.year, sizeof(tags.year));
+  p += sizeof(tags.year);
 
   memcpy(p, &tags.time, sizeof(tags.time));
   p += sizeof(tags.time);
@@ -251,6 +254,7 @@ static int cache_record_deserialize(struct cache_record *rec,
     extract_str(rec->tags->album);
     extract_str(rec->tags->title);
     extract_num(rec->tags->track);
+    extract_num(rec->tags->year);
     extract_num(rec->tags->time);
 
     if (!rec->tags->title.empty())

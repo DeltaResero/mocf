@@ -483,6 +483,13 @@ static void aac_info(const char *file_name, struct file_tags *info,
           info->track = -1;
         }
       }
+
+      /* ID3_FRAME_YEAR is TDRC, which libid3tag also synthesises from
+       * the ID3v2.3 TYER/TDAT pair, so this covers both tag versions. */
+      if (const auto year = parse_year(get_tag(tag, ID3_FRAME_YEAR)))
+      {
+        info->year = *year;
+      }
     }
     id3_file_close(id3file);
   }

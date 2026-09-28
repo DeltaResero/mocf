@@ -277,6 +277,13 @@ static void sndfile_info(const char *file_name, struct file_tags *info,
     {
       info->track = static_cast<int>(strtol(res, nullptr, 10));
     }
+    if ((res = sf_get_string(data->sndfile, SF_STR_DATE)))
+    {
+      if (const auto year = parse_year(res))
+      {
+        info->year = *year;
+      }
+    }
   }
 
   sndfile_close(data);

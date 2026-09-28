@@ -315,6 +315,13 @@ static void parse_comment(const char *str, struct file_tags *tags)
   {
     tags->track = static_cast<int>(strtol(str + strlen("track="), nullptr, 10));
   }
+  else if (!strncasecmp(str, "date=", strlen("date=")))
+  {
+    if (const auto year = parse_year(str + strlen("date=")))
+    {
+      tags->year = *year;
+    }
+  }
 }
 
 static void get_comments(struct spx_data *data, struct file_tags *tags)

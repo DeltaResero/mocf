@@ -440,6 +440,13 @@ void AsfReader::parse_extended_content_description(const uint8_t *p, size_t len)
     {
       info_.artist = utf16le_to_utf8(value, value_len);
     }
+    /* Windows Media Player writes WM/Year; FFmpeg's muxer writes the
+     * bare key, so both show up in the wild. */
+    else if ((name == "WM/Year" || name == "date") && type == 0 &&
+             info_.date.empty())
+    {
+      info_.date = utf16le_to_utf8(value, value_len);
+    }
   }
 }
 

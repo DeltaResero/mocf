@@ -46,6 +46,7 @@ struct AsfAudioInfo
   std::string title;
   std::string artist;
   std::string album;
+  std::string date; /* WM/Year, raw text; the decoder parses the year. */
   int track = -1;
 
   int64_t play_duration_100ns = 0;  ///< File Properties play duration

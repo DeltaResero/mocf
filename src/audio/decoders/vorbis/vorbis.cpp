@@ -99,6 +99,14 @@ static void get_comment_tags(OggVorbis_File *vf, struct file_tags *info)
     {
       info->track = static_cast<int>(strtol(comments->user_comments[i] + strlen("track="), nullptr, 10));
     }
+    else if (!strncasecmp(comments->user_comments[i],
+                          "date=", strlen("date=")))
+    {
+      if (const auto year = parse_year(comments->user_comments[i] + strlen("date=")))
+      {
+        info->year = *year;
+      }
+    }
   }
 }
 

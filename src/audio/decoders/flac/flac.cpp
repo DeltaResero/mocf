@@ -396,6 +396,13 @@ static void fill_tag(FLAC__StreamMetadata_VorbisComment_Entry *comm,
   {
     tags->track = static_cast<int>(strtol(value.c_str(), nullptr, 10));
   }
+  else if (!strcasecmp(name.c_str(), "date"))
+  {
+    if (const auto year = parse_year(value))
+    {
+      tags->year = *year;
+    }
+  }
 }
 
 static void get_vorbiscomments(const char *filename, struct file_tags *tags)
