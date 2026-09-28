@@ -2631,15 +2631,23 @@ static void bar_update_title(struct bar *b)
   b->title[b->width] = 0;
 }
 
-static void bar_set_title(struct bar *b, const char *title)
+/* Returns true when the title changed and the bar needs redrawing. */
+static bool bar_set_title(struct bar *b, const char *title)
 {
   assert(b != nullptr);
   assert(b->show_val);
   assert(title != nullptr);
   assert(strlen(title) < sizeof(b->title) - 5);
 
+  if (b->orig_title == title)
+  {
+    return false;
+  }
+
   b->orig_title = title;
   bar_update_title(b);
+
+  return true;
 }
 
 static void bar_init(struct bar *b, const int width, const char *title,
@@ -2659,7 +2667,8 @@ static void bar_init(struct bar *b, const int width, const char *title,
 
   if (show_val)
   {
-    bar_set_title(b, title);
+    b->orig_title = title;
+    bar_update_title(b);
   }
   else
   {
@@ -2688,17 +2697,27 @@ static void bar_draw(const struct bar *b, WINDOW *win, const int pos_x,
   xwaddstr(win, b->title + fill_chars);
 }
 
-static void bar_set_fill(struct bar *b, const double fill)
+/* Returns true when the fill changed and the bar needs redrawing. */
+static bool bar_set_fill(struct bar *b, const double fill)
 {
   assert(b != nullptr);
   assert(fill >= 0.0);
 
-  b->filled = std::min(fill, 100.0);
+  const float filled = static_cast<float>(std::min(fill, 100.0));
+
+  if (b->filled == filled)
+  {
+    return false;
+  }
+
+  b->filled = filled;
 
   if (b->show_val)
   {
     bar_update_title(b);
   }
+
+  return true;
 }
 
 static void bar_resize(struct bar *b, const int width)
@@ -2824,18 +2843,22 @@ static void info_win_update_curs(const struct info_win *w)
   }
 }
 
-static void info_win_set_mixer_name(struct info_win *w, const char *name)
+/* Returns true when the bar was redrawn and the screen needs refreshing. */
+static bool info_win_set_mixer_name(struct info_win *w, const char *name)
 {
   assert(w != nullptr);
   assert(name != nullptr);
 
-  bar_set_title(&w->mixer_bar, name);
-  if (!w->in_entry && !w->too_small)
+  if (!bar_set_title(&w->mixer_bar, name) || w->in_entry || w->too_small)
   {
-    bar_draw(&w->mixer_bar, w->win,
-             COLS - w->mixer_bar.width - MIXER_BAR_RIGHT_SPACE, 0);
-    info_win_update_curs(w);
+    return false;
   }
+
+  bar_draw(&w->mixer_bar, w->win,
+           COLS - w->mixer_bar.width - MIXER_BAR_RIGHT_SPACE, 0);
+  info_win_update_curs(w);
+
+  return true;
 }
 
 static void info_win_draw_status(const struct info_win *w)
@@ -2847,6 +2870,12 @@ static void info_win_draw_status(const struct info_win *w)
     wattrset(w->win, get_color(CLR_STATUS));
     wmove(w->win, 0, 6);
     xwprintw(w->win, "%-*s", static_cast<int>(sizeof(w->status_msg)) - 1, w->status_msg);
+
+    /* The status field and the mixer bar share this row and overlap on a
+     * narrow terminal, so put the bar back on top of what we just wrote. */
+    bar_draw(&w->mixer_bar, w->win,
+             COLS - w->mixer_bar.width - MIXER_BAR_RIGHT_SPACE, 0);
+
     info_win_update_curs(w);
   }
 }
@@ -3183,16 +3212,21 @@ static void info_win_set_rate(struct info_win *w, const int rate)
   info_win_draw_rate(w);
 }
 
-static void info_win_set_mixer_value(struct info_win *w, const int value)
+/* Returns true when the bar was redrawn and the screen needs refreshing. */
+static bool info_win_set_mixer_value(struct info_win *w, const int value)
 {
   assert(w != nullptr);
 
-  bar_set_fill(&w->mixer_bar, static_cast<double>(value));
-  if (!w->in_entry && !w->too_small)
+  if (!bar_set_fill(&w->mixer_bar, static_cast<double>(value)) ||
+      w->in_entry || w->too_small)
   {
-    bar_draw(&w->mixer_bar, w->win,
-             COLS - w->mixer_bar.width - MIXER_BAR_RIGHT_SPACE, 0);
+    return false;
   }
+
+  bar_draw(&w->mixer_bar, w->win,
+           COLS - w->mixer_bar.width - MIXER_BAR_RIGHT_SPACE, 0);
+
+  return true;
 }
 
 /* Draw a switch that is turned on or off in form of [TITLE]. */
@@ -3871,8 +3905,10 @@ void iface_set_mixer_name(const char *name)
 {
   assert(name != nullptr);
 
-  info_win_set_mixer_name(&info_win, name);
-  iface_refresh_screen();
+  if (info_win_set_mixer_name(&info_win, name))
+  {
+    iface_refresh_screen();
+  }
 }
 
 /* Set the status message in the info window. */
@@ -4246,8 +4282,10 @@ void iface_set_mixer_value(const int value)
 {
   assert(value >= 0);
 
-  info_win_set_mixer_value(&info_win, value);
-  iface_refresh_screen();
+  if (info_win_set_mixer_value(&info_win, value))
+  {
+    iface_refresh_screen();
+  }
 }
 
 /* Switch to the playlist menu. */
