@@ -5,6 +5,9 @@
 // Decode-only derivative of https://github.com/phoboslab/qoa (spec
 // v1.0, 2023-04-24). The encoder half of the upstream single-file
 // library has been removed: mocf is a player and never encodes.
+// qoa_decode(), which decodes a whole file into one allocation, is
+// gone with it: the plugin streams frame by frame, and dropping it
+// leaves nothing here that C++ cannot compile.
 // Copyright (c) 2023, Dominic Szablewski - https://phoboslab.org
 //
 // This file is free software: you can use, copy, modify, and distribute
@@ -146,7 +149,6 @@ typedef struct {
 
 unsigned int qoa_decode_header(const unsigned char *bytes, int size, qoa_desc *qoa);
 unsigned int qoa_decode_frame(const unsigned char *bytes, unsigned int size, qoa_desc *qoa, short *sample_data, unsigned int *frame_len);
-short *qoa_decode(const unsigned char *bytes, int size, qoa_desc *file);
 
 
 #ifdef __cplusplus
@@ -159,12 +161,6 @@ short *qoa_decode(const unsigned char *bytes, int size, qoa_desc *file);
 	Implementation */
 
 #ifdef QOA_IMPLEMENTATION
-#include <stdlib.h>
-
-#ifndef QOA_MALLOC
-	#define QOA_MALLOC(sz) malloc(sz)
-	#define QOA_FREE(p) free(p)
-#endif
 
 typedef unsigned long long qoa_uint64_t;
 
@@ -384,40 +380,5 @@ unsigned int qoa_decode_frame(const unsigned char *bytes, unsigned int size, qoa
 	}
 	return p;
 }
-
-short *qoa_decode(const unsigned char *bytes, int size, qoa_desc *qoa) {
-	unsigned int p = qoa_decode_header(bytes, size, qoa);
-	if (!p) {
-		return NULL;
-	}
-
-	/* Calculate the required size of the sample buffer and allocate, round up to full frames */
-	unsigned long long num_frames = ((unsigned long long)qoa->samples + QOA_FRAME_LEN - 1) / QOA_FRAME_LEN;
-	unsigned long long total_samples_ull = num_frames * QOA_FRAME_LEN * (unsigned long long)qoa->channels;
-
-	if (total_samples_ull > 0x7fffffff) { return NULL; }
-
-	unsigned int total_samples = (unsigned int)total_samples_ull;
-	short *sample_data = QOA_MALLOC(total_samples * sizeof(short));
-	if (!sample_data) { return NULL; }
-
-	unsigned int sample_index = 0;
-	unsigned int frame_len;
-	unsigned int frame_size;
-
-	/* Decode all frames */
-	do {
-		short *sample_ptr = sample_data + sample_index * qoa->channels;
-		frame_size = qoa_decode_frame(bytes + p, size - p, qoa, sample_ptr, &frame_len);
-
-		p += frame_size;
-		sample_index += frame_len;
-	} while (frame_size && sample_index < qoa->samples);
-
-	qoa->samples = sample_index;
-	return sample_data;
-}
-
-
 
 #endif /* QOA_IMPLEMENTATION */

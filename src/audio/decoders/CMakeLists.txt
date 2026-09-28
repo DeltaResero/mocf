@@ -124,7 +124,6 @@ if(WITH_QOA)
     qoa
     SOURCES
     qoa/qoa.cpp
-    qoa/qoa_impl.c
     qoa/qoa.h)
 endif()
 

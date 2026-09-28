@@ -5,8 +5,7 @@
 // Copyright (C) 2026 DeltaResero <deltaresero@zoho.com>
 //
 // QOA (Quite OK Audio) decoder plugin. Wraps the vendored reference
-// decoder (qoa.h, compiled via qoa_impl.c - see both for why the split
-// exists) as a lighter alternative to FFmpeg for this format.
+// decoder (qoa.h) as a lighter alternative to FFmpeg for this format.
 //
 // Structure of this plugin is an adaption of the ac3 plugin.
 //
@@ -27,11 +26,10 @@
 #include <strings.h>
 #include <vector>
 
-// Declarations only. The reference implementation is C (its whole-file
-// helpers rely on implicit void*->T* conversion from malloc(), legal in
-// C but not C++), so it's compiled from qoa_impl.c; here we pull in just
-// the extern "C" declarations and macros.
+// The vendored decoder is header-only and this is its only consumer,
+// so the implementation is compiled here.
 #define QOA_NO_STDIO
+#define QOA_IMPLEMENTATION
 #include "qoa.h"
 
 #define DEBUG
