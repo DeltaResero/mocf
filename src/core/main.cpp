@@ -362,7 +362,7 @@ static struct poptOption general_opts[] = {
     {"ascii", 'A', POPT_ARG_NONE, nullptr, CL_ASCII,
      "Use ASCII characters to draw lines", nullptr},
     {"theme", 'T', POPT_ARG_STRING, nullptr, CL_THEME,
-     "Use the selected theme file (read from ~/.moc/themes if the path is not "
+     "Use the selected theme file (read from ~/.mocf/themes if the path is not "
      "absolute)",
      "FILE"},
     POPT_TABLEEND};
