@@ -23,11 +23,7 @@
 #include <vector>
 #include <algorithm>
 
-#ifdef MPC_IS_OLD_API
-#include <mpcdec/mpcdec.h>
-#else
 #include <mpc/mpcdec.h>
-#endif
 
 #include <tag_c.h>
 
@@ -42,11 +38,7 @@
 struct musepack_data
 {
   unique_io_stream stream;
-#ifdef MPC_IS_OLD_API
-  mpc_decoder decoder;
-#else
   mpc_demux *demux;
-#endif
   mpc_reader reader;
   mpc_streaminfo info;
   int avg_bitrate;
@@ -56,17 +48,9 @@ struct musepack_data
   std::vector<MPC_SAMPLE_FORMAT> remain_buf;
 };
 
-#ifdef MPC_IS_OLD_API
-static mpc_int32_t read_cb(void *t, void *buf, mpc_int32_t size)
-#else
 static mpc_int32_t read_cb(mpc_reader *t, void *buf, mpc_int32_t size)
-#endif
 {
-#ifdef MPC_IS_OLD_API
-  struct musepack_data *data = (struct musepack_data *)t;
-#else
   struct musepack_data *data = static_cast<struct musepack_data *>(t->data);
-#endif
   ssize_t res;
 
   res = io_read(data->stream.get(), buf, size);
@@ -79,68 +63,36 @@ static mpc_int32_t read_cb(mpc_reader *t, void *buf, mpc_int32_t size)
   return res;
 }
 
-#ifdef MPC_IS_OLD_API
-static mpc_bool_t seek_cb(void *t, mpc_int32_t offset)
-#else
 static mpc_bool_t seek_cb(mpc_reader *t, mpc_int32_t offset)
-#endif
 {
-#ifdef MPC_IS_OLD_API
-  struct musepack_data *data = (struct musepack_data *)t;
-#else
   struct musepack_data *data = static_cast<struct musepack_data *>(t->data);
-#endif
 
   debug("Seek request to %" PRId32, offset);
 
   return io_seek(data->stream.get(), offset, SEEK_SET) >= 0 ? 1 : 0;
 }
 
-#ifdef MPC_IS_OLD_API
-static mpc_int32_t tell_cb(void *t)
-#else
 static mpc_int32_t tell_cb(mpc_reader *t)
-#endif
 {
-#ifdef MPC_IS_OLD_API
-  struct musepack_data *data = (struct musepack_data *)t;
-#else
   struct musepack_data *data = static_cast<struct musepack_data *>(t->data);
-#endif
 
   debug("tell callback");
 
   return static_cast<mpc_int32_t>(io_tell(data->stream.get()));
 }
 
-#ifdef MPC_IS_OLD_API
-static mpc_int32_t get_size_cb(void *t)
-#else
 static mpc_int32_t get_size_cb(mpc_reader *t)
-#endif
 {
-#ifdef MPC_IS_OLD_API
-  struct musepack_data *data = (struct musepack_data *)t;
-#else
   struct musepack_data *data = static_cast<struct musepack_data *>(t->data);
-#endif
 
   debug("size callback");
 
   return static_cast<mpc_int32_t>(io_file_size(data->stream.get()));
 }
 
-#ifdef MPC_IS_OLD_API
-static mpc_bool_t canseek_cb(void *t)
-#else
 static mpc_bool_t canseek_cb(mpc_reader *t)
-#endif
 {
-#ifdef MPC_IS_OLD_API
-  struct musepack_data *data = (struct musepack_data *)t;
-#else
   struct musepack_data *data = static_cast<struct musepack_data *>(t->data);
-#endif
 
   return io_seekable(data->stream.get());
 }
@@ -154,24 +106,6 @@ static void musepack_open_stream_internal(struct musepack_data *data)
   data->reader.canseek = canseek_cb;
   data->reader.data = data;
 
-#ifdef MPC_IS_OLD_API
-  mpc_streaminfo_init(&data->info);
-
-  if (mpc_streaminfo_read(&data->info, &data->reader) != ERROR_CODE_OK)
-  {
-    decoder_error(&data->error, ERROR_FATAL, 0, "Not a valid MPC file.");
-    return;
-  }
-
-  mpc_decoder_setup(&data->decoder, &data->reader);
-
-  if (!mpc_decoder_initialize(&data->decoder, &data->info))
-  {
-    decoder_error(&data->error, ERROR_FATAL, 0,
-                  "Can't initialize mpc decoder.");
-    return;
-  }
-#else
   data->demux = mpc_demux_init(&data->reader);
   if (!data->demux)
   {
@@ -180,7 +114,6 @@ static void musepack_open_stream_internal(struct musepack_data *data)
   }
 
   mpc_demux_get_info(data->demux, &data->info);
-#endif
 
   data->avg_bitrate = static_cast<int>(data->info.average_bitrate / 1000);
   debug("Avg bitrate: %d", data->avg_bitrate);
@@ -223,9 +156,7 @@ static void musepack_close(void *prv_data)
 
   if (data->ok)
   {
-#ifndef MPC_IS_OLD_API
     mpc_demux_exit(data->demux);
-#endif
   }
 
   decoder_error_clear(&data->error);
@@ -302,9 +233,6 @@ static int musepack_seek(void *prv_data, int sec)
 
   assert(sec >= 0);
 
-#ifdef MPC_IS_OLD_API
-  res = mpc_decoder_seek_seconds(&data->decoder, sec) ? sec : -1;
-#else
   mpc_status status;
   status = mpc_demux_seek_second(data->demux, sec);
   if (status == MPC_STATUS_OK)
@@ -315,7 +243,6 @@ static int musepack_seek(void *prv_data, int sec)
   {
     res = -1;
   }
-#endif
 
   if (res != -1 && !data->remain_buf.empty())
   {
@@ -331,14 +258,8 @@ static int musepack_decode(void *prv_data, char *buf, int buf_len,
   struct musepack_data *data = static_cast<struct musepack_data *>(prv_data);
   int decoded;
   int bytes_from_decoder;
-#ifndef MPC_IS_OLD_API
   mpc_frame_info frame;
   mpc_status err;
-#else
-  int ret;
-  mpc_uint32_t vbrAcc = 0;
-  mpc_uint32_t vbrUpd = 0;
-#endif
   MPC_SAMPLE_FORMAT decode_buf[MPC_DECODER_BUFFER_LENGTH];
   if (!data->remain_buf.empty())
   {
@@ -363,23 +284,6 @@ static int musepack_decode(void *prv_data, char *buf, int buf_len,
     return to_copy;
   }
 
-#ifdef MPC_IS_OLD_API
-  ret = mpc_decoder_decode(&data->decoder, decode_buf, &vbrAcc, &vbrUpd);
-  if (ret == 0)
-  {
-    debug("EOF");
-    return 0;
-  }
-
-  if (ret < 0)
-  {
-    decoder_error(&data->error, ERROR_FATAL, 0, "Error in the stream!");
-    return 0;
-  }
-
-  bytes_from_decoder = ret * sizeof(MPC_SAMPLE_FORMAT) * 2; /* stereo */
-  data->bitrate = vbrUpd * sound_params->rate / 1152 / 1000;
-#else
   do
   {
     frame.buffer = decode_buf;
@@ -409,7 +313,6 @@ static int musepack_decode(void *prv_data, char *buf, int buf_len,
   bytes_from_decoder =
       frame.samples * sizeof(MPC_SAMPLE_FORMAT) * data->info.channels;
   data->bitrate = data->info.bitrate;
-#endif
 
   decoder_error_clear(&data->error);
   sound_params->channels = data->info.channels;

@@ -252,11 +252,8 @@ endif()
 # Musepack decoder
 if(WITH_MUSEPACK)
   check_include_file(mpc/mpcdec.h HAVE_MPC_MPCDEC_H)
-  if(NOT HAVE_MPC_MPCDEC_H)
-    check_include_file(mpcdec/mpcdec.h HAVE_MPCDEC_MPCDEC_H)
-  endif()
 
-  if(HAVE_MPC_MPCDEC_H OR HAVE_MPCDEC_MPCDEC_H)
+  if(HAVE_MPC_MPCDEC_H)
     find_program(TAGLIB_CONFIG taglib-config)
     if(TAGLIB_CONFIG)
       execute_process(
@@ -274,11 +271,6 @@ if(WITH_MUSEPACK)
         unset(CMAKE_REQUIRED_FLAGS)
 
         if(HAVE_TAG_C_H)
-          set(MPC_DEFS "")
-          if(HAVE_MPCDEC_MPCDEC_H)
-            list(APPEND MPC_DEFS MPC_IS_OLD_API=1)
-          endif()
-
           string(REPLACE "-I" ";" TAGLIB_INC_LIST "${TAGLIB_CFLAGS}")
 
           add_decoder_plugin(
@@ -289,9 +281,7 @@ if(WITH_MUSEPACK)
             mpcdec
             tag_c
             INCLUDE_DIRS
-            ${TAGLIB_INC_LIST}
-            COMPILE_DEFINITIONS
-            ${MPC_DEFS})
+            ${TAGLIB_INC_LIST})
         endif()
       endif()
     endif()
