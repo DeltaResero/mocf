@@ -1831,17 +1831,33 @@ static void side_menu_resize(struct side_menu *m,
 
 static void main_win_draw_too_small_screen(const struct main_win *w)
 {
+  static const char msg[] = "...TERMINAL TOO SMALL...";
+  int height;
+  int width;
+  int x;
+
   assert(w != nullptr);
   assert(w->too_small);
 
   werase(w->win);
   wbkgd(w->win, get_color(CLR_BACKGROUND));
 
-  wmove(w->win, 0, 0);
+  /* Centre in the window rather than on the screen. The window is only
+   * LINES - 4 tall, so LINES / 2 can fall outside it and a row outside the
+   * window draws nothing at all. */
+  getmaxyx(w->win, height, width);
+
+  x = (width - static_cast<int>(sizeof(msg) - 1)) / 2;
+  if (x < 0)
+  {
+    x = 0;
+  }
+
   wattrset(w->win, get_color(CLR_MESSAGE));
-  xmvwaddstr(w->win, LINES / 2,
-             COLS / 2 - (sizeof("...TERMINAL IS TOO SMALL...") - 1) / 2,
-             "...TERMINAL TOO SMALL...");
+
+  /* Truncate on a window too narrow for the whole message, so that something
+   * is shown instead of nothing. */
+  xmvwaddnstr(w->win, height / 2, x, msg, width - x);
 }
 
 static void main_win_draw_help_screen(const struct main_win *w)
