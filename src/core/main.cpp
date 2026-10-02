@@ -145,6 +145,20 @@ static bool terminal_too_short()
   return rows < INTERFACE_MIN_ROWS;
 }
 
+/* Stops the engine thread and collects it. Done from a destructor so that it
+ * happens however the interface is left, including when a fatal error unwinds
+ * out of it: an unjoined thread leaves the process unable to exit. */
+struct engine_stopper
+{
+  pthread_t thread;
+
+  ~engine_stopper()
+  {
+    engine_quit();
+    pthread_join(thread, nullptr);
+  }
+};
+
 /* Run client and server in the same process. */
 static void start_moc(const struct parameters *params, const std::vector<std::string> &args)
 {
@@ -190,12 +204,13 @@ static void start_moc(const struct parameters *params, const std::vector<std::st
   /* Block until the engine thread has finished initialising. */
   engine_wait_ready();
 
-  init_interface(eq, args);
-  interface_loop();
-  interface_end();
+  {
+    engine_stopper stopper{server_thread};
 
-  /* engine_quit() was called by interface_end(); wait for the thread. */
-  pthread_join(server_thread, nullptr);
+    init_interface(eq, args);
+    interface_loop();
+    interface_end();
+  }
 
   engine_event_queue_free(eq);
 
