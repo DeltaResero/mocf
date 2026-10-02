@@ -30,6 +30,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -113,11 +114,48 @@ static void *server_thread_func(void *arg)
   return nullptr;
 }
 
+/* 4 rows for the info window plus 1 for the main window. Below this newwin()
+ * returns NULL. */
+#define INTERFACE_MIN_ROWS 5
+
+/* Checked before the engine thread starts, where a fatal error can still
+ * unwind cleanly. False when there is no terminal to measure. */
+static bool terminal_too_short()
+{
+  struct winsize ws;
+  const char *env;
+  long rows = 0;
+
+  /* Curses honours LINES over the real size, so honour it here too. */
+  env = getenv("LINES");
+  if (env)
+  {
+    rows = strtol(env, nullptr, 10);
+  }
+
+  if (rows <= 0)
+  {
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_row == 0)
+    {
+      return false;
+    }
+    rows = ws.ws_row;
+  }
+
+  return rows < INTERFACE_MIN_ROWS;
+}
+
 /* Run client and server in the same process. */
 static void start_moc(const struct parameters *params, const std::vector<std::string> &args)
 {
   pthread_t server_thread;
   struct engine_event_queue *eq;
+
+  if (terminal_too_short())
+  {
+    fatal("The terminal is too short to run mocf; it needs at least %d rows.",
+          INTERFACE_MIN_ROWS);
+  }
 
   eq = engine_event_queue_new();
 
