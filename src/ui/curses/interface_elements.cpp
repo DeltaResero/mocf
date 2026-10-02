@@ -2899,25 +2899,43 @@ static void info_win_set_status(struct info_win *w, const char *msg)
   info_win_draw_status(w);
 }
 
+/* Width of the playlist time field, which info_win_draw_files_time() right
+ * aligns at COLS - PLIST_TIME_WIDTH. */
+#define PLIST_TIME_WIDTH 12
+
+/* The queue counter is "-Q:nnn-" when drawn and clears 9 columns of frame
+ * otherwise. */
+#define QUEUE_COUNTER_WIDTH 7
+#define QUEUE_COUNTER_CLEAR 9
+
 static void info_win_draw_files_in_queue(const struct info_win *w)
 {
   const int hstart = 5 + sizeof(w->status_msg) + 2;
+  int space;
 
   assert(w != nullptr);
 
+  /* Keep the counter clear of the playlist time on a narrow terminal. */
+  space = COLS - PLIST_TIME_WIDTH - hstart;
+  if (space < 0)
+  {
+    space = 0;
+  }
+
   if (!w->in_entry && !w->too_small)
   {
-    if (w->files_in_queue)
+    if (w->files_in_queue && space >= QUEUE_COUNTER_WIDTH)
     {
       wattrset(w->win, get_color(CLR_STATUS));
       mvwaddch(w->win, 0, hstart, lines.rtee);
       xwprintw(w->win, "Q:%3d", w->files_in_queue);
       waddch(w->win, lines.ltee);
     }
-    else
+    else if (space > 0)
     {
       wattrset(w->win, get_color(CLR_FRAME));
-      mvwhline(w->win, 0, hstart, lines.horiz, 9);
+      mvwhline(w->win, 0, hstart, lines.horiz,
+               space < QUEUE_COUNTER_CLEAR ? space : QUEUE_COUNTER_CLEAR);
     }
   }
 
@@ -3500,7 +3518,7 @@ static void info_win_draw_files_time(const struct info_win *w)
     char buf[48];
 
     sec_to_min_plist(buf, w->plist_time);
-    wmove(w->win, 0, COLS - 12);
+    wmove(w->win, 0, COLS - PLIST_TIME_WIDTH);
     wattrset(w->win, get_color(CLR_PLIST_TIME));
     waddch(w->win, w->plist_time_for_all ? ' ' : '>');
     xwaddstr(w->win, buf);
