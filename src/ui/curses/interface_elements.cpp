@@ -910,7 +910,16 @@ static std::vector<std::string> split_on_chars(const char *s, const char *delims
 }
 
 /* Parse the layout string. Return false on error. */
-static bool parse_layout(struct main_win_layout *l, const std::vector<std::string> &fmt)
+/* Reference size used to check a layout for syntax errors on its own,
+ * rather than against whatever terminal happens to be in front of us. */
+#define LAYOUT_REFERENCE_SIZE 1000
+
+/* Parse fmt into l, measured against a window of the given size. A false
+ * return means either a malformed layout or one that cannot fit that size;
+ * pass LAYOUT_REFERENCE_SIZE for both to test only the former. */
+static bool parse_layout(struct main_win_layout *l,
+                         const std::vector<std::string> &fmt, const int width,
+                         const int height)
 {
   int ix;
   bool result = false;
@@ -921,8 +930,8 @@ static bool parse_layout(struct main_win_layout *l, const std::vector<std::strin
   /* default values */
   l->menus[0].x = 0;
   l->menus[0].y = 0;
-  l->menus[0].width = COLS;
-  l->menus[0].height = LINES - 4;
+  l->menus[0].width = width;
+  l->menus[0].height = height;
   l->menus[1] = l->menus[0];
   l->menus[2] = l->menus[0];
 
@@ -940,23 +949,23 @@ static bool parse_layout(struct main_win_layout *l, const std::vector<std::strin
 
     name = format[0].c_str();
 
-    if (!parse_layout_coordinate(format[1].c_str(), &p.x, COLS))
+    if (!parse_layout_coordinate(format[1].c_str(), &p.x, width))
     {
       logit("Coordinate parse error when parsing X");
       goto err;
     }
-    if (!parse_layout_coordinate(format[2].c_str(), &p.y, LINES - 4))
+    if (!parse_layout_coordinate(format[2].c_str(), &p.y, height))
     {
       logit("Coordinate parse error when parsing Y");
       goto err;
     }
-    if (!parse_layout_coordinate(format[3].c_str(), &p.width, COLS))
+    if (!parse_layout_coordinate(format[3].c_str(), &p.width, width))
     {
       logit("Coordinate parse error when parsing width");
       goto err;
     }
     if (!parse_layout_coordinate(format[4].c_str(), &p.height,
-                                 LINES - 4))
+                                 height))
     {
       logit("Coordinate parse error when parsing height");
       goto err;
@@ -964,11 +973,11 @@ static bool parse_layout(struct main_win_layout *l, const std::vector<std::strin
 
     if (p.width == LAYOUT_SIZE_FILL)
     {
-      p.width = COLS - p.x;
+      p.width = width - p.x;
     }
     if (p.height == LAYOUT_SIZE_FILL)
     {
-      p.height = LINES - 4 - p.y;
+      p.height = height - p.y;
     }
 
     if (p.width < 15)
@@ -981,14 +990,14 @@ static bool parse_layout(struct main_win_layout *l, const std::vector<std::strin
       logit("Height is less than 2");
       goto err;
     }
-    if (p.x + p.width > COLS)
+    if (p.x + p.width > width)
     {
-      logit("X + width is more than COLS (%d)", COLS);
+      logit("X + width is more than width (%d)", width);
       goto err;
     }
-    if (p.y + p.height > LINES - 4)
+    if (p.y + p.height > height)
     {
-      logit("Y + height is more than LINES - 4 (%d)", LINES - 4);
+      logit("Y + height is more than the window height (%d)", height);
       goto err;
     }
 
@@ -1016,7 +1025,6 @@ err:
 static void main_win_init(struct main_win *w, std::vector<std::string> &layout_fmt)
 {
   struct main_win_layout l;
-  bool rc ASSERT_ONLY;
 
   assert(w != nullptr);
 
@@ -1031,8 +1039,18 @@ static void main_win_init(struct main_win *w, std::vector<std::string> &layout_f
   w->help_screen_top = 0;
   w->layout_fmt = &layout_fmt;
 
-  rc = parse_layout(&l, layout_fmt);
-  assert(rc);
+  if (!parse_layout(&l, layout_fmt, COLS, LINES - 4))
+  {
+    /* Started in a terminal too small for the layout. The too small screen
+     * is shown instead of the menus, so give them the smallest geometry
+     * they accept and let a later resize lay them out properly. */
+    l.menus[0].x = 0;
+    l.menus[0].y = 0;
+    l.menus[0].width = std::max(COLS, 8);
+    l.menus[0].height = std::max(LINES - 4, 3);
+    l.menus[1] = l.menus[0];
+    l.menus[2] = l.menus[0];
+  }
 
   side_menu_init(&w->menus[0], MENU_DIR, w->win, &l.menus[0]);
   side_menu_init(&w->menus[1], MENU_PLAYLIST, w->win, &l.menus[1]);
@@ -2273,14 +2291,18 @@ static void main_win_swap_plist_items(struct main_win *w, const char *file1,
 static void main_win_use_layout(struct main_win *w, std::vector<std::string> &layout_fmt)
 {
   struct main_win_layout l;
-  bool rc ASSERT_ONLY;
 
   assert(w != nullptr);
 
   w->layout_fmt = &layout_fmt;
 
-  rc = parse_layout(&l, layout_fmt);
-  assert(rc);
+  if (!parse_layout(&l, layout_fmt, COLS, LINES - 4))
+  {
+    /* Too small for this layout. Leave the menus as they are; the too
+     * small screen is drawn instead. */
+    main_win_draw(w);
+    return;
+  }
 
   side_menu_resize(&w->menus[0], &l.menus[0]);
   side_menu_resize(&w->menus[1], &l.menus[1]);
@@ -2294,19 +2316,25 @@ static void validate_layouts()
   std::vector<std::string> *layout_fmt;
 
   layout_fmt = &options_get_list("Layout1");
-  if (layout_fmt->empty() || !parse_layout(&l, *layout_fmt))
+  if (layout_fmt->empty()
+      || !parse_layout(&l, *layout_fmt, LAYOUT_REFERENCE_SIZE,
+                       LAYOUT_REFERENCE_SIZE))
   {
     interface_fatal("Layout1 is malformed!");
   }
 
   layout_fmt = &options_get_list("Layout2");
-  if (!layout_fmt->empty() && !parse_layout(&l, *layout_fmt))
+  if (!layout_fmt->empty()
+      && !parse_layout(&l, *layout_fmt, LAYOUT_REFERENCE_SIZE,
+                       LAYOUT_REFERENCE_SIZE))
   {
     interface_fatal("Layout2 is malformed!");
   }
 
   layout_fmt = &options_get_list("Layout3");
-  if (!layout_fmt->empty() && !parse_layout(&l, *layout_fmt))
+  if (!layout_fmt->empty()
+      && !parse_layout(&l, *layout_fmt, LAYOUT_REFERENCE_SIZE,
+                       LAYOUT_REFERENCE_SIZE))
   {
     interface_fatal("Layout3 is malformed!");
   }
@@ -2323,7 +2351,7 @@ static void main_win_resize(struct main_win *w)
   wresize(w->win, LINES - 4, COLS);
   werase(w->win);
 
-  if (!parse_layout(&l, *w->layout_fmt))
+  if (!parse_layout(&l, *w->layout_fmt, COLS, LINES - 4))
   {
     /* Too small for the layout. The too small screen is drawn instead, so
      * leave the menus at their old geometry. */
@@ -2599,7 +2627,8 @@ static void check_term_size(struct main_win *mw, struct info_win *iw)
   struct main_win_layout l;
 
   mw->too_small = iw->too_small =
-      COLS < 38 || LINES < 6 || !parse_layout(&l, *mw->layout_fmt);
+      COLS < 38 || LINES < 6
+      || !parse_layout(&l, *mw->layout_fmt, COLS, LINES - 4);
 }
 
 /* Update the title with the current fill. */
