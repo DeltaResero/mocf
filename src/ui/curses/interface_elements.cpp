@@ -58,6 +58,18 @@
 
 static const int MIXER_BAR_RIGHT_SPACE = 17;
 
+/* Size of the status message buffer, which also fixes the width of the status
+ * field on the info window's first row. */
+#define STATUS_MSG_SIZE 26
+
+/* First column the mixer bar may use, just past the status field and the frame
+ * character closing it. The two share a row and the status field wins. */
+#define MIXER_BAR_LEFT_LIMIT (5 + STATUS_MSG_SIZE + 2)
+
+/* Width of the playlist time field, which info_win_draw_files_time() right
+ * aligns at COLS - PLIST_TIME_WIDTH. */
+#define PLIST_TIME_WIDTH 12
+
 /* TODO: removing/adding a char to the entry may increase width of the text
  * by more than one column. */
 
@@ -242,7 +254,7 @@ static struct info_win
   int plist_time_for_all; /* is the above time for all files? */
 
   std::string title;       /* title of the played song. */
-  char status_msg[26]; /* status message */
+  char status_msg[STATUS_MSG_SIZE]; /* status message */
   int state_play;      /* STATE_(PLAY | STOP | PAUSE) */
 
   /* Saved user reply callback data. */
@@ -2858,7 +2870,13 @@ static void set_startup_message(struct info_win *w)
 static int mixer_bar_width()
 {
   return std::min(options_get_int("MixerBarWidth"),
-                  COLS - MIXER_BAR_RIGHT_SPACE - 2);
+                  COLS - MIXER_BAR_RIGHT_SPACE - MIXER_BAR_LEFT_LIMIT);
+}
+
+/* Is there room left for the bar once the status field has its share? */
+static bool mixer_bar_visible()
+{
+  return mixer_bar_width() >= BAR_MIN_WIDTH;
 }
 
 static void info_win_init(struct info_win *w)
@@ -2940,7 +2958,8 @@ static bool info_win_set_mixer_name(struct info_win *w, const char *name)
   assert(w != nullptr);
   assert(name != nullptr);
 
-  if (!bar_set_title(&w->mixer_bar, name) || w->in_entry || w->too_small)
+  if (!bar_set_title(&w->mixer_bar, name) || w->in_entry || w->too_small
+      || !mixer_bar_visible())
   {
     return false;
   }
@@ -2952,6 +2971,15 @@ static bool info_win_set_mixer_name(struct info_win *w, const char *name)
   return true;
 }
 
+/* Width of the status field. It gives way to the playlist time frame, which is
+ * the next thing along the row, so that the two do not overlap on a narrow
+ * terminal. */
+static int status_field_width()
+{
+  return std::max(0, std::min(STATUS_MSG_SIZE - 1,
+                              COLS - PLIST_TIME_WIDTH - 1 - 6));
+}
+
 static void info_win_draw_status(const struct info_win *w)
 {
   assert(w != nullptr);
@@ -2960,12 +2988,8 @@ static void info_win_draw_status(const struct info_win *w)
   {
     wattrset(w->win, get_color(CLR_STATUS));
     wmove(w->win, 0, 6);
-    xwprintw(w->win, "%-*s", static_cast<int>(sizeof(w->status_msg)) - 1, w->status_msg);
-
-    /* The status field and the mixer bar share this row and overlap on a
-     * narrow terminal, so put the bar back on top of what we just wrote. */
-    bar_draw(&w->mixer_bar, w->win,
-             COLS - w->mixer_bar.width - MIXER_BAR_RIGHT_SPACE, 0);
+    xwprintw(w->win, "%-*.*s", status_field_width(), status_field_width(),
+             w->status_msg);
 
     info_win_update_curs(w);
   }
@@ -2980,10 +3004,6 @@ static void info_win_set_status(struct info_win *w, const char *msg)
   info_win_draw_status(w);
 }
 
-/* Width of the playlist time field, which info_win_draw_files_time() right
- * aligns at COLS - PLIST_TIME_WIDTH. */
-#define PLIST_TIME_WIDTH 12
-
 /* The queue counter is "-Q:nnn-" when drawn and clears 9 columns of frame
  * otherwise. */
 #define QUEUE_COUNTER_WIDTH 7
@@ -2996,8 +3016,17 @@ static void info_win_draw_files_in_queue(const struct info_win *w)
 
   assert(w != nullptr);
 
-  /* Keep the counter clear of the playlist time on a narrow terminal. */
-  space = COLS - PLIST_TIME_WIDTH - hstart;
+  /* Keep the counter clear of whatever comes next along the row: the mixer
+   * bar and its frame when there is one, the playlist time otherwise. */
+  if (mixer_bar_visible())
+  {
+    space = COLS - w->mixer_bar.width - MIXER_BAR_RIGHT_SPACE - 1 - hstart;
+  }
+  else
+  {
+    space = COLS - PLIST_TIME_WIDTH - hstart;
+  }
+
   if (space < 0)
   {
     space = 0;
@@ -3327,7 +3356,7 @@ static bool info_win_set_mixer_value(struct info_win *w, const int value)
   assert(w != nullptr);
 
   if (!bar_set_fill(&w->mixer_bar, static_cast<double>(value)) ||
-      w->in_entry || w->too_small)
+      w->in_entry || w->too_small || !mixer_bar_visible())
   {
     return false;
   }
@@ -3705,9 +3734,13 @@ static void info_win_draw_static_elements(const struct info_win *w)
             lines.ltee, lines.rtee, lines.llcorn, lines.lrcorn);
 
     /* mixer frame */
-    mvwaddch(w->win, 0, COLS - 1 - w->mixer_bar.width - MIXER_BAR_RIGHT_SPACE,
-             lines.rtee);
-    mvwaddch(w->win, 0, COLS - MIXER_BAR_RIGHT_SPACE, lines.ltee);
+    if (mixer_bar_visible())
+    {
+      mvwaddch(w->win, 0,
+               COLS - 1 - w->mixer_bar.width - MIXER_BAR_RIGHT_SPACE,
+               lines.rtee);
+      mvwaddch(w->win, 0, COLS - MIXER_BAR_RIGHT_SPACE, lines.ltee);
+    }
 
     /* playlist time frame */
     mvwaddch(w->win, 0, COLS - 13, lines.rtee);
@@ -3725,7 +3758,10 @@ static void info_win_draw_static_elements(const struct info_win *w)
 
     /* status line frame */
     mvwaddch(w->win, 0, 5, lines.rtee);
-    mvwaddch(w->win, 0, 5 + sizeof(w->status_msg), lines.ltee);
+    if (6 + status_field_width() < COLS - PLIST_TIME_WIDTH - 1)
+    {
+      mvwaddch(w->win, 0, 6 + status_field_width(), lines.ltee);
+    }
 
     /* rate and bitrate units */
     wmove(w->win, 2, 25);
@@ -3758,7 +3794,7 @@ static void info_win_draw(const struct info_win *w)
     {
       entry_draw(&w->entry, w->win, 1, 0);
     }
-    else
+    else if (mixer_bar_visible())
     {
       bar_draw(&w->mixer_bar, w->win,
                COLS - w->mixer_bar.width - MIXER_BAR_RIGHT_SPACE, 0);
