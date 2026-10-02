@@ -3272,10 +3272,17 @@ static void info_win_draw_switch(const struct info_win *w, const int posx,
                                  const int posy, const char *title,
                                  const bool value)
 {
+  /* Width of "[title]". */
+  const int width = static_cast<int>(strlen(title)) + 2;
+
   assert(w != nullptr);
   assert(title != nullptr);
 
-  if (!w->too_small)
+  /* Leave the switch out rather than let it reach the right frame
+   * character. ncurses wraps an overrun onto the frame line below, and a
+   * position at or past COLS makes wmove() fail without moving, so the
+   * text would land wherever the previous field left the cursor. */
+  if (!w->too_small && posx >= 0 && posx + width <= COLS - 1)
   {
     wattrset(w->win, get_color(value ? CLR_INFO_ENABLED : CLR_INFO_DISABLED));
     wmove(w->win, posy, posx);
