@@ -2316,7 +2316,6 @@ static void validate_layouts()
 static void main_win_resize(struct main_win *w)
 {
   struct main_win_layout l;
-  bool rc ASSERT_ONLY;
 
   assert(w != nullptr);
 
@@ -2324,8 +2323,14 @@ static void main_win_resize(struct main_win *w)
   wresize(w->win, LINES - 4, COLS);
   werase(w->win);
 
-  rc = parse_layout(&l, *w->layout_fmt);
-  assert(rc);
+  if (!parse_layout(&l, *w->layout_fmt))
+  {
+    /* Too small for the layout. The too small screen is drawn instead, so
+     * leave the menus at their old geometry. */
+    assert(w->too_small);
+    main_win_draw(w);
+    return;
+  }
 
   side_menu_resize(&w->menus[0], &l.menus[0]);
   side_menu_resize(&w->menus[1], &l.menus[1]);
@@ -2586,10 +2591,15 @@ static void init_lines()
   }
 }
 
-/* End the program if the terminal is too small. */
+/* Decide whether the terminal can show the interface at its current size.
+ * A layout that is valid but cannot fit counts as too small: the layout
+ * itself was already checked by validate_layouts() at startup. */
 static void check_term_size(struct main_win *mw, struct info_win *iw)
 {
-  mw->too_small = iw->too_small = COLS < 38 || LINES < 6;
+  struct main_win_layout l;
+
+  mw->too_small = iw->too_small =
+      COLS < 38 || LINES < 6 || !parse_layout(&l, *mw->layout_fmt);
 }
 
 /* Update the title with the current fill. */
@@ -3807,9 +3817,14 @@ static void info_win_resize(struct info_win *w)
   mvwin(w->win, LINES - 4, 0);
   werase(w->win);
 
-  bar_resize(&w->mixer_bar, mixer_bar_width());
-  bar_resize(&w->time_bar, COLS - 4);
-  info_win_set_block_title(w);
+  /* The bars are not drawn while the terminal is too small, and they have
+   * no valid width at that size, so leave them alone until it grows. */
+  if (!w->too_small)
+  {
+    bar_resize(&w->mixer_bar, mixer_bar_width());
+    bar_resize(&w->time_bar, COLS - 4);
+    info_win_set_block_title(w);
+  }
 
   if (w->in_entry)
   {
@@ -4370,7 +4385,6 @@ void iface_resize()
   endwin();
   refresh();
   check_term_size(&main_win, &info_win);
-  validate_layouts();
   main_win_resize(&main_win);
   info_win_resize(&info_win);
   iface_refresh_screen();
