@@ -134,12 +134,18 @@ static struct main_win
 } main_win;
 
 /* Bar for displaying mixer state or progress. */
+/* Size of a bar's title buffer, which limits how wide a bar may be. */
+#define BAR_TITLE_SIZE 512
+
+/* bar_init() and bar_resize() need more than 5 columns to draw into. */
+#define BAR_MIN_WIDTH 6
+
 struct bar
 {
   int width;        /* width in chars */
   float filled;     /* how much is it filled in percent */
   std::string orig_title; /* optional title */
-  char title[512];  /* title with the percent value */
+  char title[BAR_TITLE_SIZE]; /* title with the percent value */
   int show_val;     /* show the title and the value? */
   int show_pct;     /* show percentage in the title value? */
   int fill_color;   /* color (ncurses attributes) of the filled part */
@@ -985,9 +991,9 @@ static bool parse_layout(struct main_win_layout *l,
       logit("Width is less than 15");
       goto err;
     }
-    if (p.height < 2)
+    if (p.height < 3)
     {
-      logit("Height is less than 2");
+      logit("Height is less than 3");
       goto err;
     }
     if (p.x + p.width > width)
@@ -2689,12 +2695,22 @@ static bool bar_set_title(struct bar *b, const char *title)
   return true;
 }
 
-static void bar_init(struct bar *b, const int width, const char *title,
+static void bar_init(struct bar *b, int width, const char *title,
                      const int show_val, const int show_pct,
                      const int fill_color, const int empty_color)
 {
   assert(b != nullptr);
-  assert(width > 5 && width < ssizeof(b->title));
+  /* Clamp rather than insist: the bars are not drawn while the terminal is
+   * too small to have a sensible width, and a very wide one must not run
+   * past the title buffer. A later resize gives the real width. */
+  if (width < BAR_MIN_WIDTH)
+  {
+    width = BAR_MIN_WIDTH;
+  }
+  else if (width > BAR_TITLE_SIZE - 1)
+  {
+    width = BAR_TITLE_SIZE - 1;
+  }
   assert(title != nullptr || !show_val);
 
   b->width = width;
@@ -2759,10 +2775,20 @@ static bool bar_set_fill(struct bar *b, const double fill)
   return true;
 }
 
-static void bar_resize(struct bar *b, const int width)
+static void bar_resize(struct bar *b, int width)
 {
   assert(b != nullptr);
-  assert(width > 5 && width < ssizeof(b->title));
+  /* Clamp rather than insist: the bars are not drawn while the terminal is
+   * too small to have a sensible width, and a very wide one must not run
+   * past the title buffer. A later resize gives the real width. */
+  if (width < BAR_MIN_WIDTH)
+  {
+    width = BAR_MIN_WIDTH;
+  }
+  else if (width > BAR_TITLE_SIZE - 1)
+  {
+    width = BAR_TITLE_SIZE - 1;
+  }
 
   b->width = width;
 
