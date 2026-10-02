@@ -3291,15 +3291,77 @@ static void info_win_draw_switch(const struct info_win *w, const int posx,
   info_win_update_curs(w);
 }
 
+/* The option indicators, with short labels for a narrow terminal and the
+ * columns MOC has always drawn them at. */
+static const struct
+{
+  const char *full;
+  const char *abbrev;
+  int fixed_x;
+} option_switches[] = {{"STEREO", "ST", 38},
+                       {"SHUFFLE", "SH", 53},
+                       {"REPEAT", "RE", 63},
+                       {"NEXT", "NX", 72}};
+
+#define OPTION_SWITCHES \
+  (sizeof(option_switches) / sizeof(option_switches[0]))
+
+/* First column the indicators may use, after the bitrate field. */
+#define OPTION_SWITCHES_START 38
+
+/* Width of "[title]" plus one column of padding. */
+static int option_switch_width(const char *title)
+{
+  return static_cast<int>(strlen(title)) + 3;
+}
+
+/* Last column a run of the switches packed together would write to. */
+static int option_switches_end(const bool abbrev)
+{
+  size_t i;
+  int x = OPTION_SWITCHES_START;
+
+  for (i = 0; i < OPTION_SWITCHES; i++)
+  {
+    x += option_switch_width(abbrev ? option_switches[i].abbrev
+                                    : option_switches[i].full);
+  }
+
+  /* Drop the padding after the last one. */
+  return x - 2;
+}
+
 static void info_win_draw_options_state(const struct info_win *w)
 {
+  size_t i;
+  int x;
+  bool packed;
+  bool abbrev;
+
   assert(w != nullptr);
 
-  info_win_draw_switch(w, 38, 2, "STEREO", w->state_stereo);
+  const bool value[OPTION_SWITCHES] = {w->state_stereo, w->state_shuffle,
+                                       w->state_repeat, w->state_next};
 
-  info_win_draw_switch(w, 53, 2, "SHUFFLE", w->state_shuffle);
-  info_win_draw_switch(w, 63, 2, "REPEAT", w->state_repeat);
-  info_win_draw_switch(w, 72, 2, "NEXT", w->state_next);
+  /* Widest arrangement that fits, so nothing moves on a wide terminal:
+   * the historical columns, then the same labels packed together, then the
+   * short labels. Anything that still does not fit is left out by
+   * info_win_draw_switch(). */
+  packed = option_switches[OPTION_SWITCHES - 1].fixed_x
+               + option_switch_width(option_switches[OPTION_SWITCHES - 1].full)
+               - 1 > COLS - 1;
+  abbrev = packed && option_switches_end(false) > COLS - 2;
+
+  x = OPTION_SWITCHES_START;
+  for (i = 0; i < OPTION_SWITCHES; i++)
+  {
+    const char *title =
+        abbrev ? option_switches[i].abbrev : option_switches[i].full;
+
+    info_win_draw_switch(w, packed ? x : option_switches[i].fixed_x, 2, title,
+                         value[i]);
+    x += option_switch_width(title);
+  }
 }
 
 static void info_win_make_entry(struct info_win *w, const enum entry_type type)
